@@ -1,4 +1,7 @@
 $(document).ready(function() {
+    // Load dynamic menu
+    loadDynamicMenu();
+    
     // Display current date and time
     function updateDateTime() {
         const now = new Date();
@@ -60,9 +63,33 @@ $(document).ready(function() {
         }
     });
 
+    // International news button - redirect to English version
+    $('#btnInternational').click(function() {
+        window.location.href = 'international.html';
+    });
+
+    // Submenu hover behavior (backup in case CSS hover doesn't work)
+    $(document).on('mouseenter', '.nav-menu > li.has-submenu', function() {
+        $(this).find('.submenu').show();
+    });
+    
+    $(document).on('mouseleave', '.nav-menu > li.has-submenu', function() {
+        $(this).find('.submenu').hide();
+    });
+    
     // Navigation active state
-    $('.nav-menu li').click(function() {
-        $('.nav-menu li').removeClass('active');
+    $(document).on('click', '.nav-menu > li', function(e) {
+        // Only if clicking on parent, not submenu
+        if ($(e.target).closest('.submenu').length === 0) {
+            $('.nav-menu > li').removeClass('active');
+            $(this).addClass('active');
+        }
+    });
+    
+    // Submenu active state
+    $(document).on('click', '.submenu li', function(e) {
+        e.stopPropagation();
+        $('.submenu li').removeClass('active');
         $(this).addClass('active');
     });
 
@@ -292,3 +319,124 @@ $(window).scroll(function() {
 $('<style>')
     .text('.news-card { opacity: 0; transform: translateY(30px); transition: all 0.6s; } .news-card.animated { opacity: 1; transform: translateY(0); }')
     .appendTo('head');
+
+// Load dynamic menu from menu manager
+function loadDynamicMenu() {
+    const menuTree = menuManager.buildMenuTree();
+    console.log('Menu Tree:', menuTree);
+    let menuHtml = '';
+    
+    menuTree.forEach(menu => {
+        const hasChildren = menu.children && menu.children.length > 0;
+        console.log(`Menu: ${menu.name}, Has Children: ${hasChildren}, Children:`, menu.children);
+        
+        const icon = menu.icon ? `<i class="${menu.icon}"></i> ` : '';
+        const activeClass = menu.order === 1 ? 'active' : '';
+        const submenuClass = hasChildren ? 'has-submenu' : '';
+        
+        // Build class list properly
+        const classList = [activeClass, submenuClass].filter(c => c).join(' ');
+        
+        menuHtml += `<li class="${classList}" data-slug="${menu.slug}">`;
+        menuHtml += `<a href="#${menu.slug}">${icon}${menu.name}</a>`;
+        
+        if (hasChildren) {
+            console.log(`Adding submenu for ${menu.name} with ${menu.children.length} children`);
+            menuHtml += '<ul class="submenu">';
+            menu.children.forEach(child => {
+                const childIcon = child.icon ? `<i class="${child.icon}"></i> ` : '';
+                menuHtml += `<li data-slug="${child.slug}">`;
+                menuHtml += `<a href="#${child.slug}">${childIcon}${child.name}</a>`;
+                menuHtml += '</li>';
+            });
+            menuHtml += '</ul>';
+        }
+        
+        menuHtml += '</li>';
+    });
+    
+    // Add more menu button (will be shown/hidden by adjustMenuVisibility)
+    menuHtml += `
+        <li class="more-menu-btn">
+            <a href="javascript:void(0)">
+                <i class="fas fa-ellipsis-h"></i> Xem thêm
+            </a>
+            <ul class="more-menu-dropdown"></ul>
+        </li>
+    `;
+    
+    $('#mainMenu').html(menuHtml);
+    
+    console.log('Menu HTML loaded into #mainMenu');
+    console.log('Elements with .has-submenu:', $('.has-submenu').length);
+    console.log('Elements with .submenu:', $('.submenu').length);
+    
+    // Adjust menu visibility after load
+    setTimeout(adjustMenuVisibility, 100);
+}
+
+// Adjust menu visibility based on available space
+function adjustMenuVisibility() {
+    const navMenu = $('.nav-menu');
+    const moreBtn = $('.more-menu-btn');
+    const moreDropdown = $('.more-menu-dropdown');
+    const menuItems = $('.nav-menu > li:not(.more-menu-btn)');
+    
+    if (!navMenu.length || !menuItems.length) return;
+    
+    // Reset
+    menuItems.removeClass('nav-hidden');
+    moreBtn.removeClass('show');
+    moreDropdown.empty();
+    
+    const navWidth = navMenu.width();
+    const moreBtnWidth = 120; // Width for "Xem thêm" button
+    let totalWidth = 0;
+    let hiddenMenus = [];
+    
+    menuItems.each(function(index) {
+        const itemWidth = $(this).outerWidth(true);
+        totalWidth += itemWidth;
+        
+        // Check if this item would overflow
+        if (totalWidth > (navWidth - moreBtnWidth)) {
+            $(this).addClass('nav-hidden');
+            
+            // Get menu data
+            const menuSlug = $(this).data('slug');
+            const menuHtml = $(this).clone();
+            menuHtml.removeClass('nav-hidden active');
+            
+            // Build dropdown item
+            let dropdownItem = `<li>`;
+            dropdownItem += `<a href="#${menuSlug}">${menuHtml.find('> a').html()}</a>`;
+            
+            // Add submenu if exists
+            const submenu = $(this).find('.submenu');
+            if (submenu.length) {
+                dropdownItem += '<ul class="more-submenu">';
+                submenu.find('> li').each(function() {
+                    const childSlug = $(this).data('slug');
+                    const childName = $(this).find('a').text();
+                    dropdownItem += `<li><a href="#${childSlug}">${childName}</a></li>`;
+                });
+                dropdownItem += '</ul>';
+            }
+            
+            dropdownItem += '</li>';
+            hiddenMenus.push(dropdownItem);
+        }
+    });
+    
+    // Show more button if there are hidden menus
+    if (hiddenMenus.length > 0) {
+        moreDropdown.html(hiddenMenus.join(''));
+        moreBtn.addClass('show');
+    }
+}
+
+// Recalculate on window resize
+$(window).on('resize', function() {
+    clearTimeout(window.resizeTimer);
+    window.resizeTimer = setTimeout(adjustMenuVisibility, 250);
+});

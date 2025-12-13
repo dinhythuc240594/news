@@ -21,6 +21,22 @@ $(document).ready(function() {
         ]
     });
     
+    // Initialize International Article editor
+    $('#intArticleContent').summernote({
+        height: 400,
+        placeholder: 'Enter article content in English...',
+        toolbar: [
+            ['style', ['style']],
+            ['font', ['bold', 'italic', 'underline', 'clear']],
+            ['fontname', ['fontname']],
+            ['color', ['color']],
+            ['para', ['ul', 'ol', 'paragraph']],
+            ['table', ['table']],
+            ['insert', ['link', 'picture', 'video']],
+            ['view', ['fullscreen', 'codeview', 'help']]
+        ]
+    });
+    
     // Load initial data
     loadMyArticles();
     loadStatistics();
@@ -81,6 +97,20 @@ $(document).ready(function() {
     $('#articleForm').submit(function(e) {
         e.preventDefault();
         submitArticle();
+    });
+    
+    // International article form handlers
+    $('#internationalArticleForm').submit(function(e) {
+        e.preventDefault();
+        submitInternationalArticle();
+    });
+    
+    $('#saveIntDraftBtn').click(function() {
+        saveInternationalDraft();
+    });
+    
+    $('#previewIntBtn').click(function() {
+        previewInternationalArticle();
     });
     
     // Filter articles
@@ -426,6 +456,88 @@ function hideSpinner() {
     $('.spinner-overlay').fadeOut(function() {
         $(this).remove();
     });
+}
+
+// ===== International Article Functions =====
+
+function submitInternationalArticle() {
+    const title = $('#intArticleTitle').val();
+    const content = $('#intArticleContent').summernote('code');
+    const category = $('#intArticleCategory').val();
+    const summary = $('#intArticleSummary').val();
+    const image = $('#intArticleImage').val();
+    const author = $('#intArticleAuthor').val();
+    const tags = $('#intArticleTags').val();
+    
+    if (!title || !content || !category) {
+        showToast('Error', 'Please fill in all required fields', 'warning');
+        return;
+    }
+    
+    showSpinner();
+    
+    // Simulate API call
+    setTimeout(function() {
+        hideSpinner();
+        showToast('Success', 'International article submitted for review', 'success');
+        
+        // Reset form
+        $('#internationalArticleForm')[0].reset();
+        $('#intArticleContent').summernote('reset');
+        
+        // Switch to international articles view
+        $('.sidebar-menu a[data-section="international-articles"]').click();
+    }, 1500);
+}
+
+function saveInternationalDraft() {
+    const title = $('#intArticleTitle').val();
+    
+    if (!title) {
+        showToast('Error', 'Please enter article title', 'warning');
+        return;
+    }
+    
+    showSpinner();
+    
+    setTimeout(function() {
+        hideSpinner();
+        showToast('Success', 'Draft saved successfully', 'success');
+    }, 1000);
+}
+
+function previewInternationalArticle() {
+    const title = $('#intArticleTitle').val();
+    const content = $('#intArticleContent').summernote('code');
+    const category = $('#intArticleCategory').val();
+    
+    if (!title || !content) {
+        showToast('Warning', 'Please add title and content to preview', 'warning');
+        return;
+    }
+    
+    // Open preview in new window
+    const previewWindow = window.open('', 'Article Preview', 'width=800,height=600');
+    previewWindow.document.write(`
+        <html>
+        <head>
+            <title>${title}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
+                h1 { color: #333; margin-bottom: 10px; }
+                .meta { color: #666; font-size: 14px; margin-bottom: 20px; }
+                .category { background: #0066cc; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; }
+                .content { line-height: 1.8; color: #444; }
+            </style>
+        </head>
+        <body>
+            <span class="category">${category}</span>
+            <h1>${title}</h1>
+            <div class="meta">Preview - ${new Date().toLocaleString()}</div>
+            <div class="content">${content}</div>
+        </body>
+        </html>
+    `);
 }
 
 // Show toast notification

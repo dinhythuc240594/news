@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Menu</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h2 style="padding: 20px;">Debug Menu - Check Console (F12)</h2>
+    
+    <!-- Navigation -->
+    <nav class="main-nav">
+        <div class="container">
+            <ul class="nav-menu" id="mainMenu">
+                <!-- Menu will be loaded dynamically -->
+            </ul>
+        </div>
+    </nav>
+    
+    <div style="padding: 20px; margin-top: 20px;">
+        <h3>Instructions:</h3>
+        <ol>
+            <li>Mở Developer Console (F12)</li>
+            <li>Xem console log để kiểm tra menu tree</li>
+            <li>Hover vào menu "Thời sự" hoặc "Thế giới"</li>
+            <li>Submenu phải hiển thị ra</li>
+        </ol>
+        
+        <h3>Check List:</h3>
+        <ul id="checkList"></ul>
+    </div>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    
+    <!-- Menu Manager -->
+    <script src="menu-manager.js"></script>
+    
+    <!-- Debug Script -->
+    <script>
+        $(document).ready(function() {
+            console.log('=== DEBUG MENU START ===');
+            
+            // Check if menuManager exists
+            console.log('menuManager exists:', typeof menuManager !== 'undefined');
+            
+            // Load menu
+            loadDynamicMenu();
+            
+            // Wait a bit and check DOM
+            setTimeout(function() {
+                const checks = [];
+                
+                // Check menu items
+                const menuItems = $('.nav-menu > li').length;
+                checks.push(`Menu items: ${menuItems}`);
+                console.log('Menu items:', menuItems);
+                
+                // Check has-submenu class
+                const hasSubmenuItems = $('.nav-menu > li.has-submenu').length;
+                checks.push(`Items with .has-submenu: ${hasSubmenuItems}`);
+                console.log('Items with .has-submenu:', hasSubmenuItems);
+                
+                // Check submenu elements
+                const submenus = $('.submenu').length;
+                checks.push(`Submenu elements: ${submenus}`);
+                console.log('Submenu elements:', submenus);
+                
+                // Check submenu display
+                $('.submenu').each(function(i) {
+                    const display = $(this).css('display');
+                    checks.push(`Submenu ${i} display: ${display}`);
+                    console.log(`Submenu ${i} display:`, display);
+                });
+                
+                // Display checks
+                $('#checkList').html(checks.map(c => '<li>' + c + '</li>').join(''));
+                
+                console.log('=== DEBUG MENU END ===');
+            }, 500);
+        });
+        
+        // Load dynamic menu function (same as in script.js)
+        function loadDynamicMenu() {
+            const menuTree = menuManager.buildMenuTree();
+            console.log('Menu Tree:', menuTree);
+            let menuHtml = '';
+            
+            menuTree.forEach(menu => {
+                const hasChildren = menu.children && menu.children.length > 0;
+                console.log(`Menu: ${menu.name}, Has Children: ${hasChildren}`);
+                
+                const icon = menu.icon ? `<i class="${menu.icon}"></i> ` : '';
+                const activeClass = menu.order === 1 ? 'active' : '';
+                const submenuClass = hasChildren ? 'has-submenu' : '';
+                
+                // Build class list properly
+                const classList = [activeClass, submenuClass].filter(c => c).join(' ');
+                console.log(`  Classes: "${classList}"`);
+                
+                menuHtml += `<li class="${classList}" data-slug="${menu.slug}">`;
+                menuHtml += `<a href="#${menu.slug}">${icon}${menu.name}</a>`;
+                
+                if (hasChildren) {
+                    console.log(`  Adding submenu with ${menu.children.length} items`);
+                    menuHtml += '<ul class="submenu">';
+                    menu.children.forEach(child => {
+                        menuHtml += `<li data-slug="${child.slug}">`;
+                        menuHtml += `<a href="#${child.slug}">${child.name}</a>`;
+                        menuHtml += '</li>';
+                    });
+                    menuHtml += '</ul>';
+                }
+                
+                menuHtml += '</li>';
+            });
+            
+            console.log('Generated HTML:', menuHtml.substring(0, 500) + '...');
+            $('#mainMenu').html(menuHtml);
+            console.log('Menu injected into DOM');
+        }
+    </script>
+</body>
+</html>

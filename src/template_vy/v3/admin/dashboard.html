@@ -56,6 +56,25 @@
                 </a>
             </li>
             <li>
+                <a href="menu-manager.html">
+                    <i class="fas fa-bars"></i> Quản lý Menu
+                </a>
+            </li>
+            <li class="nav-divider">
+                <span>QUỐC TẾ</span>
+            </li>
+            <li>
+                <a href="#" data-section="international">
+                    <i class="fas fa-globe"></i> Bài báo Quốc tế
+                    <span class="badge bg-info" id="internationalCount">0</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" data-section="international-pending">
+                    <i class="fas fa-clock"></i> Quốc tế chờ duyệt
+                </a>
+            </li>
+            <li>
                 <a href="#" data-section="users">
                     <i class="fas fa-users"></i> Quản lý người dùng
                 </a>
@@ -255,6 +274,131 @@
                 </div>
                 <div class="card-body">
                     <p class="text-muted">Danh sách bài viết bị từ chối...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- International Articles Section -->
+    <div class="content-section" id="international">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-globe"></i> Bài báo Quốc tế</h5>
+                <button class="btn btn-sm btn-primary" data-section="international-pending">
+                    <i class="fas fa-clock"></i> Xem chờ duyệt
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th width="5%">#</th>
+                                <th width="30%">Title</th>
+                                <th width="12%">Category</th>
+                                <th width="10%">Author</th>
+                                <th width="10%">Status</th>
+                                <th width="8%">Views</th>
+                                <th width="10%">Published</th>
+                                <th width="15%">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>Global Leaders Meet to Discuss Climate Action</td>
+                                <td><span class="badge bg-info">World</span></td>
+                                <td>John Smith</td>
+                                <td><span class="badge bg-success">Approved</span></td>
+                                <td>15,234</td>
+                                <td>13/12/2025</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
+                                    <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
+                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>Tech Giants Report Record Earnings</td>
+                                <td><span class="badge bg-primary">Business</span></td>
+                                <td>Mary Johnson</td>
+                                <td><span class="badge bg-success">Approved</span></td>
+                                <td>12,456</td>
+                                <td>12/12/2025</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
+                                    <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
+                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>3</td>
+                                <td>AI Revolution in Healthcare Industry</td>
+                                <td><span class="badge bg-success">Technology</span></td>
+                                <td>Editor A</td>
+                                <td><span class="badge bg-success">Approved</span></td>
+                                <td>9,876</td>
+                                <td>11/12/2025</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
+                                    <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
+                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- International Pending Articles Section -->
+    <div class="content-section" id="international-pending">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-clock"></i> Bài báo Quốc tế chờ duyệt</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th width="5%">#</th>
+                                <th width="35%">Title</th>
+                                <th width="12%">Category</th>
+                                <th width="12%">Author</th>
+                                <th width="12%">Submitted</th>
+                                <th width="24%">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>1</td>
+                                <td>Election Results Show Shift in Political Landscape</td>
+                                <td><span class="badge bg-warning">Politics</span></td>
+                                <td>Editor B</td>
+                                <td>13/12/2025 08:30</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> Review</button>
+                                    <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> Approve</button>
+                                    <button class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Reject</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>2</td>
+                                <td>Champions League Quarterfinals Results</td>
+                                <td><span class="badge bg-danger">Sports</span></td>
+                                <td>Editor C</td>
+                                <td>13/12/2025 07:15</td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> Review</button>
+                                    <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> Approve</button>
+                                    <button class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Reject</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

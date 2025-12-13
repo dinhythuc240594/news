@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Menu</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        
+        .nav-menu {
+            list-style: none;
+            display: flex;
+            background-color: #f5f5f5;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .nav-menu > li {
+            position: relative;
+            padding: 15px 20px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .nav-menu > li:hover {
+            background-color: #c00;
+        }
+        
+        .nav-menu > li:hover > a {
+            color: #fff;
+        }
+        
+        .nav-menu > li > a {
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .submenu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: #fff;
+            min-width: 200px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            list-style: none;
+            padding: 10px 0;
+            margin: 0;
+            display: none;
+            z-index: 1001;
+        }
+        
+        .nav-menu li.has-submenu:hover .submenu {
+            display: block;
+        }
+        
+        .submenu li {
+            padding: 0;
+        }
+        
+        .submenu li a {
+            display: block;
+            padding: 10px 20px;
+            color: #333;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .submenu li:hover {
+            background-color: #f5f5f5;
+        }
+        
+        .submenu li:hover a {
+            color: #c00;
+        }
+        
+        .has-submenu > a::after {
+            content: ' ▼';
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test Menu với Submenu</h1>
+    <p>Di chuột vào "Thời sự" hoặc "Thế giới" để xem submenu</p>
+    
+    <ul class="nav-menu">
+        <li><a href="#">Trang chủ</a></li>
+        <li class="has-submenu">
+            <a href="#">Thời sự</a>
+            <ul class="submenu">
+                <li><a href="#">Chính trị</a></li>
+                <li><a href="#">Nhân sự</a></li>
+                <li><a href="#">Chính sách</a></li>
+            </ul>
+        </li>
+        <li><a href="#">Góc nhìn</a></li>
+        <li class="has-submenu">
+            <a href="#">Thế giới</a>
+            <ul class="submenu">
+                <li><a href="#">Châu Á</a></li>
+                <li><a href="#">Châu Âu</a></li>
+                <li><a href="#">Châu Mỹ</a></li>
+            </ul>
+        </li>
+        <li><a href="#">Kinh doanh</a></li>
+    </ul>
+    
+    <div style="margin-top: 50px;">
+        <h2>Inspect Element</h2>
+        <p>Mở Developer Tools (F12) và kiểm tra:</p>
+        <ul>
+            <li>Có class "has-submenu" trên menu cha không?</li>
+            <li>Có thẻ ul.submenu bên trong không?</li>
+            <li>CSS display: none đang hoạt động không?</li>
+        </ul>
+    </div>
+</body>
+</html>

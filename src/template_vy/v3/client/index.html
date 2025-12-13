@@ -50,9 +50,14 @@
                     </div>
                 </div>
                 <div class="col-md-3 text-end">
-                    <button class="btn-login">
-                        <i class="fas fa-user"></i> Đăng nhập
-                    </button>
+                    <div class="header-buttons">
+                        <button class="btn-international" id="btnInternational">
+                            <i class="fas fa-globe"></i> Quốc tế
+                        </button>
+                        <button class="btn-login">
+                            <i class="fas fa-user"></i> Đăng nhập
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -61,22 +66,8 @@
     <!-- Navigation -->
     <nav class="main-nav">
         <div class="container">
-            <ul class="nav-menu">
-                <li class="active"><a href="#"><i class="fas fa-home"></i> Trang chủ</a></li>
-                <li><a href="#">Thời sự</a></li>
-                <li><a href="#">Góc nhìn</a></li>
-                <li><a href="#">Thế giới</a></li>
-                <li><a href="#">Kinh doanh</a></li>
-                <li><a href="#">Giải trí</a></li>
-                <li><a href="#">Thể thao</a></li>
-                <li><a href="#">Pháp luật</a></li>
-                <li><a href="#">Giáo dục</a></li>
-                <li><a href="#">Sức khỏe</a></li>
-                <li><a href="#">Đời sống</a></li>
-                <li><a href="#">Du lịch</a></li>
-                <li><a href="#">Khoa học</a></li>
-                <li><a href="#">Số hóa</a></li>
-                <li><a href="#">Xe</a></li>
+            <ul class="nav-menu" id="mainMenu">
+                <!-- Menu will be loaded dynamically -->
             </ul>
         </div>
     </nav>
@@ -443,6 +434,9 @@
     
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Menu Manager (must load before script.js) -->
+    <script src="menu-manager.js"></script>
     
     <!-- Custom JS -->
     <script src="script.js"></script>
