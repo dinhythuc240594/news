@@ -2,7 +2,7 @@
 Database configuration and schema for News application
 Using PostgreSQL
 """
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Enum
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Enum, TypeDecorator
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -12,20 +12,135 @@ Base = declarative_base()
 
 
 class NewsStatus(enum.Enum):
-    """Trạng thái bài viết"""
+    
     DRAFT = "draft"           # Bản nháp
     PENDING = "pending"       # Chờ duyệt
     PUBLISHED = "published"   # Đã xuất bản
     HIDDEN = "hidden"         # Đã ẩn
     REJECTED = "rejected"     # Đã từ chối
 
+    def __str__(self):
+        return self.value
+    
+    @classmethod
+    def from_string(cls, value):
+        """Convert string to NewsStatus enum"""
+        if value is None:
+            return None
+        if isinstance(value, cls):
+            return value
+        try:
+            # Try to get enum by value
+            for status in cls:
+                if status.value == value:
+                    return status
+        except (ValueError, AttributeError):
+            pass
+        return None
+
+
+class NewsStatusType(TypeDecorator):
+    """Custom type decorator for NewsStatus enum"""
+    impl = String(20)
+    cache_ok = True
+    
+    def __init__(self):
+        super(NewsStatusType, self).__init__(length=20)
+    
+    def process_bind_param(self, value, dialect):
+        """Convert enum to string when saving to database"""
+        if value is None:
+            return None
+        if isinstance(value, NewsStatus):
+            return value.value
+        if isinstance(value, str):
+            return value
+        return str(value)
+    
+    def process_result_value(self, value, dialect):
+        """Convert string to enum when reading from database"""
+        if value is None:
+            return None
+        if isinstance(value, NewsStatus):
+            return value
+        # Convert string to enum
+        if isinstance(value, str):
+            # Try to find enum by value
+            value_lower = value.lower()
+            for status in NewsStatus:
+                if status.value.lower() == value_lower:
+                    return status
+            # If not found, try NewsStatus.from_string
+            result = NewsStatus.from_string(value)
+            if result:
+                return result
+        # If all else fails, return None or raise error
+        return None
+
 
 class UserRole(enum.Enum):
-    """Vai trò người dùng"""
+    
     ADMIN = "admin"           # Quản trị viên
     EDITOR = "editor"         # Biên tập viên
     USER = "user"             # Người dùng thường
 
+    def __str__(self):
+        return self.value
+    
+    @classmethod
+    def from_string(cls, value):
+        """Convert string to UserRole enum"""
+        if value is None:
+            return None
+        if isinstance(value, cls):
+            return value
+        try:
+            # Try to get enum by value
+            for role in cls:
+                if role.value == value:
+                    return role
+        except (ValueError, AttributeError):
+            pass
+        return None
+
+
+class UserRoleType(TypeDecorator):
+    """Custom type decorator for UserRole enum"""
+    impl = String(20)
+    cache_ok = True
+    
+    def __init__(self):
+        super(UserRoleType, self).__init__(length=20)
+    
+    def process_bind_param(self, value, dialect):
+        """Convert enum to string when saving to database"""
+        if value is None:
+            return None
+        if isinstance(value, UserRole):
+            return value.value
+        if isinstance(value, str):
+            return value
+        return str(value)
+    
+    def process_result_value(self, value, dialect):
+        """Convert string to enum when reading from database"""
+        if value is None:
+            return None
+        if isinstance(value, UserRole):
+            return value
+        # Convert string to enum
+        if isinstance(value, str):
+            # Try to find enum by value
+            value_lower = value.lower()
+            for role in UserRole:
+                if role.value.lower() == value_lower:
+                    return role
+            # If not found, try UserRole.from_string
+            result = UserRole.from_string(value)
+            if result:
+                return result
+        # If all else fails, return None or raise error
+        return None
 
 class Category(Base):
     """Bảng danh mục tin tức"""
@@ -56,7 +171,7 @@ class User(Base):
     email = Column(String(100), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=True)
-    role = Column(Enum(UserRole), default=UserRole.USER)
+    role = Column(UserRoleType(), default=UserRole.USER)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -84,7 +199,7 @@ class News(Base):
     approved_by = Column(Integer, ForeignKey('users.id'), nullable=True)
     
     # Status and visibility
-    status = Column(Enum(NewsStatus), default=NewsStatus.DRAFT)
+    status = Column(NewsStatusType(), default=NewsStatus.DRAFT)
     is_featured = Column(Boolean, default=False)
     is_hot = Column(Boolean, default=False)
     view_count = Column(Integer, default=0)

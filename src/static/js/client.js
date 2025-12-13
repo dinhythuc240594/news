@@ -1,6 +1,7 @@
 $(document).ready(function() {
-    // Load dynamic menu
-    loadDynamicMenu();
+    // Menu is now loaded from template (categories from database)
+    // Adjust menu visibility after page load
+    setTimeout(adjustMenuVisibility, 100);
     
     // Display current date and time
     function updateDateTime() {

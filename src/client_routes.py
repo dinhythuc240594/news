@@ -8,17 +8,17 @@ from typing import Optional
 from database import get_session, NewsStatus
 from models import NewsModel, CategoryModel
 
-# Tạo Blueprint cho client
+# Tạo Blueprint cho client để chỉ đường dẫn file tĩnh trong dự án
 client_bp = Blueprint('client', __name__, 
                      url_prefix='',
                      template_folder='templates/client')
 
 
 class ClientController:
-    """Controller class quản lý các route của client"""
+    """Quản lý các route của client"""
     
     def __init__(self):
-        """Khởi tạo controller"""
+
         self.db_session = get_session()
         self.news_model = NewsModel(self.db_session)
         self.category_model = CategoryModel(self.db_session)
@@ -32,7 +32,7 @@ class ClientController:
         latest_news = self.news_model.get_published(limit=10)
         hot_news = self.news_model.get_hot(limit=5)
         categories = self.category_model.get_all()
-        
+
         return render_template('client/index.html',
                              featured_news=featured_news,
                              latest_news=latest_news,
@@ -57,11 +57,14 @@ class ClientController:
             limit=per_page,
             offset=offset
         )
-        
+
+        categories = self.category_model.get_all()
+
         return render_template('client/category.html',
                              category=category,
                              news_list=news_list,
-                             page=page)
+                             page=page,
+                             categories=categories)
     
     def news_detail(self, news_slug: str):
         """
@@ -82,9 +85,12 @@ class ClientController:
         )
         related_news = [n for n in related_news if n.id != news.id][:5]
         
+        categories = self.category_model.get_all()
+        
         return render_template('client/news_detail.html',
                              news=news,
-                             related_news=related_news)
+                             related_news=related_news,
+                             categories=categories)
     
     def search(self):
         """
@@ -94,11 +100,14 @@ class ClientController:
         keyword = request.args.get('q', '').strip()
         page = request.args.get('page', 1, type=int)
         
+        categories = self.category_model.get_all()
+        
         if not keyword:
             return render_template('client/search.html',
                                  keyword='',
                                  news_list=[],
-                                 page=1)
+                                 page=1,
+                                 categories=categories)
         
         per_page = 20
         offset = (page - 1) * per_page
@@ -109,7 +118,8 @@ class ClientController:
         return render_template('client/search.html',
                              keyword=keyword,
                              news_list=news_list,
-                             page=page)
+                             page=page,
+                             categories=categories)
     
     def api_latest_news(self):
         """

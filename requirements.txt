@@ -3,4 +3,5 @@ SQLAlchemy==2.0.30
 psycopg2==2.9.11
 python-dotenv==1.0.0
 Werkzeug==3.0.1
+pytz==2024.1
 

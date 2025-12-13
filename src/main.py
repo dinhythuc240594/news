@@ -6,6 +6,8 @@ from admin_routes import admin_bp
 from client_routes import client_bp
 from database import init_db
 from config import Config
+from datetime import datetime, timezone
+import pytz
 
 
 def create_app(config_class=Config):
@@ -27,6 +29,53 @@ def create_app(config_class=Config):
     # Đăng ký Blueprints
     app.register_blueprint(client_bp)
     app.register_blueprint(admin_bp)
+    
+    # Đăng ký Jinja2 filters
+    @app.template_filter('timeago')
+    def timeago_filter(dt):
+        """Format datetime thành 'X giờ trước', 'X ngày trước'"""
+        if dt is None:
+            return "Vừa xong"
+        
+        # Đảm bảo datetime có timezone
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        # Chuyển sang timezone Việt Nam
+        vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+        now = datetime.now(vn_tz)
+        dt = dt.astimezone(vn_tz)
+        
+        diff = now - dt
+        
+        if diff.days > 0:
+            return f"{diff.days} ngày trước"
+        elif diff.seconds >= 3600:
+            hours = diff.seconds // 3600
+            return f"{hours} giờ trước"
+        elif diff.seconds >= 60:
+            minutes = diff.seconds // 60
+            return f"{minutes} phút trước"
+        else:
+            return "Vừa xong"
+    
+    @app.template_filter('format_view')
+    def format_view_filter(count):
+        """Format số lượt xem: 1500 -> 1.5K"""
+        if count is None:
+            return "0"
+        if count >= 1000000:
+            return f"{count/1000000:.1f}M"
+        elif count >= 1000:
+            return f"{count/1000:.1f}K"
+        return str(count)
+    
+    @app.template_filter('default_image')
+    def default_image_filter(image_url):
+        """Trả về ảnh mặc định nếu không có thumbnail"""
+        if image_url:
+            return image_url
+        return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800"
     
     return app
 

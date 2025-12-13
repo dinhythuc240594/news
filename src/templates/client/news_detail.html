@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VnNews - Trang Tin Tức Hàng Đầu</title>
+    <title>{{ news.title }} - VnNews</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -71,7 +71,7 @@
                     {% set parent_categories = categories|selectattr('parent_id', 'none')|list %}
                     {% for category in parent_categories %}
                         {% set child_categories = categories|selectattr('parent_id', 'equalto', category.id)|list %}
-                        <li class="{% if child_categories %}has-submenu{% endif %} {% if loop.index == 1 %}active{% endif %}" data-slug="{{ category.slug }}">
+                        <li class="{% if child_categories %}has-submenu{% endif %}" data-slug="{{ category.slug }}">
                             <a href="{{ url_for('client.category', category_slug=category.slug) }}">
                                 {% if category.icon %}<i class="{{ category.icon }}"></i> {% endif %}{{ category.name }}
                             </a>
@@ -89,8 +89,7 @@
                         </li>
                     {% endfor %}
                 {% else %}
-                    <!-- Fallback menu if no categories -->
-                    <li class="active"><a href="/">Trang chủ</a></li>
+                    <li class="active"><a href="{{ url_for('client.index') }}">Trang chủ</a></li>
                 {% endif %}
                 <li class="more-menu-btn">
                     <a href="javascript:void(0)">
@@ -108,108 +107,98 @@
             <div class="row">
                 <!-- Left Content -->
                 <div class="col-lg-9">
-                    <!-- Featured News -->
-                    <section class="featured-news mb-4">
-                        {% if featured_news %}
-                        <div class="row">
-                            {% if featured_news|length > 0 %}
-                            <div class="col-md-8">
-                                {% set main_featured = featured_news[0] %}
-                                <article class="news-card featured-card">
-                                    <div class="news-image">
-                                        <img src="{{ main_featured.thumbnail|default_image }}" alt="{{ main_featured.title }}">
-                                        <span class="badge-category">{{ main_featured.category.name }}</span>
-                                    </div>
-                                    <div class="news-content">
-                                        <h2 class="news-title">
-                                            <a href="{{ url_for('client.news_detail', news_slug=main_featured.slug) }}">{{ main_featured.title }}</a>
-                                        </h2>
-                                        <p class="news-description">
-                                            {{ main_featured.summary or main_featured.content[:200] + '...' }}
-                                        </p>
-                                        <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> {{ (main_featured.published_at or main_featured.created_at)|timeago }}</span>
-                                            <span><i class="far fa-eye"></i> {{ main_featured.view_count|format_view }}</span>
-                                        </div>
-                                    </div>
-                                </article>
+                    <!-- Breadcrumb -->
+                    <nav aria-label="breadcrumb" class="mb-4">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{{ url_for('client.index') }}">Trang chủ</a></li>
+                            <li class="breadcrumb-item"><a href="{{ url_for('client.category', category_slug=news.category.slug) }}">{{ news.category.name }}</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">{{ news.title[:50] }}{% if news.title|length > 50 %}...{% endif %}</li>
+                        </ol>
+                    </nav>
+
+                    <!-- News Detail -->
+                    <article class="news-detail">
+                        <div class="news-header mb-4">
+                            <span class="badge-category">{{ news.category.name }}</span>
+                            <h1 class="news-title">{{ news.title }}</h1>
+                            <div class="news-meta mb-3">
+                                <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>
+                                <span><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
+                                <span><i class="far fa-user"></i> {{ news.creator.full_name if news.creator else 'Admin' }}</span>
                             </div>
-                            {% endif %}
-                            {% if featured_news|length > 1 %}
-                            <div class="col-md-4">
-                                <div class="sub-featured">
-                                    {% for news in featured_news[1:3] %}
-                                    <article class="news-card small-card">
-                                        <div class="news-image">
-                                            <img src="{{ news.thumbnail|default_image }}" alt="{{ news.title }}">
-                                            <span class="badge-category">{{ news.category.name }}</span>
-                                        </div>
-                                        <h3 class="news-title">
-                                            <a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
-                                        </h3>
-                                        <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>
-                                        </div>
-                                    </article>
-                                    {% endfor %}
-                                </div>
-                            </div>
-                            {% endif %}
                         </div>
-                        {% else %}
-                        <div class="row">
-                            <div class="col-12">
-                                <p class="text-center text-muted">Chưa có tin nổi bật</p>
-                            </div>
+
+                        {% if news.thumbnail %}
+                        <div class="news-image mb-4">
+                            <img src="{{ news.thumbnail }}" alt="{{ news.title }}" class="img-fluid">
                         </div>
                         {% endif %}
-                    </section>
 
-                    <!-- Latest News -->
-                    <section class="latest-news">
+                        {% if news.summary %}
+                        <div class="news-summary mb-4">
+                            <p class="lead">{{ news.summary }}</p>
+                        </div>
+                        {% endif %}
+
+                        <div class="news-content">
+                            {{ news.content|safe }}
+                        </div>
+
+                        <!-- Tags and Share -->
+                        <div class="news-footer mt-4 pt-4 border-top">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="share-buttons">
+                                        <span class="me-2">Chia sẻ:</span>
+                                        <a href="#" class="btn btn-sm btn-outline-primary me-2"><i class="fab fa-facebook-f"></i> Facebook</a>
+                                        <a href="#" class="btn btn-sm btn-outline-info me-2"><i class="fab fa-twitter"></i> Twitter</a>
+                                        <a href="#" class="btn btn-sm btn-outline-danger"><i class="fab fa-youtube"></i> Copy Link</a>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    <a href="{{ url_for('client.category', category_slug=news.category.slug) }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-arrow-left"></i> Về danh mục {{ news.category.name }}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Related News -->
+                    {% if related_news %}
+                    <section class="related-news mt-5">
                         <h2 class="section-title">
-                            <span>Mới nhất</span>
+                            <span>Tin liên quan</span>
                         </h2>
-                        
-                        <div class="news-list">
-                            {% if latest_news %}
-                                {% for news in latest_news %}
+                        <div class="row">
+                            {% for related in related_news %}
+                            <div class="col-md-6 mb-4">
                                 <article class="news-card horizontal-card">
                                     <div class="row g-0">
                                         <div class="col-md-4">
                                             <div class="news-image">
-                                                <img src="{{ news.thumbnail|default_image }}" alt="{{ news.title }}">
-                                                <span class="badge-category">{{ news.category.name }}</span>
+                                                <img src="{{ related.thumbnail|default_image }}" alt="{{ related.title }}">
+                                                <span class="badge-category">{{ related.category.name }}</span>
                                             </div>
                                         </div>
                                         <div class="col-md-8">
                                             <div class="news-content">
                                                 <h3 class="news-title">
-                                                    <a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
+                                                    <a href="{{ url_for('client.news_detail', news_slug=related.slug) }}">{{ related.title }}</a>
                                                 </h3>
-                                                <p class="news-description">
-                                                    {{ news.summary or news.content[:200] + '...' }}
-                                                </p>
                                                 <div class="news-meta">
-                                                    <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>
-                                                    <span><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
+                                                    <span><i class="far fa-clock"></i> {{ (related.published_at or related.created_at)|timeago }}</span>
+                                                    <span><i class="far fa-eye"></i> {{ related.view_count|format_view }}</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </article>
-                                {% endfor %}
-                            {% else %}
-                                <p class="text-center text-muted">Chưa có tin tức mới</p>
-                            {% endif %}
-                        </div>
-
-                        <div class="text-center mt-4">
-                            <button class="btn-load-more">
-                                <i class="fas fa-sync-alt"></i> Xem thêm
-                            </button>
+                            </div>
+                            {% endfor %}
                         </div>
                     </section>
+                    {% endif %}
                 </div>
 
                 <!-- Right Sidebar -->
@@ -220,59 +209,7 @@
                             <i class="fas fa-fire"></i> Xem nhiều
                         </h3>
                         <div class="most-read-list">
-                            {% if hot_news %}
-                                {% for news in hot_news %}
-                                <article class="most-read-item">
-                                    <span class="rank">{{ loop.index }}</span>
-                                    <div class="content">
-                                        <h4><a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a></h4>
-                                        <span class="meta"><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
-                                    </div>
-                                </article>
-                                {% endfor %}
-                            {% else %}
-                                <p class="text-muted text-center">Chưa có tin nóng</p>
-                            {% endif %}
-                        </div>
-                    </aside>
-
-                    <!-- Video -->
-                    <aside class="sidebar-widget">
-                        <h3 class="widget-title">
-                            <i class="fas fa-video"></i> Video
-                        </h3>
-                        <div class="video-widget">
-                            <div class="video-thumbnail">
-                                <img src="https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=400" alt="Video">
-                                <div class="play-icon">
-                                    <i class="fas fa-play"></i>
-                                </div>
-                            </div>
-                            <h4 class="video-title">Cảnh đẹp Việt Nam từ trên cao</h4>
-                        </div>
-                    </aside>
-
-                    <!-- Weather -->
-                    <aside class="sidebar-widget weather-widget">
-                        <h3 class="widget-title">
-                            <i class="fas fa-cloud-sun"></i> Thời tiết
-                        </h3>
-                        <div class="weather-content">
-                            <div class="city-name">Hà Nội</div>
-                            <div class="temperature">25°C</div>
-                            <div class="weather-desc">
-                                <i class="fas fa-cloud"></i> Nhiều mây
-                            </div>
-                            <div class="weather-details">
-                                <div class="detail-item">
-                                    <i class="fas fa-tint"></i>
-                                    <span>Độ ẩm: 75%</span>
-                                </div>
-                                <div class="detail-item">
-                                    <i class="fas fa-wind"></i>
-                                    <span>Gió: 15 km/h</span>
-                                </div>
-                            </div>
+                            <p class="text-muted text-center">Đang tải...</p>
                         </div>
                     </aside>
 
@@ -315,10 +252,16 @@
                 <div class="col-md-3">
                     <h4>Chuyên mục</h4>
                     <ul class="footer-links">
-                        <li><a href="#">Thời sự</a></li>
-                        <li><a href="#">Kinh doanh</a></li>
-                        <li><a href="#">Giải trí</a></li>
-                        <li><a href="#">Thể thao</a></li>
+                        {% if categories %}
+                            {% for cat in categories[:4] %}
+                            <li><a href="{{ url_for('client.category', category_slug=cat.slug) }}">{{ cat.name }}</a></li>
+                            {% endfor %}
+                        {% else %}
+                            <li><a href="#">Thời sự</a></li>
+                            <li><a href="#">Kinh doanh</a></li>
+                            <li><a href="#">Giải trí</a></li>
+                            <li><a href="#">Thể thao</a></li>
+                        {% endif %}
                     </ul>
                 </div>
                 <div class="col-md-3">
@@ -352,10 +295,37 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Menu Manager (must load before client.js) -->
-    <script src="{{ url_for('static', filename='js/menu-manager.js') }}"></script>
-    
     <!-- Custom JS -->
     <script src="{{ url_for('static', filename='js/client.js') }}"></script>
+    
+    <script>
+        // Load hot news for sidebar
+        $(document).ready(function() {
+            $.get('{{ url_for("client.api_hot_news") }}?limit=5', function(data) {
+                if (data.success && data.data.length > 0) {
+                    let html = '';
+                    data.data.forEach(function(news, index) {
+                        html += `
+                            <article class="most-read-item">
+                                <span class="rank">${index + 1}</span>
+                                <div class="content">
+                                    <h4><a href="/news/${news.slug}">${news.title}</a></h4>
+                                    <span class="meta"><i class="far fa-eye"></i> ${formatViewCount(news.view_count)}</span>
+                                </div>
+                            </article>
+                        `;
+                    });
+                    $('.most-read-list').html(html);
+                }
+            });
+            
+            function formatViewCount(count) {
+                if (count >= 1000000) return (count/1000000).toFixed(1) + 'M';
+                if (count >= 1000) return (count/1000).toFixed(1) + 'K';
+                return count;
+            }
+        });
+    </script>
 </body>
 </html>
+
