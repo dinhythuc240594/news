@@ -311,10 +311,10 @@ function saveDraft() {
     const content = $('#articleContent').summernote('code');
     const category = $('#articleCategory').val();
     
-    if (!title) {
-        alert('Vui lòng nhập tiêu đề bài viết!');
-        return;
-    }
+    // if (!title) {
+    //     alert('Vui lòng nhập tiêu đề bài viết!');
+    //     return;
+    // }
     
     showSpinner();
     
@@ -343,10 +343,10 @@ function submitArticle() {
     const description = $('#articleDescription').val();
     const tags = $('#articleTags').val();
     
-    if (!title || !content || !category) {
-        alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
-        return;
-    }
+    // if (!title || !content || !category) {
+    //     alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
+    //     return;
+    // }
     
     showSpinner();
     

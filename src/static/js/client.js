@@ -51,7 +51,7 @@ $(document).ready(function() {
     $('.btn-search').click(function() {
         const searchTerm = $('.search-box input').val();
         if (searchTerm.trim() !== '') {
-            alert('Đang tìm kiếm: ' + searchTerm);
+            // alert('Đang tìm kiếm: ' + searchTerm);
             // In a real application, you would redirect to a search results page
             // window.location.href = '/search?q=' + encodeURIComponent(searchTerm);
         }
@@ -188,12 +188,12 @@ $(document).ready(function() {
     // Newsletter subscription
     $('.btn-subscribe').click(function() {
         const email = $('.newsletter input').val();
-        if (email && validateEmail(email)) {
-            alert('Cảm ơn bạn đã đăng ký nhận tin! Email: ' + email);
-            $('.newsletter input').val('');
-        } else {
-            alert('Vui lòng nhập email hợp lệ');
-        }
+        // if (email && validateEmail(email)) {
+        //     alert('Cảm ơn bạn đã đăng ký nhận tin! Email: ' + email);
+        //     $('.newsletter input').val('');
+        // } else {
+        //     alert('Vui lòng nhập email hợp lệ');
+        // }
     });
 
     // Email validation
@@ -202,18 +202,18 @@ $(document).ready(function() {
         return re.test(email);
     }
 
-    // Video play
-    $('.video-widget').click(function() {
-        alert('Video đang được tải...');
-        // In a real application, you would open a video player modal
-    });
+    // // Video play
+    // $('.video-widget').click(function() {
+    //     alert('Video đang được tải...');
+    //     // In a real application, you would open a video player modal
+    // });
 
-    // Most read items click
-    $('.most-read-item').click(function() {
-        const title = $(this).find('h4').text();
-        alert('Đang mở: ' + title);
-        // In a real application, you would navigate to the article page
-    });
+    // // Most read items click
+    // $('.most-read-item').click(function() {
+    //     const title = $(this).find('h4').text();
+    //     // alert('Đang mở: ' + title);
+    //     // In a real application, you would navigate to the article page
+    // });
 
     // News card click tracking
     $('.news-card').click(function(e) {
