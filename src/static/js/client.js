@@ -291,10 +291,212 @@ $(document).ready(function() {
         .text('.reading-progress { position: fixed; top: 0; left: 0; height: 3px; background: linear-gradient(to right, #c00, #ff0000); z-index: 9999; transition: width 0.3s; }')
         .appendTo('head');
 
+    // Weather Widget - Load weather data
+    loadWeatherData();
+
     // Console log for debugging
     console.log('VnNews website loaded successfully!');
     console.log('jQuery version:', $.fn.jquery);
 });
+
+// const cityList = {
+//     'HaNoi': ['Ha Noi City', 'Ha Dong', 'Hoai Duc', 'Ba Vi', 'Thach That', 'Thanh Tri', 'Thanh Xuan'],
+//     'HoChiMinh': ['Ho Chi Minh City', 'Tan Binh', 'Tan Phu', 'Thu Duc', 'Binh Tan', 'Binh Thanh', 'Go Vap', 'Phu Nhuan'],
+//     'DaNang': ['Da Nang City', 'Hai Chau', 'Lien Chieu', 'Thanh Khe', 'Son Tra', 'Ngu Hanh Son', 'Hai Van', 'Cam Le'],
+//     'HaiPhong': ['Hai Phong City', 'Hai An', 'Hai Duong', 'Hai Phong', 'Hai Phong', 'Hai Phong', 'Hai Phong', 'Hai Phong'],
+//     'ThanhHoA': ['Thanh Hoa City', 'Thanh Hoa', 'Thanh Hoa', 'Thanh Hoa', 'Thanh Hoa', 'Thanh Hoa', 'Thanh Hoa', 'Thanh Hoa'],
+//     'NhaTrang': ['Nha Trang City', 'Nha Trang', 'Nha Trang', 'Nha Trang', 'Nha Trang', 'Nha Trang', 'Nha Trang', 'Nha Trang'],
+//     'Hue': ['Hue City', 'Hue', 'Hue', 'Hue', 'Hue', 'Hue', 'Hue', 'Hue'],
+//     'CanTho': ['Can Tho City', 'Can Tho', 'Can Tho', 'Can Tho', 'Can Tho', 'Can Tho', 'Can Tho', 'Can Tho'],
+// };
+
+// function getLocation(position) {
+
+//     const latitude  = position.coords.latitude;
+//     const longitude = position.coords.longitude;
+
+//     // 2. Gửi tọa độ đến OpenStreetMap để lấy tên thành phố (Reverse Geocoding)
+//     const apiUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`;
+
+//     return fetch(apiUrl)
+//     .then(res => res.json())
+//     .then(data => {
+//         // Cấu trúc data trả về của OpenStreetMap nằm trong address
+//         const address = data.address;
+//         // Đôi khi nó là city, town, hoặc village tùy khu vực
+//         const city = address.city || address.town || address.village || address.state; 
+        
+//         console.log("Địa chỉ đầy đủ:", data.display_name);
+//         console.log("Thành phố hiện tại:", city);
+//         return city;
+//     })
+//     .catch(err => console.log("Lỗi API bản đồ:", err));
+// }
+
+function getCity(cityName) {
+    var converted_city = cityName.toLowerCase();
+    for (const key in cityList) {
+        if (cityList[key].includes(converted_city)) {
+            return key;
+        }
+    }
+    return null;
+}
+
+// Weather Widget Function
+function loadWeatherData() {
+    const weatherWidget = $('#weatherWidget');
+    if (!weatherWidget.length) return;
+
+    var city = 'Saigon';
+
+    fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=vi&format=json`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.results && data.results.length > 0) {
+                const location = data.results[0];
+                const latitude = location.latitude;
+                const longitude = location.longitude;
+                const cityName = "TP. Hồ Chí Minh";
+                
+                // Get current weather
+                return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=Asia/Ho_Chi_Minh`)
+                    .then(response => response.json())
+                    .then(weatherData => {
+                        displayWeather(cityName, weatherData);
+                    });
+            } else {
+                throw new Error('Không tìm thấy thành phố');
+            }
+        })
+        .catch(error => {
+            console.error('Weather API error:', error);
+            // Fallback to wttr.in API
+            loadWeatherFallback(city);
+        });
+}
+
+
+// Fallback weather API (wttr.in)
+function loadWeatherFallback(city) {
+    const weatherWidget = $('#weatherWidget');
+    
+    fetch(`https://wttr.in/${city}?format=j1&lang=vi`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.current_condition && data.current_condition[0]) {
+                const current = data.current_condition[0];
+                const location = data.nearest_area[0].areaName[0].value;
+                
+                const weatherData = {
+                    current: {
+                        temperature_2m: parseFloat(current.temp_C),
+                        relative_humidity_2m: parseFloat(current.humidity),
+                        wind_speed_10m: parseFloat(current.windspeedKmph) / 3.6, // Convert km/h to m/s
+                        weather_code: getWeatherCode(current.weatherDesc[0].value)
+                    }
+                };
+                
+                displayWeather(location, weatherData);
+            } else {
+                throw new Error('Không thể lấy dữ liệu thời tiết');
+            }
+        })
+        .catch(error => {
+            console.error('Weather fallback error:', error);
+            displayWeatherError();
+        });
+}
+
+// Display weather data
+function displayWeather(cityName, weatherData) {
+    const weatherWidget = $('#weatherWidget');
+    const current = weatherData.current;
+    
+    // Get weather icon and description
+    const weatherInfo = getWeatherInfo(current.weather_code);
+    const temperature = Math.round(current.temperature_2m);
+    const humidity = Math.round(current.relative_humidity_2m);
+    const windSpeed = Math.round(current.wind_speed_10m * 3.6); // Convert m/s to km/h
+    
+    const weatherHTML = `
+        <div class="city-name">${cityName}</div>
+        <div class="temperature">${temperature}°C</div>
+        <div class="weather-desc">
+            <i class="${weatherInfo.icon}"></i> ${weatherInfo.description}
+        </div>
+        <div class="weather-details">
+            <div class="detail-item">
+                <i class="fas fa-tint"></i>
+                <span>Độ ẩm: ${humidity}%</span>
+            </div>
+            <div class="detail-item">
+                <i class="fas fa-wind"></i>
+                <span>Gió: ${windSpeed} km/h</span>
+            </div>
+        </div>
+    `;
+    
+    weatherWidget.html(weatherHTML);
+}
+
+// Display weather error
+function displayWeatherError() {
+    const weatherWidget = $('#weatherWidget');
+    weatherWidget.html(`
+        <div class="weather-error">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p>Không thể tải dữ liệu thời tiết</p>
+        </div>
+    `);
+}
+
+// Get weather code from description (for wttr.in fallback)
+function getWeatherCode(description) {
+    const desc = description.toLowerCase();
+    if (desc.includes('sun') || desc.includes('nắng') || desc.includes('clear')) return 0;
+    if (desc.includes('cloud') || desc.includes('mây')) return 1;
+    if (desc.includes('rain') || desc.includes('mưa')) return 61;
+    if (desc.includes('snow') || desc.includes('tuyết')) return 71;
+    if (desc.includes('thunder') || desc.includes('sấm')) return 95;
+    return 1; // Default to cloudy
+}
+
+// Get weather icon and description from weather code (WMO Weather interpretation codes)
+function getWeatherInfo(code) {
+    const weatherMap = {
+        0: { icon: 'fas fa-sun', description: 'Trời nắng' },
+        1: { icon: 'fas fa-sun', description: 'Trời quang' },
+        2: { icon: 'fas fa-cloud-sun', description: 'Ít mây' },
+        3: { icon: 'fas fa-cloud', description: 'Nhiều mây' },
+        45: { icon: 'fas fa-smog', description: 'Sương mù' },
+        48: { icon: 'fas fa-smog', description: 'Sương mù' },
+        51: { icon: 'fas fa-cloud-rain', description: 'Mưa nhẹ' },
+        53: { icon: 'fas fa-cloud-rain', description: 'Mưa vừa' },
+        55: { icon: 'fas fa-cloud-rain', description: 'Mưa nặng' },
+        56: { icon: 'fas fa-cloud-rain', description: 'Mưa đá nhẹ' },
+        57: { icon: 'fas fa-cloud-rain', description: 'Mưa đá nặng' },
+        61: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa nhẹ' },
+        63: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa vừa' },
+        65: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa nặng' },
+        66: { icon: 'fas fa-cloud-rain', description: 'Mưa đá nhẹ' },
+        67: { icon: 'fas fa-cloud-rain', description: 'Mưa đá nặng' },
+        71: { icon: 'fas fa-snowflake', description: 'Tuyết nhẹ' },
+        73: { icon: 'fas fa-snowflake', description: 'Tuyết vừa' },
+        75: { icon: 'fas fa-snowflake', description: 'Tuyết nặng' },
+        77: { icon: 'fas fa-snowflake', description: 'Hạt tuyết' },
+        80: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa rào nhẹ' },
+        81: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa rào vừa' },
+        82: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa rào nặng' },
+        85: { icon: 'fas fa-snowflake', description: 'Mưa tuyết nhẹ' },
+        86: { icon: 'fas fa-snowflake', description: 'Mưa tuyết nặng' },
+        95: { icon: 'fas fa-bolt', description: 'Dông' },
+        96: { icon: 'fas fa-bolt', description: 'Dông có mưa đá' },
+        99: { icon: 'fas fa-bolt', description: 'Dông có mưa đá nặng' }
+    };
+    
+    return weatherMap[code] || { icon: 'fas fa-cloud', description: 'Nhiều mây' };
+}
 
 // Add animation on scroll
 function isInViewport(element) {

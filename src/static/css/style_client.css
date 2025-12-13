@@ -674,6 +674,36 @@ img {
     margin-right: 5px;
 }
 
+.weather-loading {
+    padding: 20px;
+    color: #666;
+    font-size: 14px;
+}
+
+.weather-loading i {
+    margin-right: 8px;
+    color: #4a90e2;
+}
+
+.weather-error {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-size: 14px;
+}
+
+.weather-error i {
+    font-size: 24px;
+    color: #ff9800;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.weather-error p {
+    margin: 0;
+    margin-top: 5px;
+}
+
 /* Ads Box */
 .ads-box {
     background-color: #f0f0f0;
