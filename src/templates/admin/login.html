@@ -164,14 +164,25 @@
             <div class="col-md-7 login-right">
                 <h2 class="login-title">Đăng nhập hệ thống</h2>
                 
-                <form id="loginForm">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST" action="{{ url_for('admin.login') }}">
                     <div class="form-group">
                         <label class="form-label">Tên đăng nhập</label>
                         <div class="input-group">
                             <span class="input-group-text">
                                 <i class="fas fa-user"></i>
                             </span>
-                            <input type="text" class="form-control" id="username" placeholder="Nhập tên đăng nhập" required>
+                            <input type="text" class="form-control" name="username" id="username" placeholder="Nhập tên đăng nhập" required>
                         </div>
                     </div>
                     
@@ -181,12 +192,12 @@
                             <span class="input-group-text">
                                 <i class="fas fa-lock"></i>
                             </span>
-                            <input type="password" class="form-control" id="password" placeholder="Nhập mật khẩu" required>
+                            <input type="password" class="form-control" name="password" id="password" placeholder="Nhập mật khẩu" required>
                         </div>
                     </div>
                     
                     <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" id="remember">
+                        <input class="form-check-input" type="checkbox" id="remember" name="remember">
                         <label class="form-check-label" for="remember">
                             Ghi nhớ đăng nhập
                         </label>
@@ -220,58 +231,12 @@
     
     <script>
         $(document).ready(function() {
-            // Demo accounts data
-            const users = {
-                'admin': {
-                    password: 'admin123',
-                    role: 'admin',
-                    name: 'Quản trị viên'
-                },
-                'editor': {
-                    password: 'editor123',
-                    role: 'editor',
-                    name: 'Biên tập viên'
-                }
-            };
-            
             // Click demo account to auto-fill
             $('.demo-account').click(function() {
                 const username = $(this).data('username');
                 const password = $(this).data('password');
                 $('#username').val(username);
                 $('#password').val(password);
-            });
-            
-            // Login form submit
-            $('#loginForm').submit(function(e) {
-                e.preventDefault();
-                
-                const username = $('#username').val();
-                const password = $('#password').val();
-                
-                if (users[username] && users[username].password === password) {
-                    // Store user info in localStorage
-                    const userInfo = {
-                        username: username,
-                        role: users[username].role,
-                        name: users[username].name,
-                        loginTime: new Date().toISOString()
-                    };
-                    
-                    localStorage.setItem('userInfo', JSON.stringify(userInfo));
-                    
-                    // Show success message
-                    alert('Đăng nhập thành công!\nChào mừng ' + users[username].name);
-                    
-                    // Redirect to admin dashboard
-                    if (users[username].role === 'admin') {
-                        window.location.href = 'dashboard.html';
-                    } else {
-                        window.location.href = 'editor-dashboard.html';
-                    }
-                } else {
-                    alert('Tên đăng nhập hoặc mật khẩu không đúng!');
-                }
             });
         });
     </script>

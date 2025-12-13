@@ -142,8 +142,8 @@ img {
     margin-right: 5px;
 }
 
-.btn-login {
-    background-color: #333;
+.btn-login-header {
+    background-color: #4CAF50;
     color: #fff;
     border: none;
     padding: 10px 20px;
@@ -154,11 +154,11 @@ img {
     transition: background-color 0.3s;
 }
 
-.btn-login:hover {
-    background-color: #555;
+.btn-login-header:hover {
+    background-color: #4CAF50;
 }
 
-.btn-login i {
+.btn-login-header i {
     margin-right: 5px;
 }
 

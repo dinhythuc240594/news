@@ -61,11 +61,9 @@ class AdminController:
             username = request.form.get('username')
             password = request.form.get('password')
             
-            user = self.user_model.get_by_username(username)
+            user = self.user_model.authenticate(username, password)
             
-            # TODO: Kiểm tra password hash
-            # if user and check_password_hash(user.password_hash, password):
-            if user and user.is_active:
+            if user and user.is_active and user.role in [UserRole.ADMIN, UserRole.EDITOR]:
                 session['user_id'] = user.id
                 session['username'] = user.username
                 session['role'] = user.role.value
@@ -339,10 +337,10 @@ class ClientController:
     """Quản lý các route của client"""
     
     def __init__(self):
-
         self.db_session = get_session()
         self.news_model = NewsModel(self.db_session)
         self.category_model = CategoryModel(self.db_session)
+        self.user_model = UserModel(self.db_session)
     
     def index(self):
         """
@@ -524,3 +522,106 @@ class ClientController:
             'icon': category.icon,
             'parent_id': category.parent_id
         }
+    
+    def user_login(self):
+        """
+        Trang đăng nhập cho user
+        Route: GET /login
+        Route: POST /login
+        """
+        categories = self.category_model.get_all()
+        
+        if request.method == 'POST':
+            username = request.form.get('username')
+            password = request.form.get('password')
+            
+            user = self.user_model.authenticate(username, password)
+            
+            if user and user.is_active and user.role == UserRole.USER:
+                session['user_id'] = user.id
+                session['username'] = user.username
+                session['role'] = user.role.value
+                
+                flash('Đăng nhập thành công', 'success')
+                return redirect(url_for('client.index'))
+            else:
+                flash('Tên đăng nhập hoặc mật khẩu không đúng', 'error')
+        
+        return render_template('client/login.html', categories=categories)
+    
+    def register(self):
+        """
+        Trang đăng ký cho user
+        Route: GET /register
+        Route: POST /register
+        """
+        categories = self.category_model.get_all()
+        
+        if request.method == 'POST':
+            username = request.form.get('username', '').strip()
+            email = request.form.get('email', '').strip()
+            password = request.form.get('password', '')
+            confirm_password = request.form.get('confirm_password', '')
+            full_name = request.form.get('full_name', '').strip()
+            phone = request.form.get('phone', '').strip()
+            
+            from auth_utils import validate_email, validate_password, validate_phone
+            
+            # Validation
+            errors = []
+            
+            # Validate username
+            if not username:
+                errors.append('Tên đăng nhập không được để trống')
+            elif len(username) < 3:
+                errors.append('Tên đăng nhập phải có ít nhất 3 ký tự')
+            elif self.user_model.get_by_username(username):
+                errors.append('Tên đăng nhập đã tồn tại')
+            
+            # Validate email
+            if not validate_email(email):
+                errors.append('Email không đúng định dạng')
+            elif self.user_model.get_by_email(email):
+                errors.append('Email đã được sử dụng')
+            
+            # Validate phone
+            phone_valid, phone_error = validate_phone(phone)
+            if not phone_valid:
+                errors.append(phone_error)
+            
+            # Validate password
+            password_valid, password_error = validate_password(password)
+            if not password_valid:
+                errors.append(password_error)
+            elif password != confirm_password:
+                errors.append('Mật khẩu xác nhận không khớp')
+            
+            if errors:
+                for error in errors:
+                    flash(error, 'error')
+            else:
+                try:
+                    # Clean phone number
+                    phone_clean = phone.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+                    
+                    user = self.user_model.create(
+                        username=username,
+                        email=email,
+                        password=password,
+                        full_name=full_name if full_name else None,
+                        phone=phone_clean,
+                        role=UserRole.USER
+                    )
+                    
+                    flash('Đăng ký thành công! Vui lòng đăng nhập', 'success')
+                    return redirect(url_for('client.user_login'))
+                except Exception as e:
+                    flash('Có lỗi xảy ra khi đăng ký. Vui lòng thử lại', 'error')
+        
+        return render_template('client/register.html', categories=categories)
+    
+    def user_logout(self):
+        """Đăng xuất user"""
+        session.clear()
+        flash('Đã đăng xuất', 'success')
+        return redirect(url_for('client.index'))

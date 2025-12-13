@@ -251,7 +251,69 @@ class UserModel:
         """Lấy user theo username"""
         return self.db.query(User).filter(User.username == username).first()
     
+    def get_by_email(self, email: str) -> Optional[User]:
+        """Lấy user theo email"""
+        return self.db.query(User).filter(User.email == email).first()
+    
     def get_by_id(self, user_id: int) -> Optional[User]:
         """Lấy user theo ID"""
         return self.db.query(User).filter(User.id == user_id).first()
+    
+    def create(self, username: str, email: str, password: str, 
+               full_name: str = None, phone: str = None, 
+               role: UserRole = UserRole.USER) -> User:
+        """
+        Tạo user mới
+        
+        Args:
+            username: Tên đăng nhập
+            email: Email
+            password: Mật khẩu (sẽ được hash)
+            full_name: Họ tên đầy đủ
+            phone: Số điện thoại
+            role: Vai trò (mặc định là USER)
+            
+        Returns:
+            User object
+        """
+        from auth_utils import hash_password
+        
+        user = User(
+            username=username,
+            email=email,
+            password_hash=hash_password(password),
+            full_name=full_name,
+            phone=phone,
+            role=role
+        )
+        
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+    
+    def authenticate(self, username: str, password: str) -> Optional[User]:
+        """
+        Xác thực user với username và password
+        
+        Args:
+            username: Tên đăng nhập hoặc email
+            password: Mật khẩu
+            
+        Returns:
+            User object nếu đúng, None nếu sai
+        """
+        from auth_utils import verify_password
+        
+        # Try username first
+        user = self.get_by_username(username)
+        
+        # If not found, try email
+        if not user:
+            user = self.get_by_email(username)
+        
+        if user and user.is_active and verify_password(user.password_hash, password):
+            return user
+        
+        return None
 

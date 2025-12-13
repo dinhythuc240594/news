@@ -179,11 +179,11 @@ $(document).ready(function() {
         }, 1000);
     });
 
-    // Login button
-    $('.btn-login').click(function() {
-        alert('Chức năng đăng nhập đang được phát triển');
-        // In a real application, you would open a login modal or redirect to login page
-    });
+    // // Login button
+    // $('.btn-login').click(function() {
+    //     alert('Chức năng đăng nhập đang được phát triển');
+    //     // In a real application, you would open a login modal or redirect to login page
+    // });
 
     // Newsletter subscription
     $('.btn-subscribe').click(function() {

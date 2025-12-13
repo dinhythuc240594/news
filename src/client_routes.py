@@ -63,3 +63,20 @@ def api_categories():
     """API lấy danh sách danh mục"""
     return client_controller.api_categories()
 
+
+@client_bp.route('/login', methods=['GET', 'POST'])
+def user_login():
+    """Trang đăng nhập cho user"""
+    return client_controller.user_login()
+
+
+@client_bp.route('/register', methods=['GET', 'POST'])
+def register():
+    """Trang đăng ký cho user"""
+    return client_controller.register()
+
+
+@client_bp.route('/logout')
+def user_logout():
+    """Đăng xuất user"""
+    return client_controller.user_logout()

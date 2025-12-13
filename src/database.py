@@ -171,6 +171,7 @@ class User(Base):
     email = Column(String(100), nullable=False, unique=True)
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=True)
+    phone = Column(String(20), nullable=True)
     role = Column(UserRoleType(), default=UserRole.USER)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
