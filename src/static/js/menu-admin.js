@@ -254,10 +254,10 @@ function saveMenu() {
         visible: $('#menuVisible').is(':checked')
     };
     
-    if (!menuData.name) {
-        alert('Vui lòng nhập tên menu!');
-        return;
-    }
+    // if (!menuData.name) {
+    //     alert('Vui lòng nhập tên menu!');
+    //     return;
+    // }
     
     if (!menuData.slug) {
         menuData.slug = menuManager.slugify(menuData.name);

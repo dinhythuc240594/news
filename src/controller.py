@@ -394,6 +394,9 @@ class ClientController:
         if not news or news.status != NewsStatus.PUBLISHED:
             abort(404)
         
+        # Lấy category của news dựa trên category_id
+        category = self.category_model.get_by_id(news.category_id)
+        
         # Tăng số lượt xem
         self.news_model.increment_view(news.id)
         
@@ -408,6 +411,7 @@ class ClientController:
         
         return render_template('client/news_detail.html',
                              news=news,
+                             category=category,
                              related_news=related_news,
                              categories=categories)
     
