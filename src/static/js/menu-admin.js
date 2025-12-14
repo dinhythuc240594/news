@@ -242,6 +242,16 @@ function renderMenuRow(menu, hasChildren, isParent) {
 // Initialize drag and drop
 function initDragAndDrop() {
     if (typeof $.ui !== 'undefined' && $.ui.sortable) {
+        // Destroy existing sortable instances to avoid conflicts
+        if ($('#menuTreeList').hasClass('ui-sortable')) {
+            $('#menuTreeList').sortable('destroy');
+        }
+        $('.menu-children-container').each(function() {
+            if ($(this).hasClass('ui-sortable')) {
+                $(this).sortable('destroy');
+            }
+        });
+        
         // Make parent items sortable
         $('#menuTreeList').sortable({
             handle: '.menu-item-handle',
@@ -250,36 +260,105 @@ function initDragAndDrop() {
             cursor: 'move',
             placeholder: 'menu-item-placeholder',
             opacity: 0.8,
+            axis: 'y',
             helper: function(e, item) {
-                // Clone item with children
+                // Clone item with children container
                 const $clone = item.clone();
                 const $children = item.next('.menu-children-container');
                 if ($children.length) {
-                    $clone.append($children.clone());
+                    const $childrenClone = $children.clone();
+                    $clone.append($childrenClone);
                 }
+                $clone.css('width', item.width());
                 return $clone;
+            },
+            start: function(e, ui) {
+                ui.placeholder.height(ui.item.height());
+                // Hide children container while dragging parent
+                const $children = ui.item.next('.menu-children-container');
+                if ($children.length) {
+                    $children.hide();
+                }
+            },
+            stop: function(e, ui) {
+                // Show children container after drop
+                const $children = ui.item.next('.menu-children-container');
+                if ($children.length) {
+                    $children.show();
+                }
+                // Reinitialize child sortables after parent move
+                initChildSortables();
             },
             update: function(event, ui) {
                 saveMenuOrder();
             }
         });
         
-        // Make child items sortable within their container
-        $('.menu-children-container').each(function() {
-            $(this).sortable({
-                handle: '.menu-item-handle',
-                items: '.menu-item-row.child-item',
-                tolerance: 'pointer',
-                cursor: 'move',
-                placeholder: 'menu-item-placeholder',
-                opacity: 0.8,
-                connectWith: '.menu-children-container',
-                update: function(event, ui) {
-                    saveMenuOrder();
-                }
-            });
-        });
+        // Initialize child items sortable
+        initChildSortables();
     }
+}
+
+// Initialize child items sortable
+function initChildSortables() {
+    $('.menu-children-container').each(function() {
+        const $container = $(this);
+        
+        // Destroy existing sortable if exists
+        if ($container.hasClass('ui-sortable')) {
+            $container.sortable('destroy');
+        }
+        
+        // Make child items sortable within their container
+        $container.sortable({
+            handle: '.menu-item-handle',
+            items: '.menu-item-row.child-item',
+            tolerance: 'pointer',
+            cursor: 'move',
+            placeholder: 'menu-item-placeholder',
+            opacity: 0.8,
+            axis: 'y',
+            connectWith: '.menu-children-container',
+            receive: function(event, ui) {
+                // Update parent_id when child is moved to different parent
+                const newParentId = parseInt($container.data('parent-id'));
+                const childId = parseInt(ui.item.data('id'));
+                
+                // Update data attribute
+                ui.item.attr('data-parent-id', newParentId);
+                
+                // Update visual class if needed
+                ui.item.removeClass('parent-item').addClass('child-item');
+                
+                // Ensure the container is expanded
+                if (!$container.hasClass('expanded')) {
+                    $container.addClass('expanded');
+                    // Update expand icon
+                    const $parentRow = $(`.menu-item-row.parent-item[data-id="${newParentId}"]`);
+                    const $expandIcon = $parentRow.find('.menu-item-expand i');
+                    if ($expandIcon.length) {
+                        $expandIcon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+                    }
+                }
+            },
+            start: function(e, ui) {
+                ui.placeholder.height(ui.item.height());
+            },
+            update: function(event, ui) {
+                // Check if item was moved to different parent
+                const $item = ui.item;
+                const currentParentId = parseInt($container.data('parent-id'));
+                const itemParentId = parseInt($item.data('parent-id')) || null;
+                
+                if (itemParentId !== currentParentId) {
+                    // Item moved to different parent, update parent_id
+                    $item.attr('data-parent-id', currentParentId);
+                }
+                
+                saveMenuOrder();
+            }
+        });
+    });
 }
 
 // Save menu order after drag & drop
@@ -291,26 +370,50 @@ async function saveMenuOrder() {
     $('#menuTreeList .menu-item-row.parent-item').each(function() {
         const $row = $(this);
         parentOrder++;
+        const parentId = parseInt($row.data('id'));
+        
         items.push({
-            id: parseInt($row.data('id')),
+            id: parentId,
             parent_id: null,
             order: parentOrder
         });
         
         // Collect children of this parent
-        const parentId = parseInt($row.data('id'));
-        const $childrenContainer = $(`.menu-children-container[data-parent-id="${parentId}"]`);
+        // Find children container that comes after this parent row
+        const $childrenContainer = $row.next('.menu-children-container[data-parent-id="' + parentId + '"]');
         let childOrder = 0;
         
-        $childrenContainer.find('.menu-item-row.child-item').each(function() {
-            const $childRow = $(this);
-            childOrder++;
-            items.push({
-                id: parseInt($childRow.data('id')),
-                parent_id: parentId,
-                order: childOrder
+        if ($childrenContainer.length) {
+            $childrenContainer.find('.menu-item-row.child-item').each(function() {
+                const $childRow = $(this);
+                childOrder++;
+                const childId = parseInt($childRow.data('id'));
+                const childParentId = parseInt($childRow.data('parent-id')) || parentId;
+                
+                items.push({
+                    id: childId,
+                    parent_id: childParentId,
+                    order: childOrder
+                });
             });
-        });
+        }
+    });
+    
+    // Also collect any orphaned child items (shouldn't happen, but just in case)
+    $('#menuTreeList .menu-item-row.child-item').each(function() {
+        const $childRow = $(this);
+        const childId = parseInt($childRow.data('id'));
+        
+        // Check if this child is already in items array
+        const exists = items.some(item => item.id === childId);
+        if (!exists) {
+            const childParentId = parseInt($childRow.data('parent-id'));
+            items.push({
+                id: childId,
+                parent_id: childParentId,
+                order: 1
+            });
+        }
     });
     
     try {
