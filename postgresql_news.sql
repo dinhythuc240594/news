@@ -22,6 +22,7 @@ CREATE TABLE categories (
     order_display INTEGER DEFAULT 0,
     parent_id INTEGER REFERENCES categories(id),
     visible BOOLEAN DEFAULT TRUE,
+    level INTEGER DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
