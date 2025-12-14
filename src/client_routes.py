@@ -92,3 +92,15 @@ def profile():
 def update_profile():
     """Cập nhật thông tin cá nhân, avatar, hoặc đổi mật khẩu"""
     return client_controller.update_profile()
+
+
+@client_bp.route('/api/save-news/<int:news_id>', methods=['POST'])
+def save_news(news_id: int):
+    """API lưu/bỏ lưu tin tức"""
+    return client_controller.save_news(news_id)
+
+
+@client_bp.route('/api/comment/<int:news_id>', methods=['POST'])
+def submit_comment(news_id: int):
+    """API gửi bình luận"""
+    return client_controller.submit_comment(news_id)

@@ -77,6 +77,13 @@ def create_app(config_class=Config):
             return image_url
         return "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800"
     
+    @app.template_filter('nl2br')
+    def nl2br_filter(text):
+        """Chuyển đổi newline thành <br> tag"""
+        if not text:
+            return ''
+        return text.replace('\n', '<br>')
+    
     return app
 
 

@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from functools import wraps
 import os
+from datetime import datetime
 from werkzeug.utils import secure_filename
 from database import get_session, NewsStatus, UserRole, SavedNews, ViewedNews, Comment
 from models import NewsModel, CategoryModel, UserModel
@@ -402,6 +403,46 @@ class ClientController:
         # Tăng số lượt xem
         self.news_model.increment_view(news.id)
         
+        # Xử lý cho user đã đăng nhập
+        is_saved = False
+        user_id = None
+        if 'user_id' in session:
+            user_id = session['user_id']
+            # Lưu vào tin đã xem
+            existing_viewed = self.db_session.query(ViewedNews).filter(
+                ViewedNews.user_id == user_id,
+                ViewedNews.news_id == news.id
+            ).first()
+            
+            if not existing_viewed:
+                viewed_news = ViewedNews(
+                    user_id=user_id,
+                    news_id=news.id
+                )
+                self.db_session.add(viewed_news)
+                self.db_session.commit()
+            else:
+                # Cập nhật thời gian xem
+                existing_viewed.viewed_at = datetime.utcnow()
+                self.db_session.commit()
+            
+            # Kiểm tra xem tin đã được lưu chưa
+            saved_news = self.db_session.query(SavedNews).filter(
+                SavedNews.user_id == user_id,
+                SavedNews.news_id == news.id
+            ).first()
+            is_saved = saved_news is not None
+        
+        # Lấy bình luận
+        from sqlalchemy.orm import joinedload
+        comments = self.db_session.query(Comment).options(
+            joinedload(Comment.user)
+        ).filter(
+            Comment.news_id == news.id,
+            Comment.is_active == True,
+            Comment.parent_id == None  # Chỉ lấy comment gốc, không lấy reply
+        ).order_by(Comment.created_at.desc()).all()
+        
         # Lấy bài viết liên quan
         related_news = self.news_model.get_by_category(
             category_id=news.category_id,
@@ -415,7 +456,10 @@ class ClientController:
                              news=news,
                              category=category,
                              related_news=related_news,
-                             categories=categories)
+                             categories=categories,
+                             is_saved=is_saved,
+                             comments=comments,
+                             user_id=user_id)
     
     def search(self):
         """
@@ -788,3 +832,90 @@ class ClientController:
         """Kiểm tra file có được phép upload không"""
         return '.' in filename and \
                filename.rsplit('.', 1)[1].lower() in current_app.config.get('ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'gif', 'webp'})
+    
+    def save_news(self, news_id: int):
+        """
+        API lưu/bỏ lưu tin tức
+        Route: POST /api/save-news/<news_id>
+        """
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': 'Vui lòng đăng nhập'}), 401
+        
+        user_id = session['user_id']
+        news = self.news_model.get_by_id(news_id)
+        
+        if not news:
+            return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
+        
+        # Kiểm tra xem đã lưu chưa
+        saved_news = self.db_session.query(SavedNews).filter(
+            SavedNews.user_id == user_id,
+            SavedNews.news_id == news_id
+        ).first()
+        
+        if saved_news:
+            # Bỏ lưu
+            self.db_session.delete(saved_news)
+            self.db_session.commit()
+            return jsonify({'success': True, 'message': 'Đã bỏ lưu tin tức', 'is_saved': False})
+        else:
+            # Lưu
+            new_saved = SavedNews(
+                user_id=user_id,
+                news_id=news_id
+            )
+            self.db_session.add(new_saved)
+            self.db_session.commit()
+            return jsonify({'success': True, 'message': 'Đã lưu tin tức', 'is_saved': True})
+    
+    def submit_comment(self, news_id: int):
+        """
+        API gửi bình luận
+        Route: POST /api/comment/<news_id>
+        """
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'message': 'Vui lòng đăng nhập để bình luận'}), 401
+        
+        user_id = session['user_id']
+        news = self.news_model.get_by_id(news_id)
+        
+        if not news:
+            return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
+        
+        content = request.json.get('content', '').strip() if request.is_json else request.form.get('content', '').strip()
+        parent_id = request.json.get('parent_id') if request.is_json else request.form.get('parent_id')
+        
+        if not content:
+            return jsonify({'success': False, 'message': 'Vui lòng nhập nội dung bình luận'}), 400
+        
+        if len(content) > 1000:
+            return jsonify({'success': False, 'message': 'Bình luận không được vượt quá 1000 ký tự'}), 400
+        
+        # Tạo bình luận
+        comment = Comment(
+            user_id=user_id,
+            news_id=news_id,
+            content=content,
+            parent_id=int(parent_id) if parent_id else None,
+            is_active=True
+        )
+        self.db_session.add(comment)
+        self.db_session.commit()
+        self.db_session.refresh(comment)
+        
+        # Lấy thông tin user để trả về
+        user = self.user_model.get_by_id(user_id)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Bình luận đã được gửi',
+            'comment': {
+                'id': comment.id,
+                'content': comment.content,
+                'created_at': comment.created_at.strftime('%d/%m/%Y %H:%M'),
+                'user': {
+                    'full_name': user.full_name or user.username,
+                    'avatar': user.avatar
+                }
+            }
+        })
