@@ -64,6 +64,22 @@ $(document).ready(function() {
         }
     });
     
+    // Move menu up
+    $(document).on('click', '.btn-move-up', function(e) {
+        e.stopPropagation();
+        const menuId = parseInt($(this).data('id'));
+        const isParent = $(this).data('is-parent') === true;
+        moveMenuUp(menuId, isParent);
+    });
+    
+    // Move menu down
+    $(document).on('click', '.btn-move-down', function(e) {
+        e.stopPropagation();
+        const menuId = parseInt($(this).data('id'));
+        const isParent = $(this).data('is-parent') === true;
+        moveMenuDown(menuId, isParent);
+    });
+    
     // Auto generate slug
     $('#menuName').on('input', function() {
         const name = $(this).val();
@@ -223,6 +239,14 @@ function renderMenuRow(menu, hasChildren, isParent) {
                     </div>
                 </div>
                 <div class="menu-item-actions">
+                    <div class="btn-group me-2" role="group">
+                        <button class="btn btn-sm btn-secondary btn-move-up" data-id="${menu.id}" data-is-parent="${isParent}" title="Lên">
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                        <button class="btn btn-sm btn-secondary btn-move-down" data-id="${menu.id}" data-is-parent="${isParent}" title="Xuống">
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+                    </div>
                     <label class="visibility-switch me-2">
                         <input type="checkbox" class="menu-visibility-toggle" data-id="${menu.id}" ${checked}>
                         <span class="visibility-slider"></span>
@@ -444,6 +468,155 @@ async function saveMenuOrder() {
         showToast('Lỗi', 'Có lỗi xảy ra khi cập nhật thứ tự', 'warning');
         // Reload để revert
         loadMenuTable();
+    }
+}
+
+// Move menu item up
+function moveMenuUp(menuId, isParent) {
+    const $currentItem = $(`.menu-item-row[data-id="${menuId}"]`);
+    
+    if (!$currentItem.length) {
+        showToast('Lỗi', 'Không tìm thấy menu item', 'warning');
+        return;
+    }
+    
+    if (isParent) {
+        // Move parent item up
+        // Find previous parent, skipping any children containers
+        let $prevParent = null;
+        let $prev = $currentItem.prev();
+        
+        while ($prev.length) {
+            if ($prev.hasClass('menu-item-row') && $prev.hasClass('parent-item')) {
+                $prevParent = $prev;
+                break;
+            }
+            $prev = $prev.prev();
+        }
+        
+        if ($prevParent && $prevParent.length) {
+            // Get children container of current item
+            const $currentChildren = $currentItem.next('.menu-children-container');
+            
+            // Get children container of previous parent (if exists)
+            const $prevChildren = $prevParent.next('.menu-children-container');
+            
+            // Move current item before previous parent
+            $currentItem.insertBefore($prevParent);
+            
+            // Move children container back after current item
+            if ($currentChildren.length) {
+                $currentChildren.insertAfter($currentItem);
+            }
+            
+            // Reinitialize drag & drop
+            initDragAndDrop();
+            
+            // Save order
+            saveMenuOrder();
+        } else {
+            showToast('Thông báo', 'Menu đã ở vị trí đầu tiên', 'info');
+        }
+    } else {
+        // Move child item up
+        const $parentRow = $currentItem.closest('.menu-children-container').prev('.menu-item-row.parent-item');
+        const $childrenContainer = $currentItem.parent('.menu-children-container');
+        
+        if (!$childrenContainer.length) {
+            showToast('Lỗi', 'Không tìm thấy container', 'warning');
+            return;
+        }
+        
+        const $prevChild = $currentItem.prev('.menu-item-row.child-item');
+        
+        if ($prevChild.length) {
+            // Swap positions
+            $currentItem.insertBefore($prevChild);
+            
+            // Reinitialize drag & drop
+            initDragAndDrop();
+            
+            // Save order
+            saveMenuOrder();
+        } else {
+            showToast('Thông báo', 'Menu đã ở vị trí đầu tiên trong nhóm', 'info');
+        }
+    }
+}
+
+// Move menu item down
+function moveMenuDown(menuId, isParent) {
+    const $currentItem = $(`.menu-item-row[data-id="${menuId}"]`);
+    
+    if (!$currentItem.length) {
+        showToast('Lỗi', 'Không tìm thấy menu item', 'warning');
+        return;
+    }
+    
+    if (isParent) {
+        // Move parent item down
+        // Need to find next parent, skipping any children containers
+        let $nextParent = null;
+        let $next = $currentItem.next();
+        
+        while ($next.length) {
+            if ($next.hasClass('menu-item-row') && $next.hasClass('parent-item')) {
+                $nextParent = $next;
+                break;
+            }
+            $next = $next.next();
+        }
+        
+        if ($nextParent && $nextParent.length) {
+            // Get children container of current item
+            const $currentChildren = $currentItem.next('.menu-children-container');
+            
+            // Get children container of next parent
+            const $nextChildren = $nextParent.next('.menu-children-container');
+            
+            // Move current item after next parent
+            if ($nextChildren.length) {
+                $currentItem.insertAfter($nextChildren);
+            } else {
+                $currentItem.insertAfter($nextParent);
+            }
+            
+            // Move children container back after current item
+            if ($currentChildren.length) {
+                $currentChildren.insertAfter($currentItem);
+            }
+            
+            // Reinitialize drag & drop
+            initDragAndDrop();
+            
+            // Save order
+            saveMenuOrder();
+        } else {
+            showToast('Thông báo', 'Menu đã ở vị trí cuối cùng', 'info');
+        }
+    } else {
+        // Move child item down
+        const $childrenContainer = $currentItem.parent('.menu-children-container');
+        
+        if (!$childrenContainer.length) {
+            showToast('Lỗi', 'Không tìm thấy container', 'warning');
+            return;
+        }
+        
+        const $nextChild = $currentItem.next('.menu-item-row.child-item');
+        
+        if ($nextChild.length) {
+            // Swap positions
+            $currentItem.insertAfter($nextChild);
+            
+            // Reinitialize drag & drop
+            initDragAndDrop();
+            
+            // Save order
+            saveMenuOrder();
+        } else {
+            showToast('Thông báo', 'Menu đã ở vị trí cuối cùng trong nhóm', 'info');
+        }
     }
 }
 
