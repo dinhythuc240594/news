@@ -80,6 +80,21 @@ $(document).ready(function() {
         moveMenuDown(menuId, isParent);
     });
     
+    // Add Submenu from menu item
+    $(document).on('click', '.btn-add-submenu', function(e) {
+        e.stopPropagation();
+        const parentId = parseInt($(this).data('id'));
+        const level = parseInt($(this).data('level')) || 1;
+        
+        // Kiểm tra level
+        if (level >= 4) {
+            showToast('Cảnh báo', 'Không thể tạo menu quá 4 cấp. Menu hiện tại đã đạt cấp tối đa.', 'warning');
+            return;
+        }
+        
+        openMenuModal('add-submenu', null, parentId);
+    });
+    
     // Auto generate slug
     $('#menuName').on('input', function() {
         const name = $(this).val();
@@ -217,11 +232,13 @@ function renderMenuRow(menu, hasChildren, isParent) {
     const checked = menu.visible ? 'checked' : '';
     const rowClass = isParent ? 'parent-item' : 'child-item';
     const hiddenClass = !menu.visible ? 'hidden-item' : '';
+    const level = menu.level || 1;
+    const canAddSubmenu = 1 < level && level < 4; // Chỉ cho phép thêm submenu nếu level < 4
     // Nếu có children và container expanded, hiển thị chevron-up, ngược lại chevron-down
     const expandIcon = hasChildren ? '<i class="fas fa-chevron-up"></i>' : '<i class="fas fa-minus" style="opacity: 0.3;"></i>';
     
     return `
-        <div class="menu-item-row ${rowClass} ${hiddenClass}" data-id="${menu.id}" data-parent-id="${menu.parent_id || ''}">
+        <div class="menu-item-row ${rowClass} ${hiddenClass}" data-id="${menu.id}" data-parent-id="${menu.parent_id || ''}" data-level="${level}">
             <div class="menu-item-handle">
                 <i class="fas fa-grip-vertical"></i>
             </div>
@@ -233,20 +250,18 @@ function renderMenuRow(menu, hasChildren, isParent) {
                     <div class="menu-item-name">
                         ${icon}${menu.name}
                         ${!menu.visible ? '<span class="badge bg-secondary ms-2">Ẩn</span>' : ''}
+                        <!-- <span class="badge bg-info ms-2">Cấp ${level}</span> -->
                     </div>
                     <div class="menu-item-meta">
                         <code>${menu.slug}</code> | Thứ tự: ${menu.order}
                     </div>
                 </div>
                 <div class="menu-item-actions">
-                    <div class="btn-group me-2" role="group">
-                        <button class="btn btn-sm btn-secondary btn-move-up" data-id="${menu.id}" data-is-parent="${isParent}" title="Lên">
-                            <i class="fas fa-arrow-up"></i>
-                        </button>
-                        <button class="btn btn-sm btn-secondary btn-move-down" data-id="${menu.id}" data-is-parent="${isParent}" title="Xuống">
-                            <i class="fas fa-arrow-down"></i>
-                        </button>
-                    </div>
+                    ${canAddSubmenu ? `
+                    <button class="btn btn-sm btn-success btn-action btn-add-submenu me-2" data-id="${menu.id}" data-level="${level}" title="Thêm Submenu">
+                        <i class="fas fa-plus-circle"></i>
+                    </button>
+                    ` : ''}
                     <label class="visibility-switch me-2">
                         <input type="checkbox" class="menu-visibility-toggle" data-id="${menu.id}" ${checked}>
                         <span class="visibility-slider"></span>
@@ -258,6 +273,14 @@ function renderMenuRow(menu, hasChildren, isParent) {
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
+                                    <div class="btn-group me-2" role="group">
+                        <button class="btn btn-sm btn-secondary btn-move-up" data-id="${menu.id}" data-is-parent="${isParent}" title="Lên">
+                            <i class="fas fa-arrow-up"></i>
+                        </button>
+                        <button class="btn btn-sm btn-secondary btn-move-down" data-id="${menu.id}" data-is-parent="${isParent}" title="Xuống">
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+                    </div>
             </div>
         </div>
     `;
@@ -679,12 +702,29 @@ async function loadParentMenuOptions() {
         const result = await response.json();
         
         if (result.success && result.data) {
-            const parentMenus = result.data.filter(m => m.parent_id === null)
-                                           .sort((a, b) => a.order - b.order);
+            // Lấy tất cả menu có level < 4 (có thể làm parent)
+            const availableParents = result.data.filter(m => (m.level || 1) < 4)
+                                               .sort((a, b) => (a.order || 0) - (b.order || 0));
+            
             let html = '<option value="">-- Menu cấp 1 --</option>';
             
-            parentMenus.forEach(menu => {
-                html += `<option value="${menu.id}">${menu.name}</option>`;
+            // Nhóm theo level để hiển thị rõ hơn
+            const menusByLevel = {};
+            availableParents.forEach(menu => {
+                const level = menu.level || 1;
+                if (!menusByLevel[level]) {
+                    menusByLevel[level] = [];
+                }
+                menusByLevel[level].push(menu);
+            });
+            
+            // Hiển thị theo thứ tự level
+            Object.keys(menusByLevel).sort().forEach(level => {
+                const levelMenus = menusByLevel[level];
+                levelMenus.forEach(menu => {
+                    const indent = '&nbsp;'.repeat((parseInt(level) - 1) * 4);
+                    html += `<option value="${menu.id}">${indent}${menu.name} (Cấp ${level})</option>`;
+                });
             });
             
             $('#menuParent').html(html);
@@ -695,20 +735,51 @@ async function loadParentMenuOptions() {
 }
 
 // Open menu modal
-async function openMenuModal(mode, menuId) {
+async function openMenuModal(mode, menuId, parentId = null) {
     $('#menuForm')[0].reset();
     $('#menuId').val('');
     
+    // Load parent menu options first
+    await loadParentMenuOptions();
+    
     if (mode === 'add') {
         $('#menuModalTitle').text('Thêm Menu Mới');
-        $('#menuParent').val('');
+        $('#menuParent').val('').prop('disabled', false);
         $('#menuVisible').prop('checked', true);
     } else if (mode === 'add-submenu') {
         $('#menuModalTitle').text('Thêm Submenu');
         $('#menuVisible').prop('checked', true);
-        // Show parent menu select as required
+        
+        // Nếu có parentId, tự động set và disable select
+        if (parentId) {
+            $('#menuParent').val(parentId).prop('disabled', true);
+            
+            // Lấy thông tin parent để hiển thị
+            try {
+                const response = await fetch('/admin/api/menu-items');
+                const result = await response.json();
+                
+                if (result.success && result.data) {
+                    const parentMenu = result.data.find(m => m.id === parentId);
+                    if (parentMenu) {
+                        const parentLevel = parentMenu.level || 1;
+                        if (parentLevel >= 4) {
+                            showToast('Cảnh báo', 'Không thể tạo menu quá 4 cấp. Menu cha đã đạt cấp tối đa.', 'warning');
+                            return;
+                        }
+                        $('#menuModalTitle').text(`Thêm Submenu cho "${parentMenu.name}" (Cấp ${parentLevel + 1})`);
+                    }
+                }
+            } catch (error) {
+                console.error('Lỗi tải thông tin parent menu:', error);
+            }
+        } else {
+            // Nếu không có parentId, cho phép chọn parent
+            $('#menuParent').val('').prop('disabled', false);
+        }
     } else if (mode === 'edit' && menuId) {
         $('#menuModalTitle').text('Chỉnh sửa Menu');
+        $('#menuParent').prop('disabled', false);
         try {
             const response = await fetch('/admin/api/menu-items');
             const result = await response.json();
@@ -737,10 +808,33 @@ async function openMenuModal(mode, menuId) {
 // Save menu
 async function saveMenu() {
     const menuId = $('#menuId').val();
+    const parentId = $('#menuParent').val() ? parseInt($('#menuParent').val()) : null;
+    
+    // Kiểm tra level nếu có parent_id
+    if (parentId) {
+        try {
+            const response = await fetch('/admin/api/menu-items');
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                const parentMenu = result.data.find(m => m.id === parentId);
+                if (parentMenu) {
+                    const parentLevel = parentMenu.level || 1;
+                    if (parentLevel >= 4) {
+                        showToast('Lỗi', 'Không thể tạo menu quá 4 cấp. Menu cha đã đạt cấp tối đa.', 'warning');
+                        return;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Lỗi kiểm tra level:', error);
+        }
+    }
+    
     const menuData = {
         name: $('#menuName').val().trim(),
         slug: $('#menuSlug').val().trim(),
-        parent_id: $('#menuParent').val() ? parseInt($('#menuParent').val()) : null,
+        parent_id: parentId,
         icon: $('#menuIcon').val().trim() || null,
         order: parseInt($('#menuOrder').val()) || 1,
         visible: $('#menuVisible').is(':checked')

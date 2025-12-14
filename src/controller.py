@@ -844,9 +844,21 @@ class AdminController:
                 'icon': item.icon,
                 'order': item.order_display,
                 'parent_id': item.parent_id,
+                'level': item.level if hasattr(item, 'level') else 1,
                 'visible': item.visible
             } for item in categories]
         })
+    
+    def _calculate_level(self, parent_id):
+        """Tính toán level dựa trên parent_id"""
+        if not parent_id:
+            return 1
+        
+        parent = self.db_session.query(Category).filter(Category.id == parent_id).first()
+        if not parent:
+            return 1
+        
+        return parent.level + 1
     
     def api_create_menu_item(self):
         """API tạo category mới (menu item)"""
@@ -872,12 +884,20 @@ class AdminController:
         if existing:
             return jsonify({'success': False, 'error': 'Slug đã tồn tại'}), 400
         
+        # Tính toán level
+        level = self._calculate_level(parent_id)
+        
+        # Kiểm tra level không được vượt quá 4
+        if level > 4:
+            return jsonify({'success': False, 'error': 'Không thể tạo menu quá 4 cấp. Menu hiện tại đã đạt cấp tối đa.'}), 400
+        
         category = Category(
             name=name,
             slug=slug,
             icon=icon if icon else None,
             order_display=order,
             parent_id=int(parent_id) if parent_id else None,
+            level=level,
             visible=visible,
             description=description if description else None
         )
@@ -892,7 +912,8 @@ class AdminController:
             'data': {
                 'id': category.id,
                 'name': category.name,
-                'slug': category.slug
+                'slug': category.slug,
+                'level': category.level
             }
         })
     
@@ -924,7 +945,28 @@ class AdminController:
             # Kiểm tra không được set parent là chính nó
             if parent_id == menu_id:
                 return jsonify({'success': False, 'error': 'Không thể set parent là chính nó'}), 400
+            
+            # Kiểm tra không được set parent là con cháu của chính nó (tránh vòng lặp)
+            if parent_id:
+                # Kiểm tra xem parent_id có phải là con cháu của menu_id không
+                def is_descendant(parent_candidate_id, ancestor_id):
+                    if parent_candidate_id == ancestor_id:
+                        return True
+                    parent_candidate = self.db_session.query(Category).filter(Category.id == parent_candidate_id).first()
+                    if not parent_candidate or not parent_candidate.parent_id:
+                        return False
+                    return is_descendant(parent_candidate.parent_id, ancestor_id)
+                
+                if is_descendant(int(parent_id), menu_id):
+                    return jsonify({'success': False, 'error': 'Không thể set parent là con cháu của chính nó'}), 400
+            
             category.parent_id = int(parent_id) if parent_id else None
+            
+            # Tính toán lại level khi parent_id thay đổi
+            new_level = self._calculate_level(category.parent_id)
+            if new_level > 4:
+                return jsonify({'success': False, 'error': 'Không thể tạo menu quá 4 cấp. Menu hiện tại đã đạt cấp tối đa.'}), 400
+            category.level = new_level
         if 'visible' in data:
             category.visible = bool(data['visible'])
         if 'description' in data:
@@ -938,7 +980,8 @@ class AdminController:
             'message': 'Đã cập nhật danh mục',
             'data': {
                 'id': category.id,
-                'name': category.name
+                'name': category.name,
+                'level': category.level
             }
         })
     

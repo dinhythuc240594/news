@@ -197,6 +197,7 @@ class Category(Base):
     icon = Column(String(50), nullable=True)
     order_display = Column(Integer, default=0)
     parent_id = Column(Integer, ForeignKey('categories.id'), nullable=True)
+    level = Column(Integer, default=1)  # Cấp độ menu: 1, 2, 3, 4
     visible = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
