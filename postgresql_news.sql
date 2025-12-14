@@ -139,3 +139,16 @@ CREATE INDEX IF NOT EXISTS idx_viewed_news_news ON viewed_news(news_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
 CREATE INDEX IF NOT EXISTS idx_comments_news ON comments(news_id);
 CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
+
+-- 6. Tạo bảng menu_items (menu động)
+CREATE TABLE IF NOT EXISTS menu_items (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    icon VARCHAR(50),
+    order_display INTEGER DEFAULT 0,
+    parent_id INTEGER REFERENCES menu_items(id),
+    visible BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

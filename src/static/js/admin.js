@@ -12,6 +12,7 @@ $(document).ready(function() {
     loadPendingArticles();
     loadAPIArticles();
     loadStatistics();
+    loadHotArticles();
     
     // Menu navigation
     $('.sidebar-menu a[data-section]').click(function(e) {
@@ -28,6 +29,9 @@ $(document).ready(function() {
         
         // Update page title
         updatePageTitle(section);
+        
+        // Load data for the section
+        loadSectionData(section);
     });
     
     // Logout
@@ -50,6 +54,23 @@ $(document).ready(function() {
     $(document).on('click', '.btn-approve', function() {
         const articleId = $(this).data('id');
         approveArticle(articleId);
+    });
+    
+    // Save API article
+    $(document).on('click', '.btn-save-api', function() {
+        const articleData = JSON.parse($(this).data('article'));
+        openSaveAPIArticleModal(articleData);
+    });
+    
+    // Preview API article
+    $(document).on('click', '.btn-preview-api', function() {
+        const articleData = JSON.parse($(this).data('article'));
+        previewAPIArticle(articleData);
+    });
+    
+    // Save API article form submit
+    $('#saveAPIArticleBtn').click(function() {
+        saveAPIArticle();
     });
     
     // Reject article
@@ -122,223 +143,544 @@ function updatePageTitle(section) {
         'approved': 'Bài viết đã duyệt',
         'rejected': 'Bài viết bị từ chối',
         'api': 'Bài viết từ API',
+        'international': 'Bài báo Quốc tế',
+        'international-pending': 'Quốc tế chờ duyệt',
         'users': 'Quản lý người dùng',
         'statistics': 'Thống kê'
     };
     $('#pageTitle').text(titles[section] || 'Dashboard');
 }
 
+// Load data for specific section
+async function loadSectionData(section) {
+    switch(section) {
+        case 'pending':
+            loadPendingArticles();
+            break;
+        case 'approved':
+            loadApprovedArticles();
+            break;
+        case 'rejected':
+            loadRejectedArticles();
+            break;
+        case 'api':
+            loadAPIArticles();
+            break;
+        case 'international':
+            loadInternationalArticles();
+            break;
+        case 'international-pending':
+            loadInternationalPending();
+            break;
+        case 'dashboard':
+            loadStatistics();
+            loadHotArticles();
+            break;
+    }
+}
+
+// Load approved articles
+async function loadApprovedArticles() {
+    try {
+        const response = await fetch('/admin/api/approved-articles');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let html = '';
+            result.data.forEach((article, index) => {
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td><strong>${article.title}</strong></td>
+                        <td>${article.author}</td>
+                        <td><span class="badge bg-primary">${article.category}</span></td>
+                        <td>${article.date}</td>
+                        <td><span class="badge bg-success">${article.views} lượt xem</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-info btn-action" title="Xem">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (result.data.length === 0) {
+                html = '<tr><td colspan="7" class="text-center text-muted">Không có bài viết nào</td></tr>';
+            }
+            
+            $('#approved').find('tbody').html(html);
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết đã duyệt:', error);
+    }
+}
+
+// Load rejected articles
+async function loadRejectedArticles() {
+    try {
+        const response = await fetch('/admin/api/rejected-articles');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let html = '';
+            result.data.forEach((article, index) => {
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td><strong>${article.title}</strong></td>
+                        <td>${article.author}</td>
+                        <td><span class="badge bg-primary">${article.category}</span></td>
+                        <td>${article.date}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info btn-action" title="Xem">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (result.data.length === 0) {
+                html = '<tr><td colspan="6" class="text-center text-muted">Không có bài viết nào</td></tr>';
+            }
+            
+            $('#rejected').find('tbody').html(html);
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết bị từ chối:', error);
+    }
+}
+
+// Load international articles
+async function loadInternationalArticles() {
+    try {
+        const response = await fetch('/admin/api/international-articles');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let html = '';
+            result.data.forEach((article, index) => {
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${article.title}</td>
+                        <td><span class="badge bg-info">${article.category}</span></td>
+                        <td>${article.author}</td>
+                        <td><span class="badge bg-success">${article.status}</span></td>
+                        <td>${article.views}</td>
+                        <td>${article.published}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
+                            <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (result.data.length === 0) {
+                html = '<tr><td colspan="8" class="text-center text-muted">Không có bài viết nào</td></tr>';
+            }
+            
+            $('#international').find('tbody').html(html);
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết quốc tế:', error);
+    }
+}
+
+// Load international pending
+async function loadInternationalPending() {
+    try {
+        const response = await fetch('/admin/api/international-pending');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let html = '';
+            result.data.forEach((article, index) => {
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${article.title}</td>
+                        <td><span class="badge bg-warning">${article.category}</span></td>
+                        <td>${article.author}</td>
+                        <td>${article.submitted}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}"><i class="fas fa-eye"></i> Review</button>
+                            <button class="btn btn-sm btn-success btn-approve" data-id="${article.id}"><i class="fas fa-check"></i> Approve</button>
+                            <button class="btn btn-sm btn-danger btn-reject" data-id="${article.id}"><i class="fas fa-times"></i> Reject</button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (result.data.length === 0) {
+                html = '<tr><td colspan="6" class="text-center text-muted">Không có bài viết nào</td></tr>';
+            }
+            
+            $('#international-pending').find('tbody').html(html);
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết quốc tế chờ duyệt:', error);
+    }
+}
+
+// Load hot articles
+async function loadHotArticles() {
+    try {
+        const response = await fetch('/admin/api/hot-articles');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let html = '';
+            result.data.forEach((article, index) => {
+                html += `
+                    <div class="hot-article">
+                        <h6>${article.title}</h6>
+                        <small class="text-muted"><i class="far fa-eye"></i> ${article.views.toLocaleString()} lượt xem</small>
+                    </div>
+                `;
+            });
+            
+            if (result.data.length === 0) {
+                html = '<p class="text-muted">Chưa có bài viết hot</p>';
+            }
+            
+            $('#hotArticlesContainer').html(html);
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết hot:', error);
+    }
+}
+
 // Load statistics
-function loadStatistics() {
-    // Simulate API call
-    const stats = {
-        pending: 12,
-        approved: 156,
-        rejected: 8,
-        api: 45
-    };
-    
-    $('#statPending').text(stats.pending);
-    $('#statApproved').text(stats.approved);
-    $('#statRejected').text(stats.rejected);
-    $('#statAPI').text(stats.api);
-    $('#pendingCount').text(stats.pending);
+async function loadStatistics() {
+    try {
+        const response = await fetch('/admin/api/statistics');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            $('#statPending').text(result.data.pending);
+            $('#statApproved').text(result.data.approved);
+            $('#statRejected').text(result.data.rejected);
+            $('#statAPI').text(result.data.api);
+            $('#pendingCount').text(result.data.pending);
+        }
+    } catch (error) {
+        console.error('Lỗi tải thống kê:', error);
+    }
 }
 
 // Load pending articles
-function loadPendingArticles() {
-    const articles = [
-        {
-            id: 1,
-            title: 'Thủ tướng phát biểu tại hội nghị kinh tế quốc tế',
-            author: 'Nguyễn Văn A',
-            category: 'Thời sự',
-            date: '2024-12-13 14:30',
-            status: 'pending'
-        },
-        {
-            id: 2,
-            title: 'Giá vàng trong nước tăng cao kỷ lục',
-            author: 'Trần Thị B',
-            category: 'Kinh doanh',
-            date: '2024-12-13 13:15',
-            status: 'pending'
-        },
-        {
-            id: 3,
-            title: 'Đội tuyển Việt Nam chuẩn bị cho trận đấu quan trọng',
-            author: 'Lê Văn C',
-            category: 'Thể thao',
-            date: '2024-12-13 12:00',
-            status: 'pending'
-        },
-        {
-            id: 4,
-            title: 'Công nghệ AI đang thay đổi cách chúng ta làm việc',
-            author: 'Phạm Thị D',
-            category: 'Công nghệ',
-            date: '2024-12-13 11:30',
-            status: 'pending'
-        },
-        {
-            id: 5,
-            title: 'Top 10 địa điểm du lịch hấp dẫn nhất mùa đông',
-            author: 'Hoàng Văn E',
-            category: 'Du lịch',
-            date: '2024-12-13 10:45',
-            status: 'pending'
+async function loadPendingArticles() {
+    try {
+        const response = await fetch('/admin/api/pending-articles');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let html = '';
+            result.data.forEach((article, index) => {
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td><strong>${article.title}</strong></td>
+                        <td>${article.author}</td>
+                        <td><span class="badge bg-primary">${article.category}</span></td>
+                        <td>${article.date}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info btn-action btn-preview" data-id="${article.id}" title="Xem trước">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-success btn-action btn-approve" data-id="${article.id}" title="Duyệt">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger btn-action btn-reject" data-id="${article.id}" title="Từ chối">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (result.data.length === 0) {
+                html = '<tr><td colspan="6" class="text-center text-muted">Không có bài viết nào chờ duyệt</td></tr>';
+            }
+            
+            $('#pendingArticlesTable').html(html);
         }
-    ];
-    
-    let html = '';
-    articles.forEach((article, index) => {
-        html += `
-            <tr>
-                <td>${index + 1}</td>
-                <td><strong>${article.title}</strong></td>
-                <td>${article.author}</td>
-                <td><span class="badge bg-primary">${article.category}</span></td>
-                <td>${article.date}</td>
-                <td>
-                    <button class="btn btn-sm btn-info btn-action btn-preview" data-id="${article.id}" title="Xem trước">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn btn-sm btn-success btn-action btn-approve" data-id="${article.id}" title="Duyệt">
-                        <i class="fas fa-check"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger btn-action btn-reject" data-id="${article.id}" title="Từ chối">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    $('#pendingArticlesTable').html(html);
+    } catch (error) {
+        console.error('Lỗi tải bài viết chờ duyệt:', error);
+        $('#pendingArticlesTable').html('<tr><td colspan="6" class="text-center text-danger">Lỗi tải dữ liệu</td></tr>');
+    }
 }
 
 // Load API articles
-function loadAPIArticles() {
-    const articles = [
-        {
-            id: 101,
-            title: 'Breaking: Major tech company announces new product',
-            source: 'TechCrunch',
-            category: 'Công nghệ',
-            date: '2024-12-13 15:00',
-            status: 'new'
-        },
-        {
-            id: 102,
-            title: 'Global markets react to economic news',
-            source: 'Reuters',
-            category: 'Kinh tế',
-            date: '2024-12-13 14:30',
-            status: 'new'
-        },
-        {
-            id: 103,
-            title: 'Sports: Championship final results',
-            source: 'ESPN',
-            category: 'Thể thao',
-            date: '2024-12-13 13:45',
-            status: 'new'
+async function loadAPIArticles() {
+    try {
+        const response = await fetch('/admin/api/api-articles');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let html = '';
+            result.data.forEach((article, index) => {
+                const date = article.published_at ? new Date(article.published_at).toLocaleString('vi-VN') : 'N/A';
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td><strong>${article.title}</strong></td>
+                        <td><span class="badge bg-info">${article.source}</span></td>
+                        <td><span class="badge bg-primary">${article.category_name || 'N/A'}</span></td>
+                        <td>${date}</td>
+                        <td>
+                            <button class="btn btn-sm btn-info btn-action btn-preview-api" data-article='${JSON.stringify(article)}' title="Xem trước">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-success btn-action btn-save-api" data-article='${JSON.stringify(article)}' title="Lưu bài viết">
+                                <i class="fas fa-save"></i> Lưu
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (result.data.length === 0) {
+                html = '<tr><td colspan="6" class="text-center text-muted">Chưa có bài viết nào từ API. Nhấn "Lấy bài mới từ API" để tải.</td></tr>';
+            }
+            
+            $('#apiArticlesTable').html(html);
         }
-    ];
-    
-    let html = '';
-    articles.forEach((article, index) => {
-        html += `
-            <tr>
-                <td>${index + 1}</td>
-                <td><strong>${article.title}</strong></td>
-                <td><span class="badge bg-info">${article.source}</span></td>
-                <td><span class="badge bg-primary">${article.category}</span></td>
-                <td>${article.date}</td>
-                <td>
-                    <button class="btn btn-sm btn-info btn-action btn-preview" data-id="${article.id}" title="Xem trước">
-                        <i class="fas fa-eye"></i>
-                    </button>
-                    <button class="btn btn-sm btn-success btn-action btn-approve" data-id="${article.id}" title="Duyệt & Đăng">
-                        <i class="fas fa-check"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger btn-action" title="Xóa">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-    
-    $('#apiArticlesTable').html(html);
+    } catch (error) {
+        console.error('Lỗi tải bài viết từ API:', error);
+        $('#apiArticlesTable').html('<tr><td colspan="6" class="text-center text-danger">Lỗi tải dữ liệu</td></tr>');
+    }
 }
 
 // Fetch API articles
-function fetchAPIArticles() {
+async function fetchAPIArticles() {
     const btn = $('#fetchAPIBtn');
     btn.prop('disabled', true);
     btn.html('<i class="fas fa-spinner fa-spin"></i> Đang tải...');
     
-    // Simulate API call
-    setTimeout(function() {
-        showToast('Thành công', 'Đã lấy 10 bài viết mới từ API', 'success');
-        loadAPIArticles();
+    try {
+        // Có thể thêm form để nhập API key và URL
+        const apiKey = prompt('Nhập API Key (để trống nếu dùng mock data):') || '';
+        const apiUrl = prompt('Nhập API URL (để trống nếu dùng mock data):') || '';
+        
+        const response = await fetch('/admin/api/fetch-api-news', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                api_key: apiKey,
+                api_url: apiUrl || 'https://newsapi.org/v2/top-headlines'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('Thành công', result.message || 'Đã lấy bài viết mới từ API', 'success');
+            loadAPIArticles();
+            loadStatistics(); // Reload stats
+        } else {
+            showToast('Lỗi', result.error || 'Không thể lấy bài viết từ API', 'warning');
+        }
+    } catch (error) {
+        console.error('Lỗi fetch API:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi lấy bài viết từ API', 'warning');
+    } finally {
         btn.prop('disabled', false);
         btn.html('<i class="fas fa-sync-alt"></i> Lấy bài mới từ API');
-        
-        // Update stats
-        const currentCount = parseInt($('#statAPI').text());
-        $('#statAPI').text(currentCount + 10);
-    }, 2000);
-}
-
-// Approve article
-function approveArticle(articleId) {
-    if (confirm('Bạn có chắc muốn duyệt bài viết này?')) {
-        showSpinner();
-        
-        // Simulate API call
-        setTimeout(function() {
-            hideSpinner();
-            showToast('Thành công', 'Bài viết đã được duyệt và xuất bản', 'success');
-            
-            // Remove from table
-            $('button[data-id="' + articleId + '"]').closest('tr').fadeOut(function() {
-                $(this).remove();
-            });
-            
-            // Update stats
-            const pending = parseInt($('#statPending').text()) - 1;
-            const approved = parseInt($('#statApproved').text()) + 1;
-            $('#statPending').text(pending);
-            $('#statApproved').text(approved);
-            $('#pendingCount').text(pending);
-        }, 1000);
     }
 }
 
-// Reject article
-function rejectArticle(articleId, reason) {
+// Approve article
+async function approveArticle(articleId) {
+    if (confirm('Bạn có chắc muốn duyệt bài viết này?')) {
+        showSpinner();
+        
+        try {
+            const response = await fetch(`/admin/news/${articleId}/approve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const result = await response.json();
+            
+            hideSpinner();
+            
+            if (response.ok) {
+                showToast('Thành công', 'Bài viết đã được duyệt và xuất bản', 'success');
+                
+                // Remove from table
+                $(`button[data-id="${articleId}"]`).closest('tr').fadeOut(function() {
+                    $(this).remove();
+                });
+                
+                // Reload stats
+                loadStatistics();
+            } else {
+                showToast('Lỗi', result.error || 'Không thể duyệt bài viết', 'warning');
+            }
+        } catch (error) {
+            hideSpinner();
+            console.error('Lỗi duyệt bài viết:', error);
+            showToast('Lỗi', 'Có lỗi xảy ra khi duyệt bài viết', 'warning');
+        }
+    }
+}
+
+// Open save API article modal
+async function openSaveAPIArticleModal(articleData) {
+    // Load categories
+    try {
+        const response = await fetch('/admin/api/categories');
+        const result = await response.json();
+        
+        let categoryOptions = '<option value="">-- Chọn danh mục --</option>';
+        if (result.success && result.data) {
+            result.data.forEach(cat => {
+                categoryOptions += `<option value="${cat.id}">${cat.name}</option>`;
+            });
+        }
+        
+        $('#saveAPICategory').html(categoryOptions);
+    } catch (error) {
+        console.error('Lỗi tải danh mục:', error);
+    }
+    
+    // Set article data
+    $('#saveAPIArticleData').val(JSON.stringify(articleData));
+    $('#saveAPITitle').val(articleData.title);
+    $('#saveAPISummary').val(articleData.summary || '');
+    $('#saveAPIStatus').val('draft'); // Default to draft
+    
+    const modal = new bootstrap.Modal(document.getElementById('saveAPIArticleModal'));
+    modal.show();
+}
+
+// Save API article
+async function saveAPIArticle() {
+    const articleData = JSON.parse($('#saveAPIArticleData').val());
+    const categoryId = $('#saveAPICategory').val();
+    const status = $('#saveAPIStatus').val();
+    
+    if (!categoryId) {
+        alert('Vui lòng chọn danh mục!');
+        return;
+    }
+    
     showSpinner();
     
-    // Simulate API call
-    setTimeout(function() {
-        hideSpinner();
-        showToast('Thông báo', 'Bài viết đã bị từ chối. Lý do: ' + reason, 'warning');
-        
-        // Remove from table
-        $('button[data-id="' + articleId + '"]').closest('tr').fadeOut(function() {
-            $(this).remove();
+    try {
+        const response = await fetch('/admin/api/save-api-article', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                article: articleData,
+                category_id: parseInt(categoryId),
+                status: status
+            })
         });
         
-        // Update stats
-        const pending = parseInt($('#statPending').text()) - 1;
-        const rejected = parseInt($('#statRejected').text()) + 1;
-        $('#statPending').text(pending);
-        $('#statRejected').text(rejected);
-        $('#pendingCount').text(pending);
-    }, 1000);
+        const result = await response.json();
+        
+        hideSpinner();
+        
+        if (result.success) {
+            showToast('Thành công', result.message || 'Đã lưu bài viết', 'success');
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('saveAPIArticleModal')).hide();
+            
+            // Remove from table (find by title since we don't have persistent ID)
+            $(`tr:contains("${articleData.title}")`).fadeOut(function() {
+                $(this).remove();
+            });
+            
+            // Reload stats
+            loadStatistics();
+            loadAPIArticles();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể lưu bài viết', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi lưu bài viết API:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi lưu bài viết', 'warning');
+    }
 }
+
+// Preview API article
+function previewAPIArticle(articleData) {
+    const content = `
+        <div class="article-preview">
+            ${articleData.thumbnail ? `<img src="${articleData.thumbnail}" alt="${articleData.title}" style="width: 100%; border-radius: 8px; margin-bottom: 20px;">` : ''}
+            <h3>${articleData.title}</h3>
+            <div class="mb-3">
+                <span class="badge bg-info">${articleData.source}</span>
+                <small class="text-muted ms-2">Bởi ${articleData.author || 'Unknown'} - ${new Date(articleData.published_at).toLocaleString('vi-VN')}</small>
+            </div>
+            <div class="mb-3">
+                <strong>Tóm tắt:</strong>
+                <p>${articleData.summary || 'N/A'}</p>
+            </div>
+            <div>
+                <strong>Nội dung:</strong>
+                <div>${articleData.content || articleData.summary || 'N/A'}</div>
+            </div>
+            ${articleData.source_url ? `<div class="mt-3"><a href="${articleData.source_url}" target="_blank" class="btn btn-sm btn-outline-primary">Xem bài gốc</a></div>` : ''}
+        </div>
+    `;
+    
+    $('#previewContent').html(content);
+    
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+}
+
+// Reject article
+async function rejectArticle(articleId, reason) {
+    showSpinner();
+    
+    try {
+        const response = await fetch(`/admin/news/${articleId}/reject`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Reason': reason
+            }
+        });
+        
+        hideSpinner();
+        
+        if (response.ok) {
+            showToast('Thông báo', 'Bài viết đã bị từ chối. Lý do: ' + reason, 'warning');
+            
+            // Remove from table
+            $(`button[data-id="${articleId}"]`).closest('tr').fadeOut(function() {
+                $(this).remove();
+            });
+            
+            // Reload stats
+            loadStatistics();
+        } else {
+            const result = await response.json();
+            showToast('Lỗi', result.error || 'Không thể từ chối bài viết', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi từ chối bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi từ chối bài viết', 'warning');
+    }
+}
+
 
 // Preview article
 function previewArticle(articleId) {
@@ -378,41 +720,71 @@ function previewArticle(articleId) {
 }
 
 // Initialize chart
-function initializeChart() {
+async function initializeChart() {
     const ctx = document.getElementById('articleChart');
     if (ctx) {
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
-                datasets: [{
-                    label: 'Bài viết mới',
-                    data: [12, 19, 15, 25, 22, 30, 28],
-                    borderColor: '#c00',
-                    backgroundColor: 'rgba(192, 0, 0, 0.1)',
-                    tension: 0.4
-                }, {
-                    label: 'Bài được duyệt',
-                    data: [8, 15, 12, 20, 18, 25, 22],
-                    borderColor: '#27ae60',
-                    backgroundColor: 'rgba(39, 174, 96, 0.1)',
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        position: 'bottom'
+        try {
+            const response = await fetch('/admin/api/chart-data');
+            const result = await response.json();
+            
+            if (result.success && result.data) {
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: result.data.labels,
+                        datasets: result.data.datasets.map((dataset, index) => ({
+                            label: dataset.label,
+                            data: dataset.data,
+                            borderColor: index === 0 ? '#c00' : '#27ae60',
+                            backgroundColor: index === 0 ? 'rgba(192, 0, 0, 0.1)' : 'rgba(39, 174, 96, 0.1)',
+                            tension: 0.4
+                        }))
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
                     }
+                });
+            }
+        } catch (error) {
+            console.error('Lỗi tải dữ liệu biểu đồ:', error);
+            // Fallback to default chart
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'],
+                    datasets: [{
+                        label: 'Bài viết mới',
+                        data: [0, 0, 0, 0, 0, 0, 0],
+                        borderColor: '#c00',
+                        backgroundColor: 'rgba(192, 0, 0, 0.1)',
+                        tension: 0.4
+                    }]
                 },
-                scales: {
-                    y: {
-                        beginAtZero: true
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     }
 }
 

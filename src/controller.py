@@ -5,7 +5,7 @@ from functools import wraps
 import os
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from database import get_session, NewsStatus, UserRole, SavedNews, ViewedNews, Comment
+from database import get_session, NewsStatus, UserRole, SavedNews, ViewedNews, Comment, MenuItem, News, Category
 from models import NewsModel, CategoryModel, UserModel
 
 def admin_required(f):
@@ -276,6 +276,12 @@ class AdminController:
         user_id = session.get('user_id')
         news = self.news_model.approve(news_id, user_id)
         
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            if news:
+                return jsonify({'success': True, 'message': 'Đã duyệt bài viết'})
+            else:
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+        
         if news:
             flash('Đã duyệt bài viết', 'success')
         else:
@@ -289,7 +295,14 @@ class AdminController:
         Route: POST /admin/news/<news_id>/reject
         """
         user_id = session.get('user_id')
+        reason = request.headers.get('X-Reason') or request.json.get('reason') if request.is_json else None
         news = self.news_model.reject(news_id, user_id)
+        
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            if news:
+                return jsonify({'success': True, 'message': 'Đã từ chối bài viết', 'reason': reason})
+            else:
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
         
         if news:
             flash('Đã từ chối bài viết', 'success')
@@ -380,6 +393,532 @@ class AdminController:
             'created_at': news.created_at.isoformat(),
             'published_at': news.published_at.isoformat() if news.published_at else None
         }
+    
+    def api_statistics(self):
+        """API lấy thống kê dashboard"""
+        from sqlalchemy import func
+        
+        # Đếm số lượng bài viết theo trạng thái
+        pending_count = self.db_session.query(func.count(News.id)).filter(
+            News.status == NewsStatus.PENDING
+        ).scalar() or 0
+        
+        approved_count = self.db_session.query(func.count(News.id)).filter(
+            News.status == NewsStatus.PUBLISHED
+        ).scalar() or 0
+        
+        rejected_count = self.db_session.query(func.count(News.id)).filter(
+            News.status == NewsStatus.REJECTED
+        ).scalar() or 0
+        
+        # Đếm số bài viết từ API trong cache (tạm thời)
+        api_articles = session.get('api_articles_cache', [])
+        api_count = len(api_articles)
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'pending': pending_count,
+                'approved': approved_count,
+                'rejected': rejected_count,
+                'api': api_count
+            }
+        })
+    
+    def api_pending_articles(self):
+        """API lấy danh sách bài viết chờ duyệt"""
+        articles = self.news_model.get_all(status=NewsStatus.PENDING, limit=100)
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'author': article.creator.username if article.creator else 'N/A',
+                'category': article.category.name if article.category else 'N/A',
+                'date': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'status': article.status.value
+            } for article in articles]
+        })
+    
+    def api_approved_articles(self):
+        """API lấy danh sách bài viết đã duyệt"""
+        articles = self.news_model.get_all(status=NewsStatus.PUBLISHED, limit=100)
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'author': article.creator.username if article.creator else 'N/A',
+                'category': article.category.name if article.category else 'N/A',
+                'date': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
+                'views': article.view_count
+            } for article in articles]
+        })
+    
+    def api_rejected_articles(self):
+        """API lấy danh sách bài viết bị từ chối"""
+        articles = self.news_model.get_all(status=NewsStatus.REJECTED, limit=100)
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'author': article.creator.username if article.creator else 'N/A',
+                'category': article.category.name if article.category else 'N/A',
+                'date': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else ''
+            } for article in articles]
+        })
+    
+    def api_api_articles(self):
+        """API lấy danh sách bài viết từ API bên ngoài (chỉ hiển thị, không lưu)"""
+        # Lấy dữ liệu từ session hoặc cache (tạm thời lưu trong session)
+        # Hoặc fetch lại từ API nếu cần
+        api_articles = session.get('api_articles_cache', [])
+        
+        return jsonify({
+            'success': True,
+            'data': api_articles
+        })
+    
+    def api_international_articles(self):
+        """API lấy danh sách bài viết quốc tế (đã duyệt)"""
+        # Giả sử bài quốc tế có category với slug 'international' hoặc 'the-gioi'
+        from sqlalchemy import or_
+        articles = self.db_session.query(News).join(Category).filter(
+            News.status == NewsStatus.PUBLISHED,
+            or_(
+                Category.slug.ilike('%international%'),
+                Category.slug.ilike('%the-gioi%'),
+                Category.slug.ilike('%world%')
+            )
+        ).order_by(News.published_at.desc()).limit(100).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'category': article.category.name if article.category else 'N/A',
+                'author': article.creator.username if article.creator else 'N/A',
+                'status': 'Approved',
+                'views': article.view_count,
+                'published': article.published_at.strftime('%d/%m/%Y') if article.published_at else ''
+            } for article in articles]
+        })
+    
+    def api_international_pending(self):
+        """API lấy danh sách bài viết quốc tế chờ duyệt"""
+        from sqlalchemy import or_
+        articles = self.db_session.query(News).join(Category).filter(
+            News.status == NewsStatus.PENDING,
+            or_(
+                Category.slug.ilike('%international%'),
+                Category.slug.ilike('%the-gioi%'),
+                Category.slug.ilike('%world%')
+            )
+        ).order_by(News.created_at.desc()).limit(100).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'category': article.category.name if article.category else 'N/A',
+                'author': article.creator.username if article.creator else 'N/A',
+                'submitted': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else ''
+            } for article in articles]
+        })
+    
+    def api_fetch_api_news(self):
+        """API lấy bài viết mới từ API bên ngoài (chỉ lấy dữ liệu, không lưu)"""
+        import requests
+        from datetime import datetime
+        
+        try:
+            # Lấy thông tin từ request
+            data = request.json if request.is_json else {}
+            api_key = data.get('api_key')
+            api_url = data.get('api_url')
+            country = data.get('country', 'us')
+            category = data.get('category')
+            
+            articles = []
+            
+            # Nếu có API key và URL, fetch từ API thật
+            if api_key and api_url:
+                try:
+                    # Ví dụ với NewsAPI.org
+                    params = {
+                        'apiKey': api_key,
+                        'country': country
+                    }
+                    if category:
+                        params['category'] = category
+                    
+                    response = requests.get(api_url, params=params, timeout=10)
+                    if response.status_code == 200:
+                        api_data = response.json()
+                        articles = api_data.get('articles', [])
+                except Exception as e:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Lỗi khi fetch từ API: {str(e)}'
+                    }), 500
+            
+            # Nếu không có API key hoặc không fetch được, dùng mock data
+            if not articles:
+                # Mock data cho demo
+                articles = [
+                    {
+                        'title': 'Breaking: Major tech company announces new product',
+                        'description': 'A major technology company has announced a revolutionary new product...',
+                        'url': 'https://example.com/news1',
+                        'urlToImage': 'https://via.placeholder.com/400x300',
+                        'source': {'name': 'TechCrunch'},
+                        'author': 'John Doe',
+                        'publishedAt': datetime.utcnow().isoformat(),
+                        'content': 'Full content of the article...'
+                    },
+                    {
+                        'title': 'Global markets react to economic news',
+                        'description': 'Stock markets around the world are reacting to the latest economic data...',
+                        'url': 'https://example.com/news2',
+                        'urlToImage': 'https://via.placeholder.com/400x300',
+                        'source': {'name': 'Reuters'},
+                        'author': 'Jane Smith',
+                        'publishedAt': datetime.utcnow().isoformat(),
+                        'content': 'Full content of the article...'
+                    },
+                    {
+                        'title': 'Sports: Championship final results',
+                        'description': 'The championship final has concluded with surprising results...',
+                        'url': 'https://example.com/news3',
+                        'urlToImage': 'https://via.placeholder.com/400x300',
+                        'source': {'name': 'ESPN'},
+                        'author': 'Sports Reporter',
+                        'publishedAt': datetime.utcnow().isoformat(),
+                        'content': 'Full content of the article...'
+                    }
+                ]
+            
+            # Format dữ liệu để trả về
+            formatted_articles = []
+            for idx, article in enumerate(articles):
+                formatted_articles.append({
+                    'id': f'api_{idx}_{datetime.utcnow().timestamp()}',  # Temporary ID
+                    'title': article.get('title', 'No title'),
+                    'summary': article.get('description', ''),
+                    'content': article.get('content', article.get('description', '')),
+                    'thumbnail': article.get('urlToImage', ''),
+                    'source': article.get('source', {}).get('name', 'Unknown') if isinstance(article.get('source'), dict) else str(article.get('source', 'Unknown')),
+                    'source_url': article.get('url', ''),
+                    'author': article.get('author', 'Unknown'),
+                    'published_at': article.get('publishedAt', datetime.utcnow().isoformat()),
+                    'category_name': category or 'General'
+                })
+            
+            # Lưu vào session để sử dụng sau (tạm thời)
+            session['api_articles_cache'] = formatted_articles
+            
+            return jsonify({
+                'success': True,
+                'message': f'Đã lấy {len(formatted_articles)} bài viết từ API',
+                'count': len(formatted_articles),
+                'data': formatted_articles
+            })
+            
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
+    
+    def api_save_api_article(self):
+        """API lưu bài viết từ API vào bảng news với trạng thái được chọn"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        data = request.json if request.is_json else request.form
+        
+        # Lấy dữ liệu bài viết từ request
+        article_data = data.get('article')
+        if not article_data:
+            return jsonify({'success': False, 'error': 'Thiếu dữ liệu bài viết'}), 400
+        
+        # Lấy thông tin từ request
+        category_id = data.get('category_id', type=int)
+        status = data.get('status', NewsStatus.DRAFT.value)
+        
+        if not category_id:
+            return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+        
+        try:
+            news_status = NewsStatus(status)
+        except ValueError:
+            news_status = NewsStatus.DRAFT
+        
+        # Kiểm tra category tồn tại
+        category = self.db_session.query(Category).filter(Category.id == category_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+        
+        # Parse published_at nếu có
+        published_at = None
+        if article_data.get('published_at'):
+            try:
+                from dateutil import parser
+                published_at = parser.parse(article_data['published_at'])
+            except:
+                published_at = datetime.utcnow()
+        
+        # Tạo bài viết mới từ API article
+        news = News(
+            title=article_data.get('title', ''),
+            slug=self._generate_slug(article_data.get('title', 'Untitled')),
+            summary=article_data.get('summary', ''),
+            content=article_data.get('content', article_data.get('summary', '')),
+            thumbnail=article_data.get('thumbnail'),
+            category_id=category_id,
+            created_by=user_id,
+            approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
+            status=news_status,
+            is_api=True,  # Đánh dấu bài từ API
+            published_at=published_at if news_status == NewsStatus.PUBLISHED else None
+        )
+        
+        self.db_session.add(news)
+        self.db_session.commit()
+        self.db_session.refresh(news)
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã lưu bài viết với trạng thái {news_status.value}',
+            'news_id': news.id
+        })
+    
+    def api_chart_data(self):
+        """API lấy dữ liệu cho biểu đồ"""
+        from sqlalchemy import func, extract
+        from datetime import datetime, timedelta
+        
+        # Lấy dữ liệu 7 ngày gần nhất
+        end_date = datetime.utcnow()
+        start_date = end_date - timedelta(days=7)
+        
+        # Đếm bài viết mới theo ngày
+        new_articles = self.db_session.query(
+            func.date(News.created_at).label('date'),
+            func.count(News.id).label('count')
+        ).filter(
+            News.created_at >= start_date
+        ).group_by(func.date(News.created_at)).all()
+        
+        # Đếm bài được duyệt theo ngày
+        approved_articles = self.db_session.query(
+            func.date(News.published_at).label('date'),
+            func.count(News.id).label('count')
+        ).filter(
+            News.published_at >= start_date,
+            News.status == NewsStatus.PUBLISHED
+        ).group_by(func.date(News.published_at)).all()
+        
+        # Tạo dictionary cho dễ truy cập
+        new_dict = {str(item.date): item.count for item in new_articles}
+        approved_dict = {str(item.date): item.count for item in approved_articles}
+        
+        # Tạo labels và data cho 7 ngày
+        labels = []
+        new_data = []
+        approved_data = []
+        
+        for i in range(7):
+            date = (start_date + timedelta(days=i)).date()
+            date_str = str(date)
+            labels.append(date.strftime('%d/%m'))
+            new_data.append(new_dict.get(date_str, 0))
+            approved_data.append(approved_dict.get(date_str, 0))
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'labels': labels,
+                'datasets': [
+                    {
+                        'label': 'Bài viết mới',
+                        'data': new_data
+                    },
+                    {
+                        'label': 'Bài được duyệt',
+                        'data': approved_data
+                    }
+                ]
+            }
+        })
+    
+    def api_hot_articles(self):
+        """API lấy danh sách bài viết hot nhất"""
+        articles = self.news_model.get_hot(limit=10)
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'title': article.title,
+                'views': article.view_count
+            } for article in articles]
+        })
+    
+    def api_categories(self):
+        """API lấy danh sách danh mục"""
+        categories = self.category_model.get_all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': cat.id,
+                'name': cat.name,
+                'slug': cat.slug
+            } for cat in categories]
+        })
+    
+    def _generate_slug(self, title: str) -> str:
+        """Tạo slug từ tiêu đề"""
+        import re
+        slug = title.lower()
+        slug = re.sub(r'[^\w\s-]', '', slug)
+        slug = re.sub(r'[-\s]+', '-', slug)
+        return slug.strip('-')
+    
+    def api_menu_items(self):
+        """API lấy danh sách menu items"""
+        menu_items = self.db_session.query(MenuItem).order_by(
+            MenuItem.order_display, MenuItem.parent_id
+        ).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': item.id,
+                'name': item.name,
+                'slug': item.slug,
+                'icon': item.icon,
+                'order': item.order_display,
+                'parent_id': item.parent_id,
+                'visible': item.visible
+            } for item in menu_items]
+        })
+    
+    def api_create_menu_item(self):
+        """API tạo menu item mới"""
+        data = request.json if request.is_json else request.form
+        
+        name = data.get('name')
+        slug = data.get('slug')
+        icon = data.get('icon')
+        order = data.get('order', 0)
+        parent_id = data.get('parent_id')
+        visible = data.get('visible', True)
+        
+        if not name:
+            return jsonify({'success': False, 'error': 'Tên menu không được để trống'}), 400
+        
+        if not slug:
+            # Tự động tạo slug
+            slug = self._generate_slug(name)
+        
+        # Kiểm tra slug trùng
+        existing = self.db_session.query(MenuItem).filter(MenuItem.slug == slug).first()
+        if existing:
+            return jsonify({'success': False, 'error': 'Slug đã tồn tại'}), 400
+        
+        menu_item = MenuItem(
+            name=name,
+            slug=slug,
+            icon=icon if icon else None,
+            order_display=order,
+            parent_id=int(parent_id) if parent_id else None,
+            visible=visible
+        )
+        
+        self.db_session.add(menu_item)
+        self.db_session.commit()
+        self.db_session.refresh(menu_item)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Đã tạo menu mới',
+            'data': {
+                'id': menu_item.id,
+                'name': menu_item.name,
+                'slug': menu_item.slug
+            }
+        })
+    
+    def api_update_menu_item(self, menu_id: int):
+        """API cập nhật menu item"""
+        menu_item = self.db_session.query(MenuItem).filter(MenuItem.id == menu_id).first()
+        if not menu_item:
+            return jsonify({'success': False, 'error': 'Không tìm thấy menu'}), 404
+        
+        data = request.json if request.is_json else request.form
+        
+        if 'name' in data:
+            menu_item.name = data['name']
+        if 'slug' in data:
+            # Kiểm tra slug trùng (trừ chính nó)
+            existing = self.db_session.query(MenuItem).filter(
+                MenuItem.slug == data['slug'],
+                MenuItem.id != menu_id
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'Slug đã tồn tại'}), 400
+            menu_item.slug = data['slug']
+        if 'icon' in data:
+            menu_item.icon = data['icon'] if data['icon'] else None
+        if 'order' in data:
+            menu_item.order_display = int(data['order'])
+        if 'parent_id' in data:
+            parent_id = data['parent_id']
+            # Kiểm tra không được set parent là chính nó
+            if parent_id == menu_id:
+                return jsonify({'success': False, 'error': 'Không thể set parent là chính nó'}), 400
+            menu_item.parent_id = int(parent_id) if parent_id else None
+        if 'visible' in data:
+            menu_item.visible = bool(data['visible'])
+        
+        menu_item.updated_at = datetime.utcnow()
+        self.db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Đã cập nhật menu',
+            'data': {
+                'id': menu_item.id,
+                'name': menu_item.name
+            }
+        })
+    
+    def api_delete_menu_item(self, menu_id: int):
+        """API xóa menu item"""
+        menu_item = self.db_session.query(MenuItem).filter(MenuItem.id == menu_id).first()
+        if not menu_item:
+            return jsonify({'success': False, 'error': 'Không tìm thấy menu'}), 404
+        
+        # Xóa các menu con trước (cascade)
+        children = self.db_session.query(MenuItem).filter(MenuItem.parent_id == menu_id).all()
+        for child in children:
+            self.db_session.delete(child)
+        
+        self.db_session.delete(menu_item)
+        self.db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Đã xóa menu'
+        })
 
 
 class ClientController:

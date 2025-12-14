@@ -20,7 +20,7 @@
         </div>
         <ul class="sidebar-menu">
             <li class="active">
-                <a href="dashboard.html">
+                <a href="#" data-section="dashboard">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a>
             </li>
@@ -46,7 +46,7 @@
                 </a>
             </li>
             <li>
-                <a href="menu-manager.html">
+                <a href="#" data-section="menu-manager">
                     <i class="fas fa-bars"></i> Quản lý Menu
                 </a>
             </li>
@@ -163,19 +163,8 @@
                         <div class="card-header">
                             <h5><i class="fas fa-fire"></i> Bài viết hot nhất</h5>
                         </div>
-                        <div class="card-body">
-                            <div class="hot-article">
-                                <h6>Thủ tướng: 'Việt Nam sẽ tiếp tục là điểm đến hấp dẫn'</h6>
-                                <small class="text-muted"><i class="far fa-eye"></i> 15,234 lượt xem</small>
-                            </div>
-                            <div class="hot-article">
-                                <h6>Giá vàng hôm nay tiếp tục tăng mạnh</h6>
-                                <small class="text-muted"><i class="far fa-eye"></i> 12,567 lượt xem</small>
-                            </div>
-                            <div class="hot-article">
-                                <h6>Apple ra mắt iPhone 16 với AI mới</h6>
-                                <small class="text-muted"><i class="far fa-eye"></i> 10,891 lượt xem</small>
-                            </div>
+                        <div class="card-body" id="hotArticlesContainer">
+                            <!-- Hot articles will be loaded by JS -->
                         </div>
                     </div>
                 </div>
@@ -252,7 +241,24 @@
                     <h5><i class="fas fa-check-circle"></i> Bài viết đã duyệt</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">Danh sách bài viết đã được duyệt và đăng tải...</p>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th width="5%">#</th>
+                                    <th width="40%">Tiêu đề</th>
+                                    <th width="12%">Tác giả</th>
+                                    <th width="10%">Danh mục</th>
+                                    <th width="13%">Ngày đăng</th>
+                                    <th width="10%">Lượt xem</th>
+                                    <th width="10%">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data will be loaded by JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -263,7 +269,23 @@
                     <h5><i class="fas fa-times-circle"></i> Bài viết bị từ chối</h5>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">Danh sách bài viết bị từ chối...</p>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th width="5%">#</th>
+                                    <th width="40%">Tiêu đề</th>
+                                    <th width="12%">Tác giả</th>
+                                    <th width="10%">Danh mục</th>
+                                    <th width="13%">Ngày gửi</th>
+                                    <th width="20%">Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Data will be loaded by JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -412,6 +434,50 @@
                     </button>
                     <button type="button" class="btn btn-success" id="approveBtn">
                         <i class="fas fa-check"></i> Duyệt bài
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save API Article Modal -->
+    <div class="modal fade" id="saveAPIArticleModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Lưu bài viết từ API</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="saveAPIArticleData">
+                    <div class="mb-3">
+                        <label class="form-label">Tiêu đề</label>
+                        <input type="text" class="form-control" id="saveAPITitle" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tóm tắt</label>
+                        <textarea class="form-control" id="saveAPISummary" rows="3" readonly></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Danh mục <span class="text-danger">*</span></label>
+                        <select class="form-select" id="saveAPICategory" required>
+                            <option value="">-- Chọn danh mục --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Trạng thái</label>
+                        <select class="form-select" id="saveAPIStatus">
+                            <option value="draft">Bản nháp</option>
+                            <option value="pending">Chờ duyệt</option>
+                            <option value="published">Đã xuất bản</option>
+                        </select>
+                        <small class="text-muted">Bài viết sẽ được lưu với trạng thái đã chọn và đánh dấu là từ API</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-primary" id="saveAPIArticleBtn">
+                        <i class="fas fa-save"></i> Lưu bài viết
                     </button>
                 </div>
             </div>

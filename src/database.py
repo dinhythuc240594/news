@@ -207,6 +207,7 @@ class News(Base):
     status = Column(NewsStatusType(), default=NewsStatus.DRAFT)
     is_featured = Column(Boolean, default=False)
     is_hot = Column(Boolean, default=False)
+    is_api = Column(Boolean, default=False)  # Đánh dấu bài viết từ API
     view_count = Column(Integer, default=0)
     
     # SEO
@@ -289,6 +290,24 @@ class Comment(Base):
     user = relationship("User", back_populates="comments")
     news = relationship("News")
     parent = relationship("Comment", remote_side=[id], backref="replies")
+
+
+class MenuItem(Base):
+    """Bảng quản lý menu động"""
+    __tablename__ = 'menu_items'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    slug = Column(String(100), nullable=False, unique=True)
+    icon = Column(String(50), nullable=True)
+    order_display = Column(Integer, default=0)
+    parent_id = Column(Integer, ForeignKey('menu_items.id'), nullable=True)
+    visible = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    parent = relationship("MenuItem", remote_side=[id], backref="children")
 
 
 # Database connection
