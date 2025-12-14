@@ -374,7 +374,7 @@ def create_engine_instance():
     """Tạo engine kết nối database"""
     global _engine
     if _engine is None:
-        _engine = create_engine(get_database_url(), echo=True)
+        _engine = create_engine(get_database_url(), echo=True, pool_size=20, max_overflow=0)
     return _engine
 
 
