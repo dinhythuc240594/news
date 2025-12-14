@@ -179,6 +179,27 @@ async function checkAndInitDefaultMenus() {
     }
 }
 
+// Render menu item recursively with all levels
+function renderMenuWithChildren(menu, allMenus, level = 1) {
+    const children = allMenus.filter(m => m.parent_id === menu.id)
+                              .sort((a, b) => a.order - b.order);
+    const hasChildren = children.length > 0;
+    const isParent = level === 1;
+    
+    let html = renderMenuRow(menu, hasChildren, isParent, level);
+    
+    if (hasChildren) {
+        // Mặc định expand khi có children
+        html += `<div class="menu-children-container expanded" data-parent-id="${menu.id}">`;
+        children.forEach(child => {
+            html += renderMenuWithChildren(child, allMenus, level + 1);
+        });
+        html += `</div>`;
+    }
+    
+    return html;
+}
+
 // Load menu table with tree view
 async function loadMenuTable() {
     try {
@@ -188,27 +209,15 @@ async function loadMenuTable() {
         if (result.success && result.data) {
             const menus = result.data;
             
-            // Build tree structure
+            // Build tree structure - chỉ lấy parent items (level 1)
             const parentMenus = menus.filter(m => m.parent_id === null)
                                      .sort((a, b) => a.order - b.order);
             
             let html = '';
             
+            // Render đệ quy tất cả các cấp
             parentMenus.forEach(parent => {
-                const children = menus.filter(m => m.parent_id === parent.id)
-                                      .sort((a, b) => a.order - b.order);
-                const hasChildren = children.length > 0;
-                
-                html += renderMenuRow(parent, hasChildren, true);
-                
-                if (hasChildren) {
-                    // Mặc định expand khi có children
-                    html += `<div class="menu-children-container expanded" data-parent-id="${parent.id}">`;
-                    children.forEach(child => {
-                        html += renderMenuRow(child, false, false);
-                    });
-                    html += `</div>`;
-                }
+                html += renderMenuWithChildren(parent, menus, 1);
             });
             
             if (menus.length === 0) {
@@ -227,18 +236,18 @@ async function loadMenuTable() {
 }
 
 // Render menu row
-function renderMenuRow(menu, hasChildren, isParent) {
+function renderMenuRow(menu, hasChildren, isParent, level = null) {
     const icon = menu.icon ? `<i class="${menu.icon}"></i> ` : '';
     const checked = menu.visible ? 'checked' : '';
-    const rowClass = isParent ? 'parent-item' : 'child-item';
+    const menuLevel = level || menu.level || 1;
+    const rowClass = isParent ? 'parent-item' : `child-item level-${menuLevel}`;
     const hiddenClass = !menu.visible ? 'hidden-item' : '';
-    const level = menu.level || 1;
-    const canAddSubmenu = 1 < level && level < 4; // Chỉ cho phép thêm submenu nếu level < 4
+    const canAddSubmenu = menuLevel < 4; // Cho phép thêm submenu nếu level < 4
     // Nếu có children và container expanded, hiển thị chevron-up, ngược lại chevron-down
     const expandIcon = hasChildren ? '<i class="fas fa-chevron-up"></i>' : '<i class="fas fa-minus" style="opacity: 0.3;"></i>';
     
     return `
-        <div class="menu-item-row ${rowClass} ${hiddenClass}" data-id="${menu.id}" data-parent-id="${menu.parent_id || ''}" data-level="${level}">
+        <div class="menu-item-row ${rowClass} ${hiddenClass}" data-id="${menu.id}" data-parent-id="${menu.parent_id || ''}" data-level="${menuLevel}">
             <div class="menu-item-handle">
                 <i class="fas fa-grip-vertical"></i>
             </div>
@@ -258,7 +267,7 @@ function renderMenuRow(menu, hasChildren, isParent) {
                 </div>
                 <div class="menu-item-actions">
                     ${canAddSubmenu ? `
-                    <button class="btn btn-sm btn-success btn-action btn-add-submenu me-2" data-id="${menu.id}" data-level="${level}" title="Thêm Submenu">
+                    <button class="btn btn-sm btn-success btn-action btn-add-submenu me-2" data-id="${menu.id}" data-level="${level}" title="Thêm Submenu" style="display: none">
                         <i class="fas fa-plus-circle"></i>
                     </button>
                     ` : ''}
@@ -408,60 +417,40 @@ function initChildSortables() {
     });
 }
 
+// Save menu order after drag & drop - recursive function to collect all levels
+function collectMenuItems($container, parentId, items) {
+    let order = 0;
+    
+    $container.children('.menu-item-row').each(function() {
+        const $row = $(this);
+        order++;
+        const menuId = parseInt($row.data('id'));
+        const rowParentId = parseInt($row.data('parent-id')) || null;
+        
+        // Use the provided parentId (from container) or the row's parent_id
+        const finalParentId = parentId !== undefined ? parentId : rowParentId;
+        
+        items.push({
+            id: menuId,
+            parent_id: finalParentId,
+            order: order
+        });
+        
+        // Recursively collect children
+        const $childrenContainer = $row.next('.menu-children-container[data-parent-id="' + menuId + '"]');
+        if ($childrenContainer.length) {
+            collectMenuItems($childrenContainer, menuId, items);
+        }
+    });
+}
+
 // Save menu order after drag & drop
 async function saveMenuOrder() {
     const items = [];
-    let parentOrder = 0;
     
-    // Collect parent items
-    $('#menuTreeList .menu-item-row.parent-item').each(function() {
-        const $row = $(this);
-        parentOrder++;
-        const parentId = parseInt($row.data('id'));
-        
-        items.push({
-            id: parentId,
-            parent_id: null,
-            order: parentOrder
-        });
-        
-        // Collect children of this parent
-        // Find children container that comes after this parent row
-        const $childrenContainer = $row.next('.menu-children-container[data-parent-id="' + parentId + '"]');
-        let childOrder = 0;
-        
-        if ($childrenContainer.length) {
-            $childrenContainer.find('.menu-item-row.child-item').each(function() {
-                const $childRow = $(this);
-                childOrder++;
-                const childId = parseInt($childRow.data('id'));
-                const childParentId = parseInt($childRow.data('parent-id')) || parentId;
-                
-                items.push({
-                    id: childId,
-                    parent_id: childParentId,
-                    order: childOrder
-                });
-            });
-        }
-    });
-    
-    // Also collect any orphaned child items (shouldn't happen, but just in case)
-    $('#menuTreeList .menu-item-row.child-item').each(function() {
-        const $childRow = $(this);
-        const childId = parseInt($childRow.data('id'));
-        
-        // Check if this child is already in items array
-        const exists = items.some(item => item.id === childId);
-        if (!exists) {
-            const childParentId = parseInt($childRow.data('parent-id'));
-            items.push({
-                id: childId,
-                parent_id: childParentId,
-                order: 1
-            });
-        }
-    });
+    // Collect all menu items recursively starting from root
+    const $rootContainer = $('#menuTreeList');
+    collectMenuItems($rootContainer, null, items);
     
     try {
         const response = await fetch('/admin/api/menu-items/update-order', {

@@ -175,9 +175,22 @@
         }
         
         .menu-item-row.child-item {
-            margin-left: 40px;
             background-color: #f8f9fa;
             border-left: 3px solid #6c757d;
+        }
+        
+        .menu-item-row.child-item.level-2 {
+            margin-left: 40px;
+        }
+        
+        .menu-item-row.child-item.level-3 {
+            margin-left: 80px;
+            border-left-color: #999;
+        }
+        
+        .menu-item-row.child-item.level-4 {
+            margin-left: 120px;
+            border-left-color: #bbb;
         }
         
         .menu-item-row.hidden-item {
@@ -239,13 +252,25 @@
         }
         
         .menu-children-container {
-            margin-left: 40px;
             margin-top: 8px;
             display: none;
         }
         
         .menu-children-container.expanded {
             display: block;
+        }
+        
+        /* Indentation cho children container dựa trên level của parent */
+        .menu-item-row[data-level="1"] + .menu-children-container {
+            margin-left: 40px;
+        }
+        
+        .menu-item-row[data-level="2"] + .menu-children-container {
+            margin-left: 80px;
+        }
+        
+        .menu-item-row[data-level="3"] + .menu-children-container {
+            margin-left: 120px;
         }
         
         .menu-item-placeholder {
