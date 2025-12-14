@@ -172,6 +172,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=True)
     phone = Column(String(20), nullable=True)
+    avatar = Column(String(255), nullable=True)  # URL to avatar image
     role = Column(UserRoleType(), default=UserRole.USER)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -180,6 +181,9 @@ class User(Base):
     # Relationships
     created_news = relationship("News", foreign_keys="News.created_by", back_populates="creator")
     approved_news = relationship("News", foreign_keys="News.approved_by", back_populates="approver")
+    saved_news = relationship("SavedNews", back_populates="user", cascade="all, delete-orphan")
+    viewed_news = relationship("ViewedNews", back_populates="user", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
 
 
 class News(Base):
@@ -238,6 +242,53 @@ class NewsTag(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
     tag_id = Column(Integer, ForeignKey('tags.id'), nullable=False)
+
+
+class SavedNews(Base):
+    """Bảng tin đã lưu của người dùng"""
+    __tablename__ = 'saved_news'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="saved_news")
+    news = relationship("News")
+
+
+class ViewedNews(Base):
+    """Bảng tin đã xem của người dùng"""
+    __tablename__ = 'viewed_news'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    viewed_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="viewed_news")
+    news = relationship("News")
+
+
+class Comment(Base):
+    """Bảng bình luận của người dùng"""
+    __tablename__ = 'comments'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    content = Column(Text, nullable=False)
+    parent_id = Column(Integer, ForeignKey('comments.id'), nullable=True)  # For reply comments
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="comments")
+    news = relationship("News")
+    parent = relationship("Comment", remote_side=[id], backref="replies")
 
 
 # Database connection

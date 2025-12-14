@@ -1,8 +1,10 @@
-from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash, session, current_app
 from sqlalchemy.orm import Session
 from typing import Optional
 from functools import wraps
-from database import get_session, NewsStatus, UserRole
+import os
+from werkzeug.utils import secure_filename
+from database import get_session, NewsStatus, UserRole, SavedNews, ViewedNews, Comment
 from models import NewsModel, CategoryModel, UserModel
 
 def admin_required(f):
@@ -544,6 +546,7 @@ class ClientController:
             if user and user.is_active and user.role == UserRole.USER:
                 session['user_id'] = user.id
                 session['username'] = user.username
+                session['full_name'] = user.full_name or user.username
                 session['role'] = user.role.value
                 
                 flash('Đăng nhập thành công', 'success')
@@ -629,3 +632,159 @@ class ClientController:
         session.clear()
         flash('Đã đăng xuất', 'success')
         return redirect(url_for('client.index'))
+    
+    def profile(self):
+        """
+        Trang thông tin cá nhân của user
+        Route: GET /profile
+        """
+        if 'user_id' not in session:
+            flash('Vui lòng đăng nhập để xem thông tin cá nhân', 'error')
+            return redirect(url_for('client.user_login'))
+        
+        user = self.user_model.get_by_id(session['user_id'])
+        if not user:
+            flash('Không tìm thấy thông tin người dùng', 'error')
+            session.clear()
+            return redirect(url_for('client.user_login'))
+        
+        # Lấy tin đã lưu
+        saved_news = self.db_session.query(SavedNews).filter(
+            SavedNews.user_id == user.id
+        ).order_by(SavedNews.created_at.desc()).limit(20).all()
+        
+        # Lấy tin đã xem
+        viewed_news = self.db_session.query(ViewedNews).filter(
+            ViewedNews.user_id == user.id
+        ).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
+        
+        # Lấy bình luận
+        comments = self.db_session.query(Comment).filter(
+            Comment.user_id == user.id
+        ).order_by(Comment.created_at.desc()).limit(20).all()
+        
+        categories = self.category_model.get_all()
+        return render_template('client/profile.html', 
+                             user=user, 
+                             categories=categories,
+                             saved_news=saved_news,
+                             viewed_news=viewed_news,
+                             comments=comments)
+    
+    def update_profile(self):
+        """
+        Cập nhật thông tin cá nhân, avatar, hoặc đổi mật khẩu
+        Route: POST /profile/update
+        """
+        if 'user_id' not in session:
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Vui lòng đăng nhập'}), 401
+            flash('Vui lòng đăng nhập', 'error')
+            return redirect(url_for('client.user_login'))
+        
+        user = self.user_model.get_by_id(session['user_id'])
+        if not user:
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Không tìm thấy người dùng'}), 404
+            flash('Không tìm thấy thông tin người dùng', 'error')
+            session.clear()
+            return redirect(url_for('client.user_login'))
+        
+        action = request.form.get('action')
+        
+        if action == 'update_avatar':
+            # Xử lý upload avatar
+            if 'avatar' not in request.files:
+                return jsonify({'success': False, 'message': 'Không có file được chọn'}), 400
+            
+            file = request.files['avatar']
+            if file.filename == '':
+                return jsonify({'success': False, 'message': 'Không có file được chọn'}), 400
+            
+            if file and self._allowed_file(file.filename):
+                filename = secure_filename(f"avatar_{user.id}_{file.filename}")
+                # Tạo đường dẫn upload folder
+                upload_folder = os.path.join('src', 'static', 'uploads', 'avatars')
+                os.makedirs(upload_folder, exist_ok=True)
+                filepath = os.path.join(upload_folder, filename)
+                file.save(filepath)
+                
+                # Xóa avatar cũ nếu có
+                if user.avatar:
+                    old_path = user.avatar.lstrip('/')
+                    old_path = os.path.join('src', old_path) if not old_path.startswith('src') else old_path
+                    if os.path.exists(old_path):
+                        try:
+                            os.remove(old_path)
+                        except:
+                            pass
+                
+                # Lưu đường dẫn avatar (relative to static folder)
+                avatar_url = f"static/uploads/avatars/{filename}"
+                user.avatar = avatar_url
+                self.db_session.commit()
+                
+                # Cập nhật session
+                session['avatar'] = avatar_url
+                
+                return jsonify({'success': True, 'message': 'Cập nhật avatar thành công', 'avatar_url': f'/{avatar_url}'})
+            else:
+                return jsonify({'success': False, 'message': 'File không hợp lệ. Chỉ chấp nhận: png, jpg, jpeg, gif, webp'}), 400
+        
+        elif action == 'update_info':
+            # Cập nhật thông tin cá nhân
+            full_name = request.form.get('full_name', '').strip()
+            email = request.form.get('email', '').strip()
+            phone = request.form.get('phone', '').strip()
+            
+            # Kiểm tra email trùng
+            if email and email != user.email:
+                existing_user = self.user_model.get_by_email(email)
+                if existing_user and existing_user.id != user.id:
+                    flash('Email này đã được sử dụng', 'error')
+                    return redirect(url_for('client.profile'))
+            
+            user.full_name = full_name if full_name else None
+            user.email = email
+            user.phone = phone if phone else None
+            self.db_session.commit()
+            
+            # Cập nhật session
+            session['full_name'] = user.full_name or user.username
+            
+            flash('Cập nhật thông tin thành công', 'success')
+            return redirect(url_for('client.profile'))
+        
+        elif action == 'change_password':
+            # Đổi mật khẩu
+            from auth_utils import verify_password, hash_password
+            
+            current_password = request.form.get('current_password')
+            new_password = request.form.get('new_password')
+            confirm_password = request.form.get('confirm_password')
+            
+            if not verify_password(user.password_hash, current_password):
+                flash('Mật khẩu hiện tại không đúng', 'error')
+                return redirect(url_for('client.profile'))
+            
+            if new_password != confirm_password:
+                flash('Mật khẩu mới và xác nhận không khớp', 'error')
+                return redirect(url_for('client.profile'))
+            
+            if len(new_password) < 6:
+                flash('Mật khẩu phải có ít nhất 6 ký tự', 'error')
+                return redirect(url_for('client.profile'))
+            
+            user.password_hash = hash_password(new_password)
+            self.db_session.commit()
+            
+            flash('Đổi mật khẩu thành công', 'success')
+            return redirect(url_for('client.profile'))
+        
+        flash('Hành động không hợp lệ', 'error')
+        return redirect(url_for('client.profile'))
+    
+    def _allowed_file(self, filename):
+        """Kiểm tra file có được phép upload không"""
+        return '.' in filename and \
+               filename.rsplit('.', 1)[1].lower() in current_app.config.get('ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'gif', 'webp'})

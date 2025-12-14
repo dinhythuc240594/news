@@ -80,3 +80,15 @@ def register():
 def user_logout():
     """Đăng xuất user"""
     return client_controller.user_logout()
+
+
+@client_bp.route('/profile')
+def profile():
+    """Trang thông tin cá nhân của user"""
+    return client_controller.profile()
+
+
+@client_bp.route('/profile/update', methods=['POST'])
+def update_profile():
+    """Cập nhật thông tin cá nhân, avatar, hoặc đổi mật khẩu"""
+    return client_controller.update_profile()

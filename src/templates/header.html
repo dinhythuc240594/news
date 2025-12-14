@@ -15,8 +15,21 @@
             <div class="col-md-5 text-end">
                 <div class="header-buttons">
                     <a href="#" class="btn-international"><i class="fas fa-globe"></i> Quốc tế</a>
-                    <a href="{{ url_for('client.user_login') }}" class="btn-login-header"><i class="fas fa-user"></i> Đăng nhập</a>
-                    <a href="{{ url_for('client.register') }}"><i class="fas fa-user"></i> Đăng ký</a>
+                    {% if session.get('user_id') %}
+                        <div class="dropdown">
+                            <button class="btn btn-link text-decoration-none text-dark dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user"></i> {{ session.get('full_name', session.get('username', 'User')) }}
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown" style="z-index: 1001;">
+                                <li><a class="dropdown-item" href="{{ url_for('client.profile') }}"><i class="fas fa-user-circle me-2"></i> Thông tin cá nhân</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{{ url_for('client.user_logout') }}"><i class="fas fa-sign-out-alt me-2"></i> Đăng xuất</a></li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <a href="{{ url_for('client.user_login') }}" class="btn-login-header"><i class="fas fa-user"></i> Đăng nhập</a>
+                        <a href="{{ url_for('client.register') }}"><i class="fas fa-user"></i> Đăng ký</a>
+                    {% endif %}
                 </div>
             </div>
         </div>

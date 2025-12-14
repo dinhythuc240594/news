@@ -99,3 +99,43 @@ CREATE TYPE news_status AS ENUM ('draft', 'pending', 'published', 'hidden', 'rej
 
 -- User Role
 CREATE TYPE user_role AS ENUM ('admin', 'editor', 'user');
+
+
+-- 2. Tạo bảng saved_news (tin đã lưu)
+CREATE TABLE IF NOT EXISTS saved_news (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    news_id INTEGER NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, news_id)
+);
+
+-- 3. Tạo bảng viewed_news (tin đã xem)
+CREATE TABLE IF NOT EXISTS viewed_news (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    news_id INTEGER NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+    viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, news_id)
+);
+
+-- 4. Tạo bảng comments (bình luận)
+CREATE TABLE IF NOT EXISTS comments (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    news_id INTEGER NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5. Tạo index cho hiệu suất
+CREATE INDEX IF NOT EXISTS idx_saved_news_user ON saved_news(user_id);
+CREATE INDEX IF NOT EXISTS idx_saved_news_news ON saved_news(news_id);
+CREATE INDEX IF NOT EXISTS idx_viewed_news_user ON viewed_news(user_id);
+CREATE INDEX IF NOT EXISTS idx_viewed_news_news ON viewed_news(news_id);
+CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
+CREATE INDEX IF NOT EXISTS idx_comments_news ON comments(news_id);
+CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
