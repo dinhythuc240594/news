@@ -13,11 +13,11 @@ INSERT INTO categories (name, slug, description, icon, order_display, parent_id,
 
 -- Dữ liệu mẫu cho bảng users
 INSERT INTO users (username, email, password_hash, full_name, role, is_active) VALUES
-('admin', 'admin@news.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5', 'Quản trị viên', 'admin', TRUE),
-('editor1', 'editor1@news.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5', 'Biên tập viên 1', 'editor', TRUE),
-('editor2', 'editor2@news.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5', 'Biên tập viên 2', 'editor', TRUE),
-('user1', 'user1@news.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5', 'Người dùng 1', 'user', TRUE),
-('user2', 'user2@news.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewY5GyY5Y5Y5Y5Y5', 'Người dùng 2', 'user', TRUE);
+-- username: admin, password: admin123
+('admin', 'admin@news.com', 'scrypt:32768:8:1$1LWacKEBH7fGhhYY$8f3f1aa0bb1c1877df77e440d2b42925e7a31fcc22f8234dcf320357808d5011a687e23ae703644fe9de7ec6a0536f42bc4cf5f13c4ca1e40cef8b1592e7f572', 'Quản trị viên', 'admin', TRUE),
+-- username: editor, password: editor123
+('editor', 'editor@news.com', 'scrypt:32768:8:1$1LWacKEBH7fGhhYY$8f3f1aa0bb1c1877df77e440d2b42925e7a31fcc22f8234dcf320357808d5011a687e23ae703644fe9de7ec6a0536f42bc4cf5f13c4ca1e40cef8b1592e7f572', 'Biên tập viên 1', 'editor', TRUE),
+
 
 -- Dữ liệu mẫu cho bảng tags
 INSERT INTO tags (name, slug) VALUES
