@@ -158,14 +158,14 @@ INSERT INTO news_tags (news_id, tag_id) VALUES
 (9, 9),  -- Bóng rổ - Premier League (ví dụ)
 (10, 11); -- Sơn Tùng M-TP - Nhạc Việt
 
-INSERT INTO menu_items (name, slug, icon, order_display, parent_id, visible) VALUES
-('Công nghệ', 'cong-nghe', 'tech', 1, NULL, TRUE),
-('Kinh tế', 'kinh-te', 'economy', 2, NULL, TRUE),
-('Thể thao', 'the-thao', 'sports', 3, NULL, TRUE),
-('Giải trí', 'giai-tri', 'entertainment', 4, NULL, TRUE),
-('Giáo dục', 'giao-duc', 'education', 5, NULL, TRUE),
-('Sức khỏe', 'suc-khoe', 'health', 6, NULL, TRUE),
-('Điện thoại', 'dien-thoai', 'phone', 1, 1, TRUE),
-('Máy tính', 'may-tinh', 'laptop', 2, 1, TRUE),
-('Bóng đá', 'bong-da', 'football', 1, 3, TRUE),
-('Bóng rổ', 'bong-ro', 'basketball', 2, 3, TRUE);
+INSERT INTO menu_items (name, slug, icon, order_display, parent_id, visible, level) VALUES
+('Công nghệ', 'cong-nghe', 'tech', 1, NULL, TRUE, 1),
+('Kinh tế', 'kinh-te', 'economy', 2, NULL, TRUE, 1),
+('Thể thao', 'the-thao', 'sports', 3, NULL, TRUE, 1),
+('Giải trí', 'giai-tri', 'entertainment', 4, NULL, TRUE, 1),
+('Giáo dục', 'giao-duc', 'education', 5, NULL, TRUE, 1),
+('Sức khỏe', 'suc-khoe', 'health', 6, NULL, TRUE, 1),
+('Điện thoại', 'dien-thoai', 'phone', 1, 1, TRUE, 2),
+('Máy tính', 'may-tinh', 'laptop', 2, 1, TRUE, 2),
+('Bóng đá', 'bong-da', 'football', 1, 3, TRUE, 2),
+('Bóng rổ', 'bong-ro', 'basketball', 2, 3, TRUE, 2);
