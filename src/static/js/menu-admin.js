@@ -19,10 +19,10 @@ $(document).ready(function() {
         openMenuModal('add', null);
     });
     
-    // Add Submenu button
-    $('#addSubmenuBtn').click(function() {
-        openMenuModal('add-submenu', null);
-    });
+    // // Add Submenu button
+    // $('#addSubmenuBtn').click(function() {
+    //     openMenuModal('add-submenu', null);
+    // });
     
     // Save menu
     $('#saveMenuBtn').click(function() {
