@@ -60,19 +60,35 @@ class AdminController:
         Route: GET /admin/login
         Route: POST /admin/login
         """
+        # Nếu đã đăng nhập, redirect đến dashboard tương ứng
+        if 'user_id' in session and 'role' in session:
+            if session['role'] == UserRole.ADMIN.value:
+                return redirect(url_for('admin.dashboard'))
+            elif session['role'] == UserRole.EDITOR.value:
+                return redirect(url_for('admin.editor_dashboard'))
+        
         if request.method == 'POST':
             username = request.form.get('username')
             password = request.form.get('password')
+            remember = request.form.get('remember') == 'on'
             
             user = self.user_model.authenticate(username, password)
             
             if user and user.is_active and user.role in [UserRole.ADMIN, UserRole.EDITOR]:
+                # Lưu session đăng nhập
                 session['user_id'] = user.id
                 session['username'] = user.username
                 session['role'] = user.role.value
                 
+                # Nếu chọn "Ghi nhớ đăng nhập", set session permanent
+                if remember:
+                    session.permanent = True
+                else:
+                    session.permanent = False
+                
                 flash('Đăng nhập thành công', 'success')
                 
+                # Kiểm tra role và redirect đến đúng dashboard
                 if user.role == UserRole.ADMIN:
                     return redirect(url_for('admin.dashboard'))
                 else:
@@ -83,7 +99,8 @@ class AdminController:
         return render_template('admin/login.html')
     
     def logout(self):
-        """Đăng xuất"""
+        """Đăng xuất - Xóa session đăng nhập"""
+        # Xóa toàn bộ session
         session.clear()
         flash('Đã đăng xuất', 'success')
         return redirect(url_for('admin.login'))
@@ -316,6 +333,35 @@ class AdminController:
         return jsonify({
             'success': True,
             'data': [self._news_to_dict(news) for news in news_list]
+        })
+    
+    def api_current_user(self):
+        """
+        API lấy thông tin user hiện tại từ session (JSON)
+        Route: GET /admin/api/current-user
+        """
+        if 'user_id' not in session:
+            return jsonify({
+                'success': False,
+                'error': 'Chưa đăng nhập'
+            }), 401
+        
+        user = self.user_model.get_by_id(session['user_id'])
+        if not user:
+            return jsonify({
+                'success': False,
+                'error': 'Không tìm thấy user'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': user.id,
+                'username': user.username,
+                'name': user.full_name or user.username,
+                'role': user.role.value,
+                'email': user.email
+            }
         })
     
     def _news_to_dict(self, news) -> dict:

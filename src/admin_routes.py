@@ -92,3 +92,8 @@ def api_news_list():
     """API lấy danh sách bài viết"""
     return admin_controller.api_news_list()
 
+
+@admin_bp.route('/api/current-user')
+def api_current_user():
+    """API lấy thông tin user hiện tại từ session"""
+    return admin_controller.api_current_user()

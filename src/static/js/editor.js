@@ -71,8 +71,10 @@ $(document).ready(function() {
     $('#logoutBtn').click(function(e) {
         e.preventDefault();
         if (confirm('Bạn có chắc muốn đăng xuất?')) {
+            // Xóa localStorage nếu có
             localStorage.removeItem('userInfo');
-            window.location.href = 'login.html';
+            // Redirect đến endpoint logout để xóa session trên server và quay về trang đăng nhập
+            window.location.href = '/admin/logout';
         }
     });
     
@@ -147,18 +149,32 @@ $(document).ready(function() {
 });
 
 // Check authentication
-function checkAuth() {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    if (!userInfo || userInfo.role !== 'editor') {
+async function checkAuth() {
+    try {
+        const response = await fetch('/admin/api/current-user');
+        const result = await response.json();
+        
+        if (!result.success || (result.data.role !== 'editor' && result.data.role !== 'admin')) {
+            window.location.href = 'login.html';
+            return;
+        }
+    } catch (error) {
+        console.error('Lỗi kiểm tra đăng nhập:', error);
         window.location.href = 'login.html';
     }
 }
 
 // Load user info
-function loadUserInfo() {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    if (userInfo) {
-        $('#userName').text(userInfo.name);
+async function loadUserInfo() {
+    try {
+        const response = await fetch('/admin/api/current-user');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            $('#userName').text(result.data.name);
+        }
+    } catch (error) {
+        console.error('Lỗi tải thông tin user:', error);
     }
 }
 

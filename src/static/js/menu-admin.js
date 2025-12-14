@@ -88,18 +88,32 @@ $(document).ready(function() {
 });
 
 // Check authentication
-function checkAuth() {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    if (!userInfo || userInfo.role !== 'admin') {
+async function checkAuth() {
+    try {
+        const response = await fetch('/admin/api/current-user');
+        const result = await response.json();
+        
+        if (!result.success || result.data.role !== 'admin') {
+            window.location.href = 'login.html';
+            return;
+        }
+    } catch (error) {
+        console.error('Lỗi kiểm tra đăng nhập:', error);
         window.location.href = 'login.html';
     }
 }
 
 // Load user info
-function loadUserInfo() {
-    const userInfo = JSON.parse(localStorage.getItem('userInfo'));
-    if (userInfo) {
-        $('#userName').text(userInfo.name);
+async function loadUserInfo() {
+    try {
+        const response = await fetch('/admin/api/current-user');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            $('#userName').text(result.data.name);
+        }
+    } catch (error) {
+        console.error('Lỗi tải thông tin user:', error);
     }
 }
 
