@@ -10,7 +10,7 @@ $(document).ready(function() {
     
     // Load initial data
     loadPendingArticles();
-    loadAPIArticles();
+    // loadAPIArticles(); // Không tự động load API articles
     loadStatistics();
     loadHotArticles();
     
@@ -48,6 +48,29 @@ $(document).ready(function() {
     // Fetch API articles
     $('#fetchAPIBtn').click(function() {
         fetchAPIArticles();
+    });
+    
+    // Clear API filters
+    $('#clearApiFilters').click(function() {
+        clearAPIFilters();
+    });
+    
+    // Apply filters on change
+    $('#apiSource, #apiSearchInput, #apiSortBy, #apiPageSize').on('input change', function() {
+        if (apiArticlesData.length > 0) {
+            $('#apiCurrentPage').val(1);
+            applyAPIFilters();
+        }
+    });
+    
+    // Pagination click
+    $(document).on('click', '#apiPagination .page-link', function(e) {
+        e.preventDefault();
+        const page = parseInt($(this).data('page'));
+        if (page && page > 0) {
+            $('#apiCurrentPage').val(page);
+            applyAPIFilters();
+        }
     });
     
     // Approve article
@@ -463,9 +486,16 @@ async function fetchAPIArticles() {
     btn.html('<i class="fas fa-spinner fa-spin"></i> Đang tải...');
     
     try {
+        // Lấy thông tin từ form
+        const limit = parseInt($('#apiLimit').val()) || 20;
+        const startDate = $('#apiStartDate').val();
+        const endDate = $('#apiEndDate').val();
+        const country = $('#apiCountry').val();
+        const category = $('#apiCategory').val();
+        
         // Có thể thêm form để nhập API key và URL
         const apiKey = prompt('Nhập API Key (để trống nếu dùng mock data):') || '';
-        const apiUrl = prompt('Nhập API URL (để trống nếu dùng mock data):') || '';
+        const apiUrl = 'https://newsapi.org/v2/top-headlines';
         
         const response = await fetch('/admin/api/fetch-api-news', {
             method: 'POST',
@@ -474,7 +504,12 @@ async function fetchAPIArticles() {
             },
             body: JSON.stringify({
                 api_key: apiKey,
-                api_url: apiUrl || 'https://newsapi.org/v2/top-headlines'
+                api_url: apiUrl,
+                limit: limit,
+                start_date: startDate,
+                end_date: endDate,
+                country: country,
+                category: category
             })
         });
         
@@ -482,8 +517,10 @@ async function fetchAPIArticles() {
         
         if (result.success) {
             showToast('Thành công', result.message || 'Đã lấy bài viết mới từ API', 'success');
-            loadAPIArticles();
-            loadStatistics(); // Reload stats
+            // Hiển thị kết quả và áp dụng filter
+            displayAPIArticles(result.data);
+            $('#apiFilterResults').show();
+            applyAPIFilters();
         } else {
             showToast('Lỗi', result.error || 'Không thể lấy bài viết từ API', 'warning');
         }
@@ -492,8 +529,178 @@ async function fetchAPIArticles() {
         showToast('Lỗi', 'Có lỗi xảy ra khi lấy bài viết từ API', 'warning');
     } finally {
         btn.prop('disabled', false);
-        btn.html('<i class="fas fa-sync-alt"></i> Lấy bài mới từ API');
+        btn.html('<i class="fas fa-sync-alt"></i> Lấy dữ liệu từ API');
     }
+}
+
+// Store API articles data
+let apiArticlesData = [];
+
+// Display API articles
+function displayAPIArticles(articles) {
+    apiArticlesData = articles;
+    applyAPIFilters();
+}
+
+// Apply filters to API articles
+function applyAPIFilters() {
+    let filtered = [...apiArticlesData];
+    
+    // Filter by source
+    const sourceFilter = $('#apiSource').val().toLowerCase();
+    if (sourceFilter) {
+        filtered = filtered.filter(article => 
+            article.source.toLowerCase().includes(sourceFilter)
+        );
+    }
+    
+    // Filter by keyword
+    const keywordFilter = $('#apiSearchInput').val().toLowerCase();
+    if (keywordFilter) {
+        filtered = filtered.filter(article => 
+            article.title.toLowerCase().includes(keywordFilter) ||
+            (article.summary && article.summary.toLowerCase().includes(keywordFilter)) ||
+            (article.content && article.content.toLowerCase().includes(keywordFilter))
+        );
+    }
+    
+    // Sort
+    const sortBy = $('#apiSortBy').val();
+    switch(sortBy) {
+        case 'published_desc':
+            filtered.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+            break;
+        case 'published_asc':
+            filtered.sort((a, b) => new Date(a.published_at) - new Date(b.published_at));
+            break;
+        case 'title_asc':
+            filtered.sort((a, b) => a.title.localeCompare(b.title));
+            break;
+        case 'title_desc':
+            filtered.sort((a, b) => b.title.localeCompare(a.title));
+            break;
+        case 'source_asc':
+            filtered.sort((a, b) => a.source.localeCompare(b.source));
+            break;
+    }
+    
+    // Pagination
+    const pageSize = parseInt($('#apiPageSize').val()) || 20;
+    const currentPage = parseInt($('#apiCurrentPage').val()) || 1;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginated = filtered.slice(startIndex, endIndex);
+    
+    // Display
+    renderAPIArticlesTable(paginated);
+    
+    // Update info
+    $('#apiResultsInfo').text(`Hiển thị ${startIndex + 1}-${Math.min(endIndex, filtered.length)} trong tổng số ${filtered.length} bài viết`);
+    
+    // Pagination
+    renderAPIPagination(filtered.length, pageSize, currentPage);
+}
+
+// Render API articles table
+function renderAPIArticlesTable(articles) {
+    let html = '';
+    
+    if (articles.length === 0) {
+        html = '<tr><td colspan="7" class="text-center text-muted">Không có bài viết nào phù hợp</td></tr>';
+    } else {
+        articles.forEach((article, index) => {
+            const date = article.published_at ? new Date(article.published_at).toLocaleString('vi-VN') : 'N/A';
+            html += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><strong>${article.title}</strong></td>
+                    <td><span class="badge bg-info">${article.source}</span></td>
+                    <td><span class="badge bg-primary">${article.category_name || 'N/A'}</span></td>
+                    <td>${article.author || 'N/A'}</td>
+                    <td>${date}</td>
+                    <td>
+                        <button class="btn btn-sm btn-info btn-action btn-preview-api" data-article='${JSON.stringify(article).replace(/'/g, "&#39;")}' title="Xem trước">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-success btn-action btn-save-api" data-article='${JSON.stringify(article).replace(/'/g, "&#39;")}' title="Lưu bài viết">
+                            <i class="fas fa-save"></i> Lưu
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    
+    $('#apiArticlesTable').html(html);
+}
+
+// Render pagination
+function renderAPIPagination(total, pageSize, currentPage) {
+    const totalPages = Math.ceil(total / pageSize);
+    let html = '';
+    
+    if (totalPages <= 1) {
+        $('#apiPagination').html('');
+        return;
+    }
+    
+    // Previous button
+    html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+        <a class="page-link" href="#" data-page="${currentPage - 1}">Trước</a>
+    </li>`;
+    
+    // Page numbers
+    const maxPages = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+    let endPage = Math.min(totalPages, startPage + maxPages - 1);
+    
+    if (endPage - startPage < maxPages - 1) {
+        startPage = Math.max(1, endPage - maxPages + 1);
+    }
+    
+    if (startPage > 1) {
+        html += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`;
+        if (startPage > 2) {
+            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+            <a class="page-link" href="#" data-page="${i}">${i}</a>
+        </li>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        html += `<li class="page-item"><a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a></li>`;
+    }
+    
+    // Next button
+    html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+        <a class="page-link" href="#" data-page="${currentPage + 1}">Sau</a>
+    </li>`;
+    
+    $('#apiPagination').html(html);
+    
+    // Store current page
+    $('<input>').attr({
+        type: 'hidden',
+        id: 'apiCurrentPage',
+        value: currentPage
+    }).appendTo('body');
+}
+
+// Clear API filters
+function clearAPIFilters() {
+    $('#apiSource').val('');
+    $('#apiSearchInput').val('');
+    $('#apiSortBy').val('published_desc');
+    $('#apiPageSize').val(20);
+    $('#apiCurrentPage').val(1);
+    applyAPIFilters();
 }
 
 // Approve article

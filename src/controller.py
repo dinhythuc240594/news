@@ -535,15 +535,18 @@ class AdminController:
     def api_fetch_api_news(self):
         """API lấy bài viết mới từ API bên ngoài (chỉ lấy dữ liệu, không lưu)"""
         import requests
-        from datetime import datetime
+        from datetime import datetime, timedelta
         
         try:
             # Lấy thông tin từ request
             data = request.json if request.is_json else {}
             api_key = data.get('api_key')
-            api_url = data.get('api_url')
-            country = data.get('country', 'us')
-            category = data.get('category')
+            api_url = data.get('api_url', 'https://newsapi.org/v2/top-headlines')
+            country = data.get('country', '')
+            category = data.get('category', '')
+            limit = data.get('limit', 20)
+            start_date = data.get('start_date')
+            end_date = data.get('end_date')
             
             articles = []
             
@@ -552,16 +555,44 @@ class AdminController:
                 try:
                     # Ví dụ với NewsAPI.org
                     params = {
-                        'apiKey': api_key,
-                        'country': country
+                        'apiKey': api_key
                     }
+                    if country:
+                        params['country'] = country
                     if category:
                         params['category'] = category
+                    if limit:
+                        params['pageSize'] = min(limit, 100)  # Max 100 per request
+                    
+                    # Nếu có ngày, sử dụng everything endpoint
+                    if start_date or end_date:
+                        api_url = 'https://newsapi.org/v2/everything'
+                        if start_date:
+                            params['from'] = start_date
+                        if end_date:
+                            params['to'] = end_date
+                        if not category and not country:
+                            params['q'] = 'news'  # Default query
                     
                     response = requests.get(api_url, params=params, timeout=10)
                     if response.status_code == 200:
                         api_data = response.json()
                         articles = api_data.get('articles', [])
+                    elif response.status_code == 401:
+                        return jsonify({
+                            'success': False,
+                            'error': 'API key không hợp lệ hoặc đã hết hạn'
+                        }), 401
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'error': f'Lỗi API: {response.status_code} - {response.text}'
+                        }), response.status_code
+                except requests.exceptions.RequestException as e:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Lỗi kết nối API: {str(e)}'
+                    }), 500
                 except Exception as e:
                     return jsonify({
                         'success': False,
@@ -570,53 +601,59 @@ class AdminController:
             
             # Nếu không có API key hoặc không fetch được, dùng mock data
             if not articles:
-                # Mock data cho demo
-                articles = [
-                    {
-                        'title': 'Breaking: Major tech company announces new product',
-                        'description': 'A major technology company has announced a revolutionary new product...',
-                        'url': 'https://example.com/news1',
-                        'urlToImage': 'https://via.placeholder.com/400x300',
-                        'source': {'name': 'TechCrunch'},
-                        'author': 'John Doe',
-                        'publishedAt': datetime.utcnow().isoformat(),
-                        'content': 'Full content of the article...'
-                    },
-                    {
-                        'title': 'Global markets react to economic news',
-                        'description': 'Stock markets around the world are reacting to the latest economic data...',
-                        'url': 'https://example.com/news2',
-                        'urlToImage': 'https://via.placeholder.com/400x300',
-                        'source': {'name': 'Reuters'},
-                        'author': 'Jane Smith',
-                        'publishedAt': datetime.utcnow().isoformat(),
-                        'content': 'Full content of the article...'
-                    },
-                    {
-                        'title': 'Sports: Championship final results',
-                        'description': 'The championship final has concluded with surprising results...',
-                        'url': 'https://example.com/news3',
-                        'urlToImage': 'https://via.placeholder.com/400x300',
-                        'source': {'name': 'ESPN'},
-                        'author': 'Sports Reporter',
-                        'publishedAt': datetime.utcnow().isoformat(),
-                        'content': 'Full content of the article...'
-                    }
-                ]
+                # Tạo mock data với số lượng và ngày tháng phù hợp
+                mock_count = min(limit, 50)
+                articles = []
+                base_date = datetime.utcnow()
+                
+                for i in range(mock_count):
+                    published_date = base_date - timedelta(days=i % 7, hours=i % 24)
+                    if start_date:
+                        try:
+                            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                            if published_date < start_dt:
+                                continue
+                        except:
+                            pass
+                    if end_date:
+                        try:
+                            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                            if published_date > end_dt:
+                                continue
+                        except:
+                            pass
+                    
+                    sources = ['TechCrunch', 'Reuters', 'ESPN', 'BBC', 'CNN', 'The Guardian']
+                    categories_list = ['Technology', 'Business', 'Sports', 'Entertainment', 'Health', 'Science']
+                    authors_list = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams', 'David Brown']
+                    
+                    articles.append({
+                        'title': f'Breaking News {i+1}: Major development in {categories_list[i % len(categories_list)]}',
+                        'description': f'This is a detailed description of the news article number {i+1}...',
+                        'url': f'https://example.com/news{i+1}',
+                        'urlToImage': f'https://via.placeholder.com/400x300?text=News+{i+1}',
+                        'source': {'name': sources[i % len(sources)]},
+                        'author': authors_list[i % len(authors_list)],
+                        'publishedAt': published_date.isoformat(),
+                        'content': f'Full content of article {i+1}. This is a comprehensive news article covering important topics...'
+                    })
             
             # Format dữ liệu để trả về
             formatted_articles = []
             for idx, article in enumerate(articles):
+                source_name = article.get('source', {}).get('name', 'Unknown') if isinstance(article.get('source'), dict) else str(article.get('source', 'Unknown'))
+                published_at = article.get('publishedAt', datetime.utcnow().isoformat())
+                
                 formatted_articles.append({
                     'id': f'api_{idx}_{datetime.utcnow().timestamp()}',  # Temporary ID
                     'title': article.get('title', 'No title'),
                     'summary': article.get('description', ''),
                     'content': article.get('content', article.get('description', '')),
                     'thumbnail': article.get('urlToImage', ''),
-                    'source': article.get('source', {}).get('name', 'Unknown') if isinstance(article.get('source'), dict) else str(article.get('source', 'Unknown')),
+                    'source': source_name,
                     'source_url': article.get('url', ''),
                     'author': article.get('author', 'Unknown'),
-                    'published_at': article.get('publishedAt', datetime.utcnow().isoformat()),
+                    'published_at': published_at,
                     'category_name': category or 'General'
                 })
             
