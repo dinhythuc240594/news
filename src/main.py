@@ -4,7 +4,8 @@ Main application file - Khởi tạo Flask app và đăng ký routes
 from flask import Flask
 from admin_routes import admin_bp
 from client_routes import client_bp
-from database import init_db
+from database import init_db, get_session
+from models import CategoryModel
 from config import Config
 from datetime import datetime, timezone
 import pytz
@@ -83,6 +84,20 @@ def create_app(config_class=Config):
         if not text:
             return ''
         return text.replace('\n', '<br>')
+    
+    # Context processor để categories có sẵn trong tất cả templates
+    @app.context_processor
+    def inject_categories():
+        """Inject categories vào tất cả templates để dùng cho navigation menu"""
+        try:
+            db_session = get_session()
+            category_model = CategoryModel(db_session)
+            categories = category_model.get_all()  # Đã lọc visible=True và sắp xếp theo order_display
+            db_session.close()
+            return dict(categories=categories)
+        except Exception:
+            # Nếu có lỗi (ví dụ: database chưa khởi tạo), trả về list rỗng
+            return dict(categories=[])
     
     return app
 

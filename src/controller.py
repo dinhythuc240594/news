@@ -5,7 +5,7 @@ from functools import wraps
 import os
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from database import get_session, NewsStatus, UserRole, SavedNews, ViewedNews, Comment, MenuItem, News, Category
+from database import get_session, NewsStatus, UserRole, SavedNews, ViewedNews, Comment, News, Category
 from models import NewsModel, CategoryModel, UserModel
 
 def admin_required(f):
@@ -830,9 +830,9 @@ class AdminController:
         return slug.strip('-')
     
     def api_menu_items(self):
-        """API lấy danh sách menu items"""
-        menu_items = self.db_session.query(MenuItem).order_by(
-            MenuItem.order_display, MenuItem.parent_id
+        """API lấy danh sách categories (menu items)"""
+        categories = self.db_session.query(Category).order_by(
+            Category.order_display, Category.parent_id
         ).all()
         
         return jsonify({
@@ -845,11 +845,11 @@ class AdminController:
                 'order': item.order_display,
                 'parent_id': item.parent_id,
                 'visible': item.visible
-            } for item in menu_items]
+            } for item in categories]
         })
     
     def api_create_menu_item(self):
-        """API tạo menu item mới"""
+        """API tạo category mới (menu item)"""
         data = request.json if request.is_json else request.form
         
         name = data.get('name')
@@ -858,198 +858,189 @@ class AdminController:
         order = data.get('order', 0)
         parent_id = data.get('parent_id')
         visible = data.get('visible', True)
+        description = data.get('description')
         
         if not name:
-            return jsonify({'success': False, 'error': 'Tên menu không được để trống'}), 400
+            return jsonify({'success': False, 'error': 'Tên danh mục không được để trống'}), 400
         
         if not slug:
             # Tự động tạo slug
             slug = self._generate_slug(name)
         
         # Kiểm tra slug trùng
-        existing = self.db_session.query(MenuItem).filter(MenuItem.slug == slug).first()
+        existing = self.db_session.query(Category).filter(Category.slug == slug).first()
         if existing:
             return jsonify({'success': False, 'error': 'Slug đã tồn tại'}), 400
         
-        menu_item = MenuItem(
+        category = Category(
             name=name,
             slug=slug,
             icon=icon if icon else None,
             order_display=order,
             parent_id=int(parent_id) if parent_id else None,
-            visible=visible
+            visible=visible,
+            description=description if description else None
         )
         
-        self.db_session.add(menu_item)
+        self.db_session.add(category)
         self.db_session.commit()
-        self.db_session.refresh(menu_item)
+        self.db_session.refresh(category)
         
         return jsonify({
             'success': True,
-            'message': 'Đã tạo menu mới',
+            'message': 'Đã tạo danh mục mới',
             'data': {
-                'id': menu_item.id,
-                'name': menu_item.name,
-                'slug': menu_item.slug
+                'id': category.id,
+                'name': category.name,
+                'slug': category.slug
             }
         })
     
     def api_update_menu_item(self, menu_id: int):
-        """API cập nhật menu item"""
-        menu_item = self.db_session.query(MenuItem).filter(MenuItem.id == menu_id).first()
-        if not menu_item:
-            return jsonify({'success': False, 'error': 'Không tìm thấy menu'}), 404
+        """API cập nhật category (menu item)"""
+        category = self.db_session.query(Category).filter(Category.id == menu_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Không tìm thấy danh mục'}), 404
         
         data = request.json if request.is_json else request.form
         
         if 'name' in data:
-            menu_item.name = data['name']
+            category.name = data['name']
         if 'slug' in data:
             # Kiểm tra slug trùng (trừ chính nó)
-            existing = self.db_session.query(MenuItem).filter(
-                MenuItem.slug == data['slug'],
-                MenuItem.id != menu_id
+            existing = self.db_session.query(Category).filter(
+                Category.slug == data['slug'],
+                Category.id != menu_id
             ).first()
             if existing:
                 return jsonify({'success': False, 'error': 'Slug đã tồn tại'}), 400
-            menu_item.slug = data['slug']
+            category.slug = data['slug']
         if 'icon' in data:
-            menu_item.icon = data['icon'] if data['icon'] else None
+            category.icon = data['icon'] if data['icon'] else None
         if 'order' in data:
-            menu_item.order_display = int(data['order'])
+            category.order_display = int(data['order'])
         if 'parent_id' in data:
             parent_id = data['parent_id']
             # Kiểm tra không được set parent là chính nó
             if parent_id == menu_id:
                 return jsonify({'success': False, 'error': 'Không thể set parent là chính nó'}), 400
-            menu_item.parent_id = int(parent_id) if parent_id else None
+            category.parent_id = int(parent_id) if parent_id else None
         if 'visible' in data:
-            menu_item.visible = bool(data['visible'])
+            category.visible = bool(data['visible'])
+        if 'description' in data:
+            category.description = data['description'] if data['description'] else None
         
-        menu_item.updated_at = datetime.utcnow()
+        category.updated_at = datetime.utcnow()
         self.db_session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'Đã cập nhật menu',
+            'message': 'Đã cập nhật danh mục',
             'data': {
-                'id': menu_item.id,
-                'name': menu_item.name
+                'id': category.id,
+                'name': category.name
             }
         })
     
     def api_delete_menu_item(self, menu_id: int):
-        """API xóa menu item"""
-        menu_item = self.db_session.query(MenuItem).filter(MenuItem.id == menu_id).first()
-        if not menu_item:
-            return jsonify({'success': False, 'error': 'Không tìm thấy menu'}), 404
+        """API xóa category (menu item)"""
+        category = self.db_session.query(Category).filter(Category.id == menu_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Không tìm thấy danh mục'}), 404
         
-        # Xóa các menu con trước (cascade)
-        children = self.db_session.query(MenuItem).filter(MenuItem.parent_id == menu_id).all()
+        # Kiểm tra xem có tin tức nào đang sử dụng category này không
+        news_count = self.db_session.query(News).filter(News.category_id == menu_id).count()
+        if news_count > 0:
+            return jsonify({
+                'success': False,
+                'error': f'Không thể xóa danh mục vì có {news_count} tin tức đang sử dụng'
+            }), 400
+        
+        # Xóa các category con trước (cascade)
+        children = self.db_session.query(Category).filter(Category.parent_id == menu_id).all()
         for child in children:
-            self.db_session.delete(child)
+            # Kiểm tra tin tức của child category
+            child_news_count = self.db_session.query(News).filter(News.category_id == child.id).count()
+            if child_news_count == 0:
+                self.db_session.delete(child)
         
-        self.db_session.delete(menu_item)
+        self.db_session.delete(category)
         self.db_session.commit()
         
         return jsonify({
             'success': True,
-            'message': 'Đã xóa menu'
+            'message': 'Đã xóa danh mục'
         })
     
     def api_init_default_menu_items(self):
-        """API khởi tạo menu items mặc định"""
-        # Kiểm tra xem đã có menu items chưa
-        count = self.db_session.query(MenuItem).count()
+        """API khởi tạo categories mặc định (menu items)"""
+        # Kiểm tra xem đã có categories chưa
+        count = self.db_session.query(Category).count()
         if count > 0:
             return jsonify({
                 'success': False,
-                'error': 'Đã có menu items trong database'
+                'error': 'Đã có categories trong database'
             }), 400
         
-        # Default menu items với temp_id để map parent
-        default_menus = [
-            {'temp_id': 1, 'name': 'Trang chủ', 'slug': 'trang-chu', 'icon': 'fas fa-home', 'order': 1, 'parent_temp_id': None},
-            {'temp_id': 2, 'name': 'Thời sự', 'slug': 'thoi-su', 'icon': None, 'order': 2, 'parent_temp_id': None},
-            {'temp_id': 21, 'name': 'Chính trị', 'slug': 'chinh-tri', 'icon': None, 'order': 1, 'parent_temp_id': 2},
-            {'temp_id': 22, 'name': 'Nhân sự', 'slug': 'nhan-su', 'icon': None, 'order': 2, 'parent_temp_id': 2},
-            {'temp_id': 23, 'name': 'Chính sách', 'slug': 'chinh-sach', 'icon': None, 'order': 3, 'parent_temp_id': 2},
-            {'temp_id': 3, 'name': 'Góc nhìn', 'slug': 'goc-nhin', 'icon': None, 'order': 3, 'parent_temp_id': None},
-            {'temp_id': 4, 'name': 'Thế giới', 'slug': 'the-gioi', 'icon': None, 'order': 4, 'parent_temp_id': None},
-            {'temp_id': 41, 'name': 'Châu Á', 'slug': 'chau-a', 'icon': None, 'order': 1, 'parent_temp_id': 4},
-            {'temp_id': 42, 'name': 'Châu Âu', 'slug': 'chau-au', 'icon': None, 'order': 2, 'parent_temp_id': 4},
-            {'temp_id': 43, 'name': 'Châu Mỹ', 'slug': 'chau-my', 'icon': None, 'order': 3, 'parent_temp_id': 4},
-            {'temp_id': 5, 'name': 'Kinh doanh', 'slug': 'kinh-doanh', 'icon': None, 'order': 5, 'parent_temp_id': None},
-            {'temp_id': 51, 'name': 'Chứng khoán', 'slug': 'chung-khoan', 'icon': None, 'order': 1, 'parent_temp_id': 5},
-            {'temp_id': 52, 'name': 'Bất động sản', 'slug': 'bat-dong-san', 'icon': None, 'order': 2, 'parent_temp_id': 5},
-            {'temp_id': 53, 'name': 'Doanh nghiệp', 'slug': 'doanh-nghiep', 'icon': None, 'order': 3, 'parent_temp_id': 5},
-            {'temp_id': 6, 'name': 'Giải trí', 'slug': 'giai-tri', 'icon': None, 'order': 6, 'parent_temp_id': None},
-            {'temp_id': 61, 'name': 'Phim ảnh', 'slug': 'phim-anh', 'icon': None, 'order': 1, 'parent_temp_id': 6},
-            {'temp_id': 62, 'name': 'Âm nhạc', 'slug': 'am-nhac', 'icon': None, 'order': 2, 'parent_temp_id': 6},
-            {'temp_id': 63, 'name': 'Sao Việt', 'slug': 'sao-viet', 'icon': None, 'order': 3, 'parent_temp_id': 6},
-            {'temp_id': 7, 'name': 'Thể thao', 'slug': 'the-thao', 'icon': None, 'order': 7, 'parent_temp_id': None},
-            {'temp_id': 71, 'name': 'Bóng đá', 'slug': 'bong-da', 'icon': None, 'order': 1, 'parent_temp_id': 7},
-            {'temp_id': 72, 'name': 'Tennis', 'slug': 'tennis', 'icon': None, 'order': 2, 'parent_temp_id': 7},
-            {'temp_id': 73, 'name': 'Võ thuật', 'slug': 'vo-thuat', 'icon': None, 'order': 3, 'parent_temp_id': 7},
-            {'temp_id': 8, 'name': 'Pháp luật', 'slug': 'phap-luat', 'icon': None, 'order': 8, 'parent_temp_id': None},
-            {'temp_id': 9, 'name': 'Giáo dục', 'slug': 'giao-duc', 'icon': None, 'order': 9, 'parent_temp_id': None},
-            {'temp_id': 10, 'name': 'Sức khỏe', 'slug': 'suc-khoe', 'icon': None, 'order': 10, 'parent_temp_id': None},
-            {'temp_id': 11, 'name': 'Đời sống', 'slug': 'doi-song', 'icon': None, 'order': 11, 'parent_temp_id': None},
-            {'temp_id': 12, 'name': 'Du lịch', 'slug': 'du-lich', 'icon': None, 'order': 12, 'parent_temp_id': None},
-            {'temp_id': 13, 'name': 'Khoa học', 'slug': 'khoa-hoc', 'icon': None, 'order': 13, 'parent_temp_id': None},
-            {'temp_id': 14, 'name': 'Số hóa', 'slug': 'so-hoa', 'icon': None, 'order': 14, 'parent_temp_id': None},
-            {'temp_id': 15, 'name': 'Xe', 'slug': 'xe', 'icon': None, 'order': 15, 'parent_temp_id': None}
-        ]
+        # Sử dụng DEFAULT_CATEGORIES từ database.py
+        from database import DEFAULT_CATEGORIES
         
-        # Tạo menu items (tạo parent trước)
-        created_items = {}  # Map temp_id -> real_id
+        # Tạo categories (tạo parent trước)
+        created_items = {}  # Map slug -> real_id
         
-        # Tạo parent items trước
-        parent_items = [m for m in default_menus if m['parent_temp_id'] is None]
-        parent_items.sort(key=lambda x: x['order'])
+        # Tạo parent categories trước
+        parent_categories = [c for c in DEFAULT_CATEGORIES if c['parent_id'] is None]
+        parent_categories.sort(key=lambda x: x['order_display'])
         
-        for menu_data in parent_items:
-            menu_item = MenuItem(
-                name=menu_data['name'],
-                slug=menu_data['slug'],
-                icon=menu_data['icon'],
-                order_display=menu_data['order'],
+        for cat_data in parent_categories:
+            category = Category(
+                name=cat_data['name'],
+                slug=cat_data['slug'],
+                icon=cat_data['icon'],
+                order_display=cat_data['order_display'],
                 parent_id=None,
                 visible=True
             )
-            self.db_session.add(menu_item)
+            self.db_session.add(category)
             self.db_session.flush()  # Để lấy ID
-            created_items[menu_data['temp_id']] = menu_item.id
+            created_items[cat_data['slug']] = category.id
         
-        # Tạo child items
-        child_items = [m for m in default_menus if m['parent_temp_id'] is not None]
-        child_items.sort(key=lambda x: (x['parent_temp_id'], x['order']))
+        # Tạo child categories (nếu có trong DEFAULT_CATEGORIES)
+        child_categories = [c for c in DEFAULT_CATEGORIES if c['parent_id'] is not None]
+        child_categories.sort(key=lambda x: (x['parent_id'], x['order_display']))
         
-        for menu_data in child_items:
-            parent_id = created_items.get(menu_data['parent_temp_id'])
-            if parent_id:
-                menu_item = MenuItem(
-                    name=menu_data['name'],
-                    slug=menu_data['slug'],
-                    icon=menu_data['icon'],
-                    order_display=menu_data['order'],
+        for cat_data in child_categories:
+            # Tìm parent_id từ slug của parent
+            parent_slug = None
+            for parent_cat in DEFAULT_CATEGORIES:
+                if parent_cat.get('id') == cat_data['parent_id']:
+                    parent_slug = parent_cat['slug']
+                    break
+            
+            if parent_slug and parent_slug in created_items:
+                parent_id = created_items[parent_slug]
+                category = Category(
+                    name=cat_data['name'],
+                    slug=cat_data['slug'],
+                    icon=cat_data['icon'],
+                    order_display=cat_data['order_display'],
                     parent_id=parent_id,
                     visible=True
                 )
-                self.db_session.add(menu_item)
+                self.db_session.add(category)
                 self.db_session.flush()
-                created_items[menu_data['temp_id']] = menu_item.id
+                created_items[cat_data['slug']] = category.id
         
         self.db_session.commit()
         
         return jsonify({
             'success': True,
-            'message': f'Đã khởi tạo {len(default_menus)} menu items mặc định',
-            'count': len(default_menus)
+            'message': f'Đã khởi tạo {len(DEFAULT_CATEGORIES)} categories mặc định',
+            'count': len(DEFAULT_CATEGORIES)
         })
     
     def api_update_menu_order(self):
-        """API cập nhật thứ tự menu items (drag & drop)"""
+        """API cập nhật thứ tự categories (drag & drop)"""
         data = request.json if request.is_json else {}
         items = data.get('items', [])
         
@@ -1058,27 +1049,27 @@ class AdminController:
         
         try:
             for item_data in items:
-                menu_id = item_data.get('id')
+                category_id = item_data.get('id')
                 new_order = item_data.get('order', 0)
                 parent_id = item_data.get('parent_id')
                 
-                menu_item = self.db_session.query(MenuItem).filter(MenuItem.id == menu_id).first()
-                if menu_item:
-                    menu_item.order_display = new_order
+                category = self.db_session.query(Category).filter(Category.id == category_id).first()
+                if category:
+                    category.order_display = new_order
                     if parent_id is not None:
                         # Kiểm tra không được set parent là chính nó
-                        if parent_id == menu_id:
+                        if parent_id == category_id:
                             continue
-                        menu_item.parent_id = int(parent_id) if parent_id else None
+                        category.parent_id = int(parent_id) if parent_id else None
                     else:
-                        menu_item.parent_id = None
-                    menu_item.updated_at = datetime.utcnow()
+                        category.parent_id = None
+                    category.updated_at = datetime.utcnow()
             
             self.db_session.commit()
             
             return jsonify({
                 'success': True,
-                'message': 'Đã cập nhật thứ tự menu'
+                'message': 'Đã cập nhật thứ tự danh mục'
             })
         except Exception as e:
             self.db_session.rollback()
