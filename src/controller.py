@@ -808,6 +808,39 @@ class AdminController:
             } for article in articles]
         })
     
+    def api_article_detail(self, article_id: int):
+        """API lấy chi tiết bài viết theo ID"""
+        article = self.news_model.get_by_id(article_id)
+        
+        if not article:
+            return jsonify({
+                'success': False,
+                'message': 'Bài viết không tồn tại'
+            }), 404
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': article.id,
+                'title': article.title,
+                'slug': article.slug,
+                'summary': article.summary or '',
+                'content': article.content or '',
+                'thumbnail': article.thumbnail or '',
+                'category': article.category.name if article.category else 'N/A',
+                'category_id': article.category_id,
+                'author': article.creator.username if article.creator else 'N/A',
+                'author_full_name': article.creator.full_name if article.creator and article.creator.full_name else article.creator.username if article.creator else 'N/A',
+                'status': article.status.value,
+                'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'published_at': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
+                'updated_at': article.updated_at.strftime('%d/%m/%Y %H:%M') if article.updated_at else '',
+                'view_count': article.view_count,
+                'is_featured': article.is_featured if hasattr(article, 'is_featured') else False,
+                'is_hot': article.is_hot if hasattr(article, 'is_hot') else False
+            }
+        })
+    
     def api_categories(self):
         """API lấy danh sách danh mục"""
         categories = self.category_model.get_all()

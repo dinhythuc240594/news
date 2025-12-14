@@ -890,40 +890,104 @@ async function rejectArticle(articleId, reason) {
 
 
 // Preview article
-function previewArticle(articleId) {
-    // Simulate loading article data
-    const article = {
-        id: articleId,
-        title: 'Thủ tướng phát biểu tại hội nghị kinh tế quốc tế',
-        author: 'Nguyễn Văn A',
-        category: 'Thời sự',
-        date: '2024-12-13 14:30',
-        image: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800',
-        content: `
-            <p>Thủ tướng Chính phủ Phạm Minh Chính đã có bài phát biểu quan trọng tại Hội nghị Kinh tế Quốc tế...</p>
-            <p>Trong bài phát biểu, Thủ tướng nhấn mạnh vai trò của Việt Nam trong khu vực và cam kết tạo môi trường đầu tư thuận lợi...</p>
-            <p>Các nhà đầu tư quốc tế đánh giá cao những nỗ lực của Chính phủ Việt Nam trong cải thiện môi trường kinh doanh...</p>
-        `
-    };
-    
-    const content = `
-        <div class="article-preview">
-            <img src="${article.image}" alt="${article.title}" style="width: 100%; border-radius: 8px; margin-bottom: 20px;">
-            <h3>${article.title}</h3>
-            <div class="mb-3">
-                <span class="badge bg-primary">${article.category}</span>
-                <small class="text-muted ms-2">Bởi ${article.author} - ${article.date}</small>
-            </div>
-            <div>${article.content}</div>
-        </div>
-    `;
-    
-    $('#previewContent').html(content);
-    $('#approveBtn').data('id', articleId);
-    $('#rejectBtn').data('id', articleId);
-    
-    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
-    modal.show();
+async function previewArticle(articleId) {
+    try {
+
+        var htmlState = '';
+            htmlState += '<div class="text-center py-5">';
+            htmlState += '<div class="spinner-border text-primary" role="status">';
+            htmlState += '<span class="visually-hidden">Đang tải...</span>';
+            htmlState += '</div>';
+            htmlState += '<p class="mt-3 text-muted">Đang tải bài viết...</p>';
+            htmlState += '</div>';
+
+        // Show loading state
+        $('#previewContent').html(htmlState);
+        
+        // Show modal first
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        modal.show();
+        
+        // Fetch article data from API
+        const response = await fetch(`/admin/api/article/${articleId}`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+            var htmlState = '';
+            htmlState += '<div class="alert alert-danger">';
+            htmlState += '<i class="fas fa-exclamation-circle"></i> Không thể tải bài viết. Vui lòng thử lại.';
+            htmlState += '</div>';
+            $('#previewContent').html(htmlState);
+            $('#previewModal').modal('hide');
+            return;
+        }
+        
+        const article = result.data;
+        
+        // Format status badge
+        const statusBadges = {
+            'draft': '<span class="badge bg-secondary">Bản nháp</span>',
+            'pending': '<span class="badge bg-warning">Chờ duyệt</span>',
+            'published': '<span class="badge bg-success">Đã xuất bản</span>',
+            'rejected': '<span class="badge bg-danger">Đã từ chối</span>',
+            'hidden': '<span class="badge bg-dark">Đã ẩn</span>'
+        };
+        const statusBadge = statusBadges[article.status] || '';
+        
+        // Build content HTML
+        var content = '';
+        content += '<div class="article-preview-container">';
+        content += '<div class="article-preview-thumbnail mb-4">';
+        content += '<img src="'+ article.thumbnail +'" alt="'+ article.title +'" class="img-fluid rounded shadow-sm">';
+        content += '</div>';
+        content += '<div class="article-preview-header mb-4">';
+        content += '<h2 class="article-preview-title mb-3">'+article.title+'</h2>';
+        content += '<div class="article-preview-meta d-flex flex-wrap align-items-center gap-3 mb-3">';
+        content += '<span class="badge bg-primary fs-6">'+article.category+'</span>';
+        content += statusBadge;
+        content += article.is_featured ? '<span class="badge bg-warning"><i class="fas fa-star"></i> Nổi bật</span>' : '';
+        content += article.is_hot ? '<span class="badge bg-danger"><i class="fas fa-fire"></i> Tin nóng</span>' : '';
+        content += '</div>';
+        content += '<div class="article-preview-info text-muted small">';
+        content += '<div class="d-flex flex-wrap gap-4">';
+        content += '<span><i class="fas fa-user me-1"></i> <strong>Tác giả:</strong> '+article.author_full_name+'</span>';
+        content += article.published_at ? '<span><i class="fas fa-calendar-alt me-1"></i> <strong>Xuất bản:</strong> '+article.published_at+'</span>' : '';
+        content += article.created_at ? '<span><i class="fas fa-clock me-1"></i> <strong>Tạo lúc:</strong> '+article.created_at+'</span>' : '';
+        content += article.view_count !== undefined ? '<span><i class="fas fa-eye me-1"></i> <strong>Lượt xem:</strong> '+article.view_count.toLocaleString('vi-VN')+'</span>' : '';
+        content += '</div>';
+        content += '</div>';
+        content += article.summary ? '<div class="article-preview-summary mb-4 p-3 bg-light rounded">': '';
+        content += '<h5 class="mb-2"><i class="fas fa-quote-left text-primary me-2"></i>Tóm tắt:</h5>';
+        content += '<p class="mb-0 text-muted">'+article.summary+'</p>';
+        content += '</div>';
+        content += '<div class="article-preview-content">';
+        content += '<h5 class="mb-3"><i class="fas fa-align-left text-primary me-2"></i>Nội dung:</h5>';
+        content += '<div class="article-content-body">';
+        content += article.content ? article.content : '<p class="text-muted">Chưa có nội dung</p>';
+        content += '</div>';
+        content += '</div>';
+        content += '</div>';
+        $('#previewContent').html(content);
+        $('#approveBtn').data('id', articleId);
+        $('#rejectBtn').data('id', articleId);
+        
+        // Show/hide approve/reject buttons based on status
+        if (article.status === 'pending') {
+            $('#approveBtn').show();
+            $('#rejectBtn').show();
+        } else {
+            $('#approveBtn').hide();
+            $('#rejectBtn').hide();
+        }
+    } catch (error) {
+        console.error('Error loading article preview:', error);
+        var htmlState = '';
+        htmlState += '<div class="alert alert-danger">';
+        htmlState += '<i class="fas fa-exclamation-circle"></i> Có lỗi xảy ra khi tải bài viết: '+error.message;
+        htmlState += '</div>';
+        $('#previewContent').html(htmlState);
+        $('#previewModal').modal('hide');
+    } 
 }
 
 // Initialize chart

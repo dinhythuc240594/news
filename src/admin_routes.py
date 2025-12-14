@@ -176,6 +176,13 @@ def api_hot_articles():
     return admin_controller.api_hot_articles()
 
 
+@admin_bp.route('/api/article/<int:article_id>')
+@controller.editor_required
+def api_article_detail(article_id: int):
+    """API lấy chi tiết bài viết theo ID"""
+    return admin_controller.api_article_detail(article_id)
+
+
 @admin_bp.route('/api/categories')
 @controller.admin_required
 def api_categories():
