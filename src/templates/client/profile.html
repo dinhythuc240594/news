@@ -70,7 +70,7 @@
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="comments-tab" data-bs-toggle="tab" data-bs-target="#comments" type="button" role="tab">
-                                        <i class="fas fa-comments me-2"></i>Ý kiến của bạn
+                                        <i class="fas fa-comments me-2"></i>Ý kiến của bạn ({{ total_comments }})
                                     </button>
                                 </li>
                             </ul>
@@ -257,6 +257,7 @@
                                             <p class="mt-2 mb-2">{{ comment.content }}</p>
                                             <div class="news-meta">
                                                 <span><i class="far fa-clock"></i> {{ comment.created_at.strftime('%d/%m/%Y %H:%M') if comment.created_at else '' }}</span>
+                                                <span class="ms-3"><i class="fas fa-comments"></i> {{ comment_counts.get(comment.news_id, 0) }} bình luận</span>
                                                 {% if not comment.is_active %}
                                                     <span class="badge bg-warning ms-2">Đang chờ duyệt</span>
                                                 {% endif %}

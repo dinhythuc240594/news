@@ -707,13 +707,36 @@ class ClientController:
             Comment.user_id == user.id
         ).order_by(Comment.created_at.desc()).limit(20).all()
         
+        # Tính số bình luận cho mỗi bài viết
+        comment_counts = {}
+        if comments:
+            news_ids = list(set([comment.news_id for comment in comments]))
+            from sqlalchemy import func
+            counts = self.db_session.query(
+                Comment.news_id,
+                func.count(Comment.id).label('count')
+            ).filter(
+                Comment.news_id.in_(news_ids),
+                Comment.is_active == True
+            ).group_by(Comment.news_id).all()
+            
+            comment_counts = {news_id: count for news_id, count in counts}
+        
+        # Tính tổng số bình luận của cá nhân
+        total_comments = self.db_session.query(Comment).filter(
+            Comment.user_id == user.id,
+            Comment.is_active == True
+        ).count()
+
         categories = self.category_model.get_all()
         return render_template('client/profile.html', 
                              user=user, 
                              categories=categories,
                              saved_news=saved_news,
                              viewed_news=viewed_news,
-                             comments=comments)
+                             comments=comments,
+                             comment_counts=comment_counts,
+                             total_comments=total_comments)
     
     def update_profile(self):
         """
