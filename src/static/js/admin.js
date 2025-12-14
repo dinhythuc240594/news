@@ -888,24 +888,37 @@ async function rejectArticle(articleId, reason) {
     }
 }
 
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.toString().replace(/[&<>"']/g, function(m) { return map[m]; });
+}
 
 // Preview article
 async function previewArticle(articleId) {
     try {
 
         var htmlState = '';
-            htmlState += '<div class="text-center py-5">';
-            htmlState += '<div class="spinner-border text-primary" role="status">';
-            htmlState += '<span class="visually-hidden">Đang tải...</span>';
-            htmlState += '</div>';
-            htmlState += '<p class="mt-3 text-muted">Đang tải bài viết...</p>';
-            htmlState += '</div>';
+        htmlState += '<div class="text-center py-5">';
+        htmlState += '<div class="spinner-border text-primary" role="status">';
+        htmlState += '<span class="visually-hidden">Đang tải...</span>';
+        htmlState += '</div>';
+        htmlState += '<p class="mt-3 text-muted">Đang tải bài viết...</p>';
+        htmlState += '</div>';
 
         // Show loading state
         $('#previewContent').html(htmlState);
         
-        // Show modal first
-        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        // Get modal element and show it
+        var modalElement = document.getElementById('previewModal');
+        var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
         modal.show();
         
         // Fetch article data from API
@@ -913,12 +926,11 @@ async function previewArticle(articleId) {
         const result = await response.json();
         
         if (!result.success || !result.data) {
-            var htmlState = '';
-            htmlState += '<div class="alert alert-danger">';
-            htmlState += '<i class="fas fa-exclamation-circle"></i> Không thể tải bài viết. Vui lòng thử lại.';
-            htmlState += '</div>';
-            $('#previewContent').html(htmlState);
-            $('#previewModal').modal('hide');
+            var errorHtml = '';
+            errorHtml += '<div class="alert alert-danger">';
+            errorHtml += '<i class="fas fa-exclamation-circle"></i> Không thể tải bài viết. Vui lòng thử lại.';
+            errorHtml += '</div>';
+            $('#previewContent').html(errorHtml);
             return;
         }
         
@@ -937,29 +949,56 @@ async function previewArticle(articleId) {
         // Build content HTML
         var content = '';
         content += '<div class="article-preview-container">';
-        content += '<div class="article-preview-thumbnail mb-4">';
-        content += '<img src="'+ article.thumbnail +'" alt="'+ article.title +'" class="img-fluid rounded shadow-sm">';
-        content += '</div>';
+        
+        // Thumbnail (only if exists)
+        if (article.thumbnail) {
+            content += '<div class="article-preview-thumbnail mb-4">';
+            content += '<img src="' + escapeHtml(article.thumbnail) + '" alt="' + escapeHtml(article.title || '') + '" class="img-fluid rounded shadow-sm" onerror="this.src=\'https://via.placeholder.com/800x400?text=No+Image\'">';
+            content += '</div>';
+        }
+        
+        // Header
         content += '<div class="article-preview-header mb-4">';
-        content += '<h2 class="article-preview-title mb-3">'+article.title+'</h2>';
+        content += '<h2 class="article-preview-title mb-3">' + escapeHtml(article.title || 'Không có tiêu đề') + '</h2>';
+        
+        // Meta badges
         content += '<div class="article-preview-meta d-flex flex-wrap align-items-center gap-3 mb-3">';
-        content += '<span class="badge bg-primary fs-6">'+article.category+'</span>';
+        content += '<span class="badge bg-primary fs-6">' + escapeHtml(article.category || 'N/A') + '</span>';
         content += statusBadge;
-        content += article.is_featured ? '<span class="badge bg-warning"><i class="fas fa-star"></i> Nổi bật</span>' : '';
-        content += article.is_hot ? '<span class="badge bg-danger"><i class="fas fa-fire"></i> Tin nóng</span>' : '';
+        if (article.is_featured) {
+            content += '<span class="badge bg-warning"><i class="fas fa-star"></i> Nổi bật</span>';
+        }
+        if (article.is_hot) {
+            content += '<span class="badge bg-danger"><i class="fas fa-fire"></i> Tin nóng</span>';
+        }
         content += '</div>';
+        
+        // Info
         content += '<div class="article-preview-info text-muted small">';
         content += '<div class="d-flex flex-wrap gap-4">';
-        content += '<span><i class="fas fa-user me-1"></i> <strong>Tác giả:</strong> '+article.author_full_name+'</span>';
-        content += article.published_at ? '<span><i class="fas fa-calendar-alt me-1"></i> <strong>Xuất bản:</strong> '+article.published_at+'</span>' : '';
-        content += article.created_at ? '<span><i class="fas fa-clock me-1"></i> <strong>Tạo lúc:</strong> '+article.created_at+'</span>' : '';
-        content += article.view_count !== undefined ? '<span><i class="fas fa-eye me-1"></i> <strong>Lượt xem:</strong> '+article.view_count.toLocaleString('vi-VN')+'</span>' : '';
+        content += '<span><i class="fas fa-user me-1"></i> <strong>Tác giả:</strong> ' + escapeHtml(article.author_full_name || article.author || 'N/A') + '</span>';
+        if (article.published_at) {
+            content += '<span><i class="fas fa-calendar-alt me-1"></i> <strong>Xuất bản:</strong> ' + escapeHtml(article.published_at) + '</span>';
+        }
+        if (article.created_at) {
+            content += '<span><i class="fas fa-clock me-1"></i> <strong>Tạo lúc:</strong> ' + escapeHtml(article.created_at) + '</span>';
+        }
+        if (article.view_count !== undefined && article.view_count !== null) {
+            content += '<span><i class="fas fa-eye me-1"></i> <strong>Lượt xem:</strong> ' + article.view_count.toLocaleString('vi-VN') + '</span>';
+        }
         content += '</div>';
         content += '</div>';
-        content += article.summary ? '<div class="article-preview-summary mb-4 p-3 bg-light rounded">': '';
-        content += '<h5 class="mb-2"><i class="fas fa-quote-left text-primary me-2"></i>Tóm tắt:</h5>';
-        content += '<p class="mb-0 text-muted">'+article.summary+'</p>';
         content += '</div>';
+        
+        // Summary (only if exists)
+        if (article.summary) {
+            content += '<div class="article-preview-summary mb-4 p-3 bg-light rounded">';
+            content += '<h5 class="mb-2"><i class="fas fa-quote-left text-primary me-2"></i>Tóm tắt:</h5>';
+            content += '<p class="mb-0 text-muted">' + escapeHtml(article.summary) + '</p>';
+            content += '</div>';
+        }
+        
+        // Content
         content += '<div class="article-preview-content">';
         content += '<h5 class="mb-3"><i class="fas fa-align-left text-primary me-2"></i>Nội dung:</h5>';
         content += '<div class="article-content-body">';
@@ -981,12 +1020,11 @@ async function previewArticle(articleId) {
         }
     } catch (error) {
         console.error('Error loading article preview:', error);
-        var htmlState = '';
-        htmlState += '<div class="alert alert-danger">';
-        htmlState += '<i class="fas fa-exclamation-circle"></i> Có lỗi xảy ra khi tải bài viết: '+error.message;
-        htmlState += '</div>';
-        $('#previewContent').html(htmlState);
-        $('#previewModal').modal('hide');
+        var errorHtml = '';
+        errorHtml += '<div class="alert alert-danger">';
+        errorHtml += '<i class="fas fa-exclamation-circle"></i> Có lỗi xảy ra khi tải bài viết: ' + escapeHtml(error.message || 'Lỗi không xác định');
+        errorHtml += '</div>';
+        $('#previewContent').html(errorHtml);
     } 
 }
 
