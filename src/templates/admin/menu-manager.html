@@ -29,25 +29,8 @@
                         </div>
                     </div>
                     <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th width="5%">ID</th>
-                                        <th width="25%">Tên Menu</th>
-                                        <th width="15%">Slug</th>
-                                        <th width="10%">Menu cha</th>
-                                        <th width="8%">Icon</th>
-                                        <th width="8%">Thứ tự</th>
-                                        <th width="10%">Hiển thị</th>
-                                        <th width="10%">Submenu</th>
-                                        <th width="19%">Hành động</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="menuTable">
-                                    <!-- Data will be loaded by JS -->
-                                </tbody>
-                            </table>
+                        <div id="menuTreeList" class="menu-tree-list">
+                            <!-- Tree view will be loaded here -->
                         </div>
                     </div>
                 </div>
@@ -131,11 +114,9 @@
                 </div>
                 <div class="modal-body">
                     <div class="preview-nav">
-                        <nav class="main-nav-preview">
-                            <ul class="nav-menu-preview" id="previewMenuList">
-                                <!-- Preview menu will be loaded here -->
-                            </ul>
-                        </nav>
+                        <div id="previewMenuList">
+                            <!-- Preview menu will be loaded here -->
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -151,11 +132,148 @@
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
+    <!-- jQuery UI for drag & drop -->
+    <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+    <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/ui-lightness/jquery-ui.css">
+    
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/menu-admin.js') }}"></script>
     
     <style>
+        /* Menu Tree List */
+        .menu-tree-list {
+            min-height: 200px;
+        }
+        
+        .menu-item-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            margin-bottom: 8px;
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            cursor: move;
+            transition: all 0.2s;
+        }
+        
+        .menu-item-row:hover {
+            background-color: #f8f9fa;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .menu-item-row.ui-sortable-helper {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            opacity: 0.9;
+        }
+        
+        .menu-item-row.parent-item {
+            background-color: #e9ecef;
+            font-weight: 600;
+            border-left: 4px solid #c00;
+        }
+        
+        .menu-item-row.child-item {
+            margin-left: 40px;
+            background-color: #f8f9fa;
+            border-left: 3px solid #6c757d;
+        }
+        
+        .menu-item-row.hidden-item {
+            opacity: 0.6;
+        }
+        
+        .menu-item-handle {
+            cursor: move;
+            color: #6c757d;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        
+        .menu-item-handle:hover {
+            color: #c00;
+        }
+        
+        .menu-item-expand {
+            cursor: pointer;
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+            color: #6c757d;
+        }
+        
+        .menu-item-expand:hover {
+            color: #c00;
+        }
+        
+        .menu-item-expand.has-children {
+            font-weight: bold;
+        }
+        
+        .menu-item-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .menu-item-info {
+            flex: 1;
+        }
+        
+        .menu-item-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .menu-item-meta {
+            font-size: 12px;
+            color: #6c757d;
+        }
+        
+        .menu-item-actions {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .menu-children-container {
+            margin-left: 40px;
+            margin-top: 8px;
+            display: none;
+        }
+        
+        .menu-children-container.expanded {
+            display: block;
+        }
+        
+        .menu-item-placeholder {
+            border: 2px dashed #c00;
+            background-color: #fff3cd;
+            height: 60px;
+            margin-bottom: 8px;
+            border-radius: 6px;
+            opacity: 0.5;
+        }
+        
+        .ui-sortable-helper {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transform: rotate(2deg);
+        }
+        
+        .nav-menu-preview > li a {
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            align-items: center;
+        }
+        
+        .nav-menu-preview > li a span {
+            margin-left: 8px;
+        }
+        
+        /* Tree View */
         .menu-tree {
             padding-left: 0;
             list-style: none;
@@ -192,16 +310,19 @@
             margin-bottom: 5px;
         }
         
+        /* Preview Styles */
         .preview-nav {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
         
         .main-nav-preview {
             background-color: #fff;
-            border-bottom: 2px solid #c00;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
         
         .nav-menu-preview {
@@ -210,17 +331,33 @@
             margin: 0;
             padding: 0;
             flex-wrap: wrap;
+            background: linear-gradient(90deg, #fff 0%, #f8f9fa 100%);
         }
         
         .nav-menu-preview > li {
             position: relative;
-            padding: 15px 18px;
+            padding: 15px 20px;
             cursor: pointer;
+            transition: all 0.3s;
+            border-right: 1px solid #e9ecef;
+        }
+        
+        .nav-menu-preview > li:last-child {
+            border-right: none;
         }
         
         .nav-menu-preview > li:hover {
-            background-color: #c00;
+            background: linear-gradient(135deg, #c00 0%, #a00 100%);
             color: #fff;
+        }
+        
+        .nav-menu-preview > li:hover i {
+            color: #fff;
+        }
+        
+        .nav-menu-preview > li i {
+            margin-right: 8px;
+            color: #c00;
         }
         
         .nav-menu-preview .submenu-preview {
@@ -228,25 +365,52 @@
             top: 100%;
             left: 0;
             background-color: #fff;
-            min-width: 200px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            min-width: 220px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
             list-style: none;
             padding: 10px 0;
             margin: 0;
             display: none;
             z-index: 1001;
+            border-radius: 0 0 8px 8px;
         }
         
         .nav-menu-preview > li:hover .submenu-preview {
             display: block;
+            animation: slideDown 0.3s ease;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .submenu-preview li {
-            padding: 10px 20px;
+            padding: 12px 25px;
+            transition: all 0.2s;
         }
         
         .submenu-preview li:hover {
-            background-color: #f5f5f5;
+            background: linear-gradient(90deg, #f8f9fa 0%, #e9ecef 100%);
             color: #c00;
+            padding-left: 30px;
+        }
+        
+        .preview-header {
+            text-align: center;
+            color: #fff;
+            margin-bottom: 20px;
+        }
+        
+        .preview-header h4 {
+            margin: 0;
+            font-weight: 600;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
         }
     </style>

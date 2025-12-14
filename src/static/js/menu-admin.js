@@ -3,10 +3,16 @@ $(document).ready(function() {
     checkAuth();
     loadUserInfo();
     
+    // Check and init default menu items if empty
+    checkAndInitDefaultMenus();
+    
     // Load menu data
     loadMenuTable();
     loadMenuTree();
     loadParentMenuOptions();
+    
+    // Initialize drag & drop
+    initDragAndDrop();
     
     // Add Menu button
     $('#addMenuBtn').click(function() {
@@ -42,11 +48,20 @@ $(document).ready(function() {
         updateMenuVisibility(menuId, visible);
     });
     
-    // Update order
-    $(document).on('change', '.menu-order-input', function() {
-        const menuId = parseInt($(this).data('id'));
-        const newOrder = parseInt($(this).val());
-        updateMenuOrder(menuId, newOrder);
+    // Toggle expand/collapse children
+    $(document).on('click', '.menu-item-expand.has-children', function(e) {
+        e.stopPropagation();
+        const menuId = $(this).data('menu-id');
+        const $container = $(`.menu-children-container[data-parent-id="${menuId}"]`);
+        const $icon = $(this).find('i');
+        
+        if ($container.hasClass('expanded')) {
+            $container.removeClass('expanded');
+            $icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+        } else {
+            $container.addClass('expanded');
+            $icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+        }
     });
     
     // Auto generate slug
@@ -63,9 +78,8 @@ $(document).ready(function() {
     
     // Reset menu
     $('#resetMenuBtn').click(function() {
-        if (confirm('Bạn có chắc muốn reset tất cả menu về mặc định? Thao tác này không thể hoàn tác!')) {
-            // Note: Reset functionality would need to be implemented on backend
-            showToast('Thông báo', 'Chức năng reset sẽ được triển khai sau', 'info');
+        if (confirm('Bạn có chắc muốn reset tất cả menu về mặc định? Thao tác này sẽ xóa tất cả menu hiện tại và tạo lại menu mặc định!')) {
+            resetMenuToDefault();
         }
     });
     
@@ -109,7 +123,32 @@ async function loadUserInfo() {
     }
 }
 
-// Load menu table
+// Check and init default menu items
+async function checkAndInitDefaultMenus() {
+    try {
+        const response = await fetch('/admin/api/menu-items');
+        const result = await response.json();
+        
+        if (result.success && result.data && result.data.length === 0) {
+            // Bảng rỗng, tự động init default menu items
+            const initResponse = await fetch('/admin/api/menu-items/init-default', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const initResult = await initResponse.json();
+            if (initResult.success) {
+                console.log('Đã tự động khởi tạo menu items mặc định');
+            }
+        }
+    } catch (error) {
+        console.error('Lỗi kiểm tra menu items:', error);
+    }
+}
+
+// Load menu table with tree view
 async function loadMenuTable() {
     try {
         const response = await fetch('/admin/api/menu-items');
@@ -117,68 +156,191 @@ async function loadMenuTable() {
         
         if (result.success && result.data) {
             const menus = result.data;
+            
+            // Build tree structure
+            const parentMenus = menus.filter(m => m.parent_id === null)
+                                     .sort((a, b) => a.order - b.order);
+            
             let html = '';
             
-            // Sort by parent first, then by order
-            menus.sort((a, b) => {
-                if (a.parent_id === null && b.parent_id !== null) return -1;
-                if (a.parent_id !== null && b.parent_id === null) return 1;
-                if (a.parent_id === b.parent_id) return a.order - b.order;
-                return (a.parent_id || 0) - (b.parent_id || 0);
-            });
-            
-            menus.forEach(menu => {
-                const parentMenu = menu.parent_id ? menus.find(m => m.id === menu.parent_id) : null;
-                const parentName = parentMenu ? parentMenu.name : '-';
-                const icon = menu.icon ? `<i class="${menu.icon}"></i>` : '-';
-                const checked = menu.visible ? 'checked' : '';
-                const childCount = menus.filter(m => m.parent_id === menu.id).length;
-                const rowClass = menu.parent_id === null ? 'table-primary' : '';
+            parentMenus.forEach(parent => {
+                const children = menus.filter(m => m.parent_id === parent.id)
+                                      .sort((a, b) => a.order - b.order);
+                const hasChildren = children.length > 0;
                 
-                html += `
-                    <tr class="${rowClass}">
-                        <td>${menu.id}</td>
-                        <td>
-                            ${menu.parent_id !== null ? '&nbsp;&nbsp;&nbsp;└─ ' : ''}
-                            <strong>${menu.name}</strong>
-                        </td>
-                        <td><code>${menu.slug}</code></td>
-                        <td>${parentName}</td>
-                        <td>${icon}</td>
-                        <td>
-                            <input type="number" class="form-control form-control-sm menu-order-input" 
-                                   value="${menu.order}" data-id="${menu.id}" style="width: 70px;">
-                        </td>
-                        <td>
-                            <label class="visibility-switch">
-                                <input type="checkbox" class="menu-visibility-toggle" data-id="${menu.id}" ${checked}>
-                                <span class="visibility-slider"></span>
-                            </label>
-                        </td>
-                        <td>
-                            ${childCount > 0 ? `<span class="badge bg-info">${childCount} menu con</span>` : '-'}
-                        </td>
-                        <td>
-                            <button class="btn btn-sm btn-info btn-action btn-edit-menu" data-id="${menu.id}" title="Sửa">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button class="btn btn-sm btn-danger btn-action btn-delete-menu" data-id="${menu.id}" title="Xóa">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
+                html += renderMenuRow(parent, hasChildren, true);
+                
+                if (hasChildren) {
+                    // Mặc định expand khi có children
+                    html += `<div class="menu-children-container expanded" data-parent-id="${parent.id}">`;
+                    children.forEach(child => {
+                        html += renderMenuRow(child, false, false);
+                    });
+                    html += `</div>`;
+                }
             });
             
             if (menus.length === 0) {
-                html = '<tr><td colspan="9" class="text-center text-muted">Chưa có menu nào</td></tr>';
+                html = '<div class="text-center text-muted p-4">Chưa có menu nào. Nhấn "Thêm Menu" để tạo mới.</div>';
             }
             
-            $('#menuTable').html(html);
+            $('#menuTreeList').html(html);
+            
+            // Initialize sortable after rendering
+            initDragAndDrop();
         }
     } catch (error) {
         console.error('Lỗi tải menu:', error);
-        $('#menuTable').html('<tr><td colspan="9" class="text-center text-danger">Lỗi tải dữ liệu</td></tr>');
+        $('#menuTreeList').html('<div class="text-center text-danger p-4">Lỗi tải dữ liệu</div>');
+    }
+}
+
+// Render menu row
+function renderMenuRow(menu, hasChildren, isParent) {
+    const icon = menu.icon ? `<i class="${menu.icon}"></i> ` : '';
+    const checked = menu.visible ? 'checked' : '';
+    const rowClass = isParent ? 'parent-item' : 'child-item';
+    const hiddenClass = !menu.visible ? 'hidden-item' : '';
+    // Nếu có children và container expanded, hiển thị chevron-up, ngược lại chevron-down
+    const expandIcon = hasChildren ? '<i class="fas fa-chevron-up"></i>' : '<i class="fas fa-minus" style="opacity: 0.3;"></i>';
+    
+    return `
+        <div class="menu-item-row ${rowClass} ${hiddenClass}" data-id="${menu.id}" data-parent-id="${menu.parent_id || ''}">
+            <div class="menu-item-handle">
+                <i class="fas fa-grip-vertical"></i>
+            </div>
+            <div class="menu-item-expand ${hasChildren ? 'has-children' : ''}" data-menu-id="${menu.id}">
+                ${expandIcon}
+            </div>
+            <div class="menu-item-content">
+                <div class="menu-item-info">
+                    <div class="menu-item-name">
+                        ${icon}${menu.name}
+                        ${!menu.visible ? '<span class="badge bg-secondary ms-2">Ẩn</span>' : ''}
+                    </div>
+                    <div class="menu-item-meta">
+                        <code>${menu.slug}</code> | Thứ tự: ${menu.order}
+                    </div>
+                </div>
+                <div class="menu-item-actions">
+                    <label class="visibility-switch me-2">
+                        <input type="checkbox" class="menu-visibility-toggle" data-id="${menu.id}" ${checked}>
+                        <span class="visibility-slider"></span>
+                    </label>
+                    <button class="btn btn-sm btn-info btn-action btn-edit-menu" data-id="${menu.id}" title="Sửa">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-action btn-delete-menu" data-id="${menu.id}" title="Xóa">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Initialize drag and drop
+function initDragAndDrop() {
+    if (typeof $.ui !== 'undefined' && $.ui.sortable) {
+        // Make parent items sortable
+        $('#menuTreeList').sortable({
+            handle: '.menu-item-handle',
+            items: '.menu-item-row.parent-item',
+            tolerance: 'pointer',
+            cursor: 'move',
+            placeholder: 'menu-item-placeholder',
+            opacity: 0.8,
+            helper: function(e, item) {
+                // Clone item with children
+                const $clone = item.clone();
+                const $children = item.next('.menu-children-container');
+                if ($children.length) {
+                    $clone.append($children.clone());
+                }
+                return $clone;
+            },
+            update: function(event, ui) {
+                saveMenuOrder();
+            }
+        });
+        
+        // Make child items sortable within their container
+        $('.menu-children-container').each(function() {
+            $(this).sortable({
+                handle: '.menu-item-handle',
+                items: '.menu-item-row.child-item',
+                tolerance: 'pointer',
+                cursor: 'move',
+                placeholder: 'menu-item-placeholder',
+                opacity: 0.8,
+                connectWith: '.menu-children-container',
+                update: function(event, ui) {
+                    saveMenuOrder();
+                }
+            });
+        });
+    }
+}
+
+// Save menu order after drag & drop
+async function saveMenuOrder() {
+    const items = [];
+    let parentOrder = 0;
+    
+    // Collect parent items
+    $('#menuTreeList .menu-item-row.parent-item').each(function() {
+        const $row = $(this);
+        parentOrder++;
+        items.push({
+            id: parseInt($row.data('id')),
+            parent_id: null,
+            order: parentOrder
+        });
+        
+        // Collect children of this parent
+        const parentId = parseInt($row.data('id'));
+        const $childrenContainer = $(`.menu-children-container[data-parent-id="${parentId}"]`);
+        let childOrder = 0;
+        
+        $childrenContainer.find('.menu-item-row.child-item').each(function() {
+            const $childRow = $(this);
+            childOrder++;
+            items.push({
+                id: parseInt($childRow.data('id')),
+                parent_id: parentId,
+                order: childOrder
+            });
+        });
+    });
+    
+    try {
+        const response = await fetch('/admin/api/menu-items/update-order', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ items: items })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('Thành công', 'Đã cập nhật thứ tự menu', 'success');
+            // Reload để đảm bảo sync
+            setTimeout(() => {
+                loadMenuTable();
+                loadMenuTree();
+            }, 500);
+        } else {
+            showToast('Lỗi', result.error || 'Không thể cập nhật thứ tự', 'warning');
+            // Reload để revert
+            loadMenuTable();
+        }
+    } catch (error) {
+        console.error('Lỗi cập nhật thứ tự:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi cập nhật thứ tự', 'warning');
+        // Reload để revert
+        loadMenuTable();
     }
 }
 
@@ -430,27 +592,32 @@ async function previewMenu() {
             const parentMenus = menus.filter(m => m.parent_id === null && m.visible)
                                       .sort((a, b) => a.order - b.order);
             
-            let html = '';
+            let html = '<div class="preview-header"><h4><i class="fas fa-eye"></i> Xem trước Menu</h4></div>';
+            html += '<nav class="main-nav-preview">';
+            html += '<ul class="nav-menu-preview">';
             
             parentMenus.forEach(menu => {
                 const children = menus.filter(m => m.parent_id === menu.id && m.visible)
                                       .sort((a, b) => a.order - b.order);
                 const hasChildren = children.length > 0;
-                const icon = menu.icon ? `<i class="${menu.icon}"></i> ` : '';
+                const icon = menu.icon ? `<i class="${menu.icon}"></i>` : '<i class="fas fa-circle" style="font-size: 6px;"></i>';
                 
                 html += `<li>`;
-                html += `<a href="#${menu.slug}">${icon}${menu.name}</a>`;
+                html += `<a href="#${menu.slug}">${icon} <span>${menu.name}</span>${hasChildren ? ' <i class="fas fa-chevron-down" style="font-size: 10px; margin-left: 5px;"></i>' : ''}</a>`;
                 
                 if (hasChildren) {
                     html += '<ul class="submenu-preview">';
                     children.forEach(child => {
-                        html += `<li><a href="#${child.slug}">${child.name}</a></li>`;
+                        html += `<li><a href="#${child.slug}"><i class="fas fa-angle-right" style="font-size: 10px; margin-right: 5px;"></i>${child.name}</a></li>`;
                     });
                     html += '</ul>';
                 }
                 
                 html += '</li>';
             });
+            
+            html += '</ul>';
+            html += '</nav>';
             
             $('#previewMenuList').html(html);
             
@@ -488,29 +655,43 @@ async function updateMenuVisibility(menuId, visible) {
     }
 }
 
-// Update menu order
-async function updateMenuOrder(menuId, order) {
+// Reset menu to default
+async function resetMenuToDefault() {
     try {
-        const response = await fetch(`/admin/api/menu-items/${menuId}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ order: order })
-        });
-        
+        // Xóa tất cả menu items
+        const response = await fetch('/admin/api/menu-items');
         const result = await response.json();
         
-        if (result.success) {
-            showToast('Thành công', 'Đã cập nhật thứ tự', 'success');
-            loadMenuTable();
-            loadMenuTree();
-        } else {
-            showToast('Lỗi', result.error || 'Không thể cập nhật', 'warning');
+        if (result.success && result.data) {
+            // Xóa từng menu item
+            for (const menu of result.data) {
+                await fetch(`/admin/api/menu-items/${menu.id}`, {
+                    method: 'DELETE'
+                });
+            }
+            
+            // Init default menu items
+            const initResponse = await fetch('/admin/api/menu-items/init-default', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            const initResult = await initResponse.json();
+            
+            if (initResult.success) {
+                showToast('Thành công', 'Đã reset menu về mặc định', 'success');
+                loadMenuTable();
+                loadMenuTree();
+                loadParentMenuOptions();
+            } else {
+                showToast('Lỗi', initResult.error || 'Không thể reset menu', 'warning');
+            }
         }
     } catch (error) {
-        console.error('Lỗi cập nhật order:', error);
-        showToast('Lỗi', 'Có lỗi xảy ra', 'warning');
+        console.error('Lỗi reset menu:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi reset menu', 'warning');
     }
 }
 

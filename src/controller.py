@@ -956,6 +956,136 @@ class AdminController:
             'success': True,
             'message': 'Đã xóa menu'
         })
+    
+    def api_init_default_menu_items(self):
+        """API khởi tạo menu items mặc định"""
+        # Kiểm tra xem đã có menu items chưa
+        count = self.db_session.query(MenuItem).count()
+        if count > 0:
+            return jsonify({
+                'success': False,
+                'error': 'Đã có menu items trong database'
+            }), 400
+        
+        # Default menu items với temp_id để map parent
+        default_menus = [
+            {'temp_id': 1, 'name': 'Trang chủ', 'slug': 'trang-chu', 'icon': 'fas fa-home', 'order': 1, 'parent_temp_id': None},
+            {'temp_id': 2, 'name': 'Thời sự', 'slug': 'thoi-su', 'icon': None, 'order': 2, 'parent_temp_id': None},
+            {'temp_id': 21, 'name': 'Chính trị', 'slug': 'chinh-tri', 'icon': None, 'order': 1, 'parent_temp_id': 2},
+            {'temp_id': 22, 'name': 'Nhân sự', 'slug': 'nhan-su', 'icon': None, 'order': 2, 'parent_temp_id': 2},
+            {'temp_id': 23, 'name': 'Chính sách', 'slug': 'chinh-sach', 'icon': None, 'order': 3, 'parent_temp_id': 2},
+            {'temp_id': 3, 'name': 'Góc nhìn', 'slug': 'goc-nhin', 'icon': None, 'order': 3, 'parent_temp_id': None},
+            {'temp_id': 4, 'name': 'Thế giới', 'slug': 'the-gioi', 'icon': None, 'order': 4, 'parent_temp_id': None},
+            {'temp_id': 41, 'name': 'Châu Á', 'slug': 'chau-a', 'icon': None, 'order': 1, 'parent_temp_id': 4},
+            {'temp_id': 42, 'name': 'Châu Âu', 'slug': 'chau-au', 'icon': None, 'order': 2, 'parent_temp_id': 4},
+            {'temp_id': 43, 'name': 'Châu Mỹ', 'slug': 'chau-my', 'icon': None, 'order': 3, 'parent_temp_id': 4},
+            {'temp_id': 5, 'name': 'Kinh doanh', 'slug': 'kinh-doanh', 'icon': None, 'order': 5, 'parent_temp_id': None},
+            {'temp_id': 51, 'name': 'Chứng khoán', 'slug': 'chung-khoan', 'icon': None, 'order': 1, 'parent_temp_id': 5},
+            {'temp_id': 52, 'name': 'Bất động sản', 'slug': 'bat-dong-san', 'icon': None, 'order': 2, 'parent_temp_id': 5},
+            {'temp_id': 53, 'name': 'Doanh nghiệp', 'slug': 'doanh-nghiep', 'icon': None, 'order': 3, 'parent_temp_id': 5},
+            {'temp_id': 6, 'name': 'Giải trí', 'slug': 'giai-tri', 'icon': None, 'order': 6, 'parent_temp_id': None},
+            {'temp_id': 61, 'name': 'Phim ảnh', 'slug': 'phim-anh', 'icon': None, 'order': 1, 'parent_temp_id': 6},
+            {'temp_id': 62, 'name': 'Âm nhạc', 'slug': 'am-nhac', 'icon': None, 'order': 2, 'parent_temp_id': 6},
+            {'temp_id': 63, 'name': 'Sao Việt', 'slug': 'sao-viet', 'icon': None, 'order': 3, 'parent_temp_id': 6},
+            {'temp_id': 7, 'name': 'Thể thao', 'slug': 'the-thao', 'icon': None, 'order': 7, 'parent_temp_id': None},
+            {'temp_id': 71, 'name': 'Bóng đá', 'slug': 'bong-da', 'icon': None, 'order': 1, 'parent_temp_id': 7},
+            {'temp_id': 72, 'name': 'Tennis', 'slug': 'tennis', 'icon': None, 'order': 2, 'parent_temp_id': 7},
+            {'temp_id': 73, 'name': 'Võ thuật', 'slug': 'vo-thuat', 'icon': None, 'order': 3, 'parent_temp_id': 7},
+            {'temp_id': 8, 'name': 'Pháp luật', 'slug': 'phap-luat', 'icon': None, 'order': 8, 'parent_temp_id': None},
+            {'temp_id': 9, 'name': 'Giáo dục', 'slug': 'giao-duc', 'icon': None, 'order': 9, 'parent_temp_id': None},
+            {'temp_id': 10, 'name': 'Sức khỏe', 'slug': 'suc-khoe', 'icon': None, 'order': 10, 'parent_temp_id': None},
+            {'temp_id': 11, 'name': 'Đời sống', 'slug': 'doi-song', 'icon': None, 'order': 11, 'parent_temp_id': None},
+            {'temp_id': 12, 'name': 'Du lịch', 'slug': 'du-lich', 'icon': None, 'order': 12, 'parent_temp_id': None},
+            {'temp_id': 13, 'name': 'Khoa học', 'slug': 'khoa-hoc', 'icon': None, 'order': 13, 'parent_temp_id': None},
+            {'temp_id': 14, 'name': 'Số hóa', 'slug': 'so-hoa', 'icon': None, 'order': 14, 'parent_temp_id': None},
+            {'temp_id': 15, 'name': 'Xe', 'slug': 'xe', 'icon': None, 'order': 15, 'parent_temp_id': None}
+        ]
+        
+        # Tạo menu items (tạo parent trước)
+        created_items = {}  # Map temp_id -> real_id
+        
+        # Tạo parent items trước
+        parent_items = [m for m in default_menus if m['parent_temp_id'] is None]
+        parent_items.sort(key=lambda x: x['order'])
+        
+        for menu_data in parent_items:
+            menu_item = MenuItem(
+                name=menu_data['name'],
+                slug=menu_data['slug'],
+                icon=menu_data['icon'],
+                order_display=menu_data['order'],
+                parent_id=None,
+                visible=True
+            )
+            self.db_session.add(menu_item)
+            self.db_session.flush()  # Để lấy ID
+            created_items[menu_data['temp_id']] = menu_item.id
+        
+        # Tạo child items
+        child_items = [m for m in default_menus if m['parent_temp_id'] is not None]
+        child_items.sort(key=lambda x: (x['parent_temp_id'], x['order']))
+        
+        for menu_data in child_items:
+            parent_id = created_items.get(menu_data['parent_temp_id'])
+            if parent_id:
+                menu_item = MenuItem(
+                    name=menu_data['name'],
+                    slug=menu_data['slug'],
+                    icon=menu_data['icon'],
+                    order_display=menu_data['order'],
+                    parent_id=parent_id,
+                    visible=True
+                )
+                self.db_session.add(menu_item)
+                self.db_session.flush()
+                created_items[menu_data['temp_id']] = menu_item.id
+        
+        self.db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã khởi tạo {len(default_menus)} menu items mặc định',
+            'count': len(default_menus)
+        })
+    
+    def api_update_menu_order(self):
+        """API cập nhật thứ tự menu items (drag & drop)"""
+        data = request.json if request.is_json else {}
+        items = data.get('items', [])
+        
+        if not items:
+            return jsonify({'success': False, 'error': 'Thiếu dữ liệu'}), 400
+        
+        try:
+            for item_data in items:
+                menu_id = item_data.get('id')
+                new_order = item_data.get('order', 0)
+                parent_id = item_data.get('parent_id')
+                
+                menu_item = self.db_session.query(MenuItem).filter(MenuItem.id == menu_id).first()
+                if menu_item:
+                    menu_item.order_display = new_order
+                    if parent_id is not None:
+                        # Kiểm tra không được set parent là chính nó
+                        if parent_id == menu_id:
+                            continue
+                        menu_item.parent_id = int(parent_id) if parent_id else None
+                    else:
+                        menu_item.parent_id = None
+                    menu_item.updated_at = datetime.utcnow()
+            
+            self.db_session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Đã cập nhật thứ tự menu'
+            })
+        except Exception as e:
+            self.db_session.rollback()
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
 
 
 class ClientController:

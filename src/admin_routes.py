@@ -209,3 +209,17 @@ def api_update_menu_item(menu_id: int):
 def api_delete_menu_item(menu_id: int):
     """API xóa menu item"""
     return admin_controller.api_delete_menu_item(menu_id)
+
+
+@admin_bp.route('/api/menu-items/init-default', methods=['POST'])
+@controller.admin_required
+def api_init_default_menu_items():
+    """API khởi tạo menu items mặc định"""
+    return admin_controller.api_init_default_menu_items()
+
+
+@admin_bp.route('/api/menu-items/update-order', methods=['POST'])
+@controller.admin_required
+def api_update_menu_order():
+    """API cập nhật thứ tự menu items (drag & drop)"""
+    return admin_controller.api_update_menu_order()
