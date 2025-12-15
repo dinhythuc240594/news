@@ -6,7 +6,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, or_
 from datetime import datetime
 from typing import List, Optional
-from database import News, Category, User, Tag, NewsTag, NewsStatus, UserRole
+from database import (
+    News,
+    Category,
+    User,
+    Tag,
+    NewsTag,
+    NewsStatus,
+    UserRole,
+    NewsInternational,
+    CategoryInternational,
+)
 
 
 class NewsModel:
@@ -316,4 +326,132 @@ class UserModel:
             return user
         
         return None
+
+
+class InternationalNewsModel:
+    """Model class quản lý NewsInternational (tin quốc tế tiếng Anh)"""
+
+    def __init__(self, db_session: Session):
+        self.db = db_session
+
+    def get_by_id(self, news_id: int) -> Optional[NewsInternational]:
+        """Lấy bài viết quốc tế theo ID"""
+        return (
+            self.db.query(NewsInternational)
+            .filter(NewsInternational.id == news_id)
+            .first()
+        )
+
+    def get_by_slug(self, slug: str) -> Optional[NewsInternational]:
+        """Lấy bài viết quốc tế theo slug"""
+        return (
+            self.db.query(NewsInternational)
+            .filter(NewsInternational.slug == slug)
+            .first()
+        )
+
+    def get_all(
+        self,
+        limit: int | None = None,
+        offset: int = 0,
+        status: NewsStatus | None = None,
+    ) -> list[NewsInternational]:
+        """Lấy danh sách bài viết quốc tế"""
+        query = self.db.query(NewsInternational)
+
+        if status:
+            query = query.filter(NewsInternational.status == status)
+
+        query = query.order_by(NewsInternational.created_at.desc())
+
+        if limit:
+            query = query.limit(limit).offset(offset)
+
+        return query.all()
+
+    def get_published(
+        self, limit: int | None = None, offset: int = 0
+    ) -> list[NewsInternational]:
+        """Lấy danh sách bài viết quốc tế đã xuất bản"""
+        return self.get_all(
+            limit=limit,
+            offset=offset,
+            status=NewsStatus.PUBLISHED,
+        )
+
+    def get_featured(self, limit: int = 10) -> list[NewsInternational]:
+        """Lấy bài viết quốc tế nổi bật"""
+        return (
+            self.db.query(NewsInternational)
+            .filter(
+                NewsInternational.is_featured.is_(True),
+                NewsInternational.status == NewsStatus.PUBLISHED,
+            )
+            .order_by(NewsInternational.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+
+    def get_hot(self, limit: int = 10) -> list[NewsInternational]:
+        """Lấy tin quốc tế nóng nhất"""
+        return (
+            self.db.query(NewsInternational)
+            .filter(
+                NewsInternational.is_hot.is_(True),
+                NewsInternational.status == NewsStatus.PUBLISHED,
+            )
+            .order_by(NewsInternational.view_count.desc())
+            .limit(limit)
+            .all()
+        )
+
+    def get_by_category(
+        self, category_id: int, limit: int | None = None, offset: int = 0
+    ) -> list[NewsInternational]:
+        """Lấy bài viết quốc tế theo danh mục"""
+        query = (
+            self.db.query(NewsInternational)
+            .filter(
+                NewsInternational.category_id == category_id,
+                NewsInternational.status == NewsStatus.PUBLISHED,
+            )
+            .order_by(NewsInternational.created_at.desc())
+        )
+
+        if limit:
+            query = query.limit(limit).offset(offset)
+
+        return query.all()
+
+
+class InternationalCategoryModel:
+    """Model class quản lý CategoryInternational (danh mục tin quốc tế)"""
+
+    def __init__(self, db_session: Session):
+        self.db = db_session
+
+    def get_all(self) -> list[CategoryInternational]:
+        """Lấy tất cả danh mục quốc tế đang hiển thị"""
+        return (
+            self.db.query(CategoryInternational)
+            .filter(CategoryInternational.visible.is_(True))
+            .order_by(CategoryInternational.order_display)
+            .all()
+        )
+
+    def get_by_id(self, category_id: int) -> Optional[CategoryInternational]:
+        """Lấy danh mục quốc tế theo ID"""
+        return (
+            self.db.query(CategoryInternational)
+            .filter(CategoryInternational.id == category_id)
+            .first()
+        )
+
+    def get_by_slug(self, slug: str) -> Optional[CategoryInternational]:
+        """Lấy danh mục quốc tế theo slug"""
+        return (
+            self.db.query(CategoryInternational)
+            .filter(CategoryInternational.slug == slug)
+            .first()
+        )
 

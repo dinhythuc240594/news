@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+{% block title %}{{ category.name }} - VnNews{% endblock %}
+{% block head %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_client.css') }}">
+{% endblock %}
+{% block content %}
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="row">
+                <!-- Left Content -->
+                <div class="col-lg-9">
+                    <!-- Breadcrumb -->
+                    <nav aria-label="breadcrumb" class="mb-4">
+                        <ol class="breadcrumb">
+                            <li class="breadcrumb-item"><a href="{{ url_for('client.index') }}">Home</a></li>
+                            <li class="breadcrumb-item"><a href="{{ url_for('client.category', category_slug=news.category.slug) }}">{{ news.category.name }}</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">{{ news.title[:50] }}{% if news.title|length > 50 %}...{% endif %}</li>
+                        </ol>
+                    </nav>
+
+                    <!-- News Detail -->
+                    <article class="news-detail">
+                        <div class="news-header mb-4">
+                            <span class="badge-category">{{ news.category.name }}</span>
+                            <h1 class="news-title">{{ news.title }}</h1>
+                            <div class="news-meta mb-3">
+                                <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>
+                                <span><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
+                                <span><i class="far fa-user"></i> {{ news.creator.full_name if news.creator else 'Admin' }}</span>
+                            </div>
+                        </div>
+
+                        {% if news.thumbnail %}
+                        <div class="news-image mb-4">
+                            <img src="{{ news.thumbnail }}" alt="{{ news.title }}" class="img-fluid">
+                        </div>
+                        {% endif %}
+
+                        {% if news.summary %}
+                        <div class="news-summary mb-4">
+                            <p class="lead">{{ news.summary }}</p>
+                        </div>
+                        {% endif %}
+
+                        <div class="news-content">
+                            {{ news.content|safe }}
+                        </div>
+
+                        <!-- Tags and Share -->
+                        <div class="news-footer mt-4 pt-4 border-top">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="share-buttons">
+                                        <span class="me-2">Share:</span>
+                                        <a href="#" class="btn btn-sm btn-outline-primary me-2"><i class="fab fa-facebook-f"></i> Facebook</a>
+                                        <a href="#" class="btn btn-sm btn-outline-info me-2"><i class="fab fa-twitter"></i> Twitter</a>
+                                        <a href="#" class="btn btn-sm btn-outline-danger"><i class="fab fa-youtube"></i> Copy Link</a>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    {% if user_id %}
+                                    <button id="saveNewsBtn" class="btn btn-sm {% if is_saved %}btn-warning{% else %}btn-outline-warning{% endif %} me-2" data-news-id="{{ news.id }}" data-is-saved="{{ 'true' if is_saved else 'false' }}">
+                                        <i class="fas {% if is_saved %}fa-bookmark{% else %}fa-bookmark-o{% endif %}"></i> 
+                                        <span id="saveNewsText">{% if is_saved %}Saved{% else %}Save{% endif %}</span>
+                                    </button>
+                                    {% endif %}
+                                    <a href="{{ url_for('client.category', category_slug=news.category.slug) }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-arrow-left"></i> Back to category {{ news.category.name }}
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </article>
+
+                    <!-- Comments Section -->
+                    <section class="comments-section mt-5 pt-4 border-top">
+                        <h2 class="section-title mb-4">
+                            <span>Bình luận ({{ comments|length }})</span>
+                        </h2>
+
+                        {% if user_id %}
+                        <!-- Comment Form -->
+                        <div class="comment-form mb-4">
+                            <form id="commentForm" data-news-id="{{ news.id }}">
+                                <div class="mb-3">
+                                    <textarea class="form-control" id="commentContent" rows="4" placeholder="Viết bình luận của bạn..." required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane me-2"></i>Send comment
+                                </button>
+                            </form>
+                        </div>
+                        {% else %}
+                        <div class="alert alert-info">
+                            <a href="{{ url_for('client.user_login') }}">Login</a> to comment
+                        </div>
+                        {% endif %}
+
+                        <!-- Comments List -->
+                        <div class="comments-list" id="commentsList">
+                            {% if comments %}
+                                {% for comment in comments %}
+                                <div class="comment-item mb-4 pb-3 border-bottom" data-comment-id="{{ comment.id }}">
+                                    <div class="d-flex">
+                                        <div class="comment-avatar me-3">
+                                            <img src="{% if comment.user.avatar %}/{{ comment.user.avatar }}{% else %}https://ui-avatars.com/api/?name={{ (comment.user.full_name or comment.user.username)|urlencode }}&size=40&background=007bff&color=fff{% endif %}" 
+                                                 alt="{{ comment.user.full_name or comment.user.username }}" 
+                                                 class="rounded-circle" 
+                                                 width="40" 
+                                                 height="40">
+                                        </div>
+                                        <div class="comment-content flex-grow-1">
+                                            <div class="comment-header mb-2">
+                                                <strong>{{ comment.user.full_name or comment.user.username }}</strong>
+                                                <span class="text-muted ms-2 small">
+                                                    <i class="far fa-clock"></i> {{ comment.created_at.strftime('%d/%m/%Y %H:%M') if comment.created_at else '' }}
+                                                </span>
+                                            </div>
+                                            <div class="comment-text">
+                                                {{ comment.content|nl2br|safe }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted text-center py-4">No comments yet. Be the first to comment!</p>
+                            {% endif %}
+                        </div>
+                    </section>
+
+                    <!-- Related News -->
+                    {% if related_news %}
+                    <section class="related-news mt-5">
+                        <h2 class="section-title">
+                            <span>Tin liên quan</span>
+                        </h2>
+                        <div class="row">
+                            {% for related in related_news %}
+                            <div class="col-md-6 mb-4">
+                                <article class="news-card horizontal-card">
+                                    <div class="row g-0">
+                                        <div class="col-md-4">
+                                            <div class="news-image">
+                                                <img src="{{ related.thumbnail|default_image }}" alt="{{ related.title }}">
+                                                <span class="badge-category">{{ related.category.name }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <div class="news-content">
+                                                <h3 class="news-title">
+                                                    <a href="{{ url_for('client.news_detail', news_slug=related.slug) }}">{{ related.title }}</a>
+                                                </h3>
+                                                <div class="news-meta">
+                                                    <span><i class="far fa-clock"></i> {{ (related.published_at or related.created_at)|timeago }}</span>
+                                                    <span><i class="far fa-eye"></i> {{ related.view_count|format_view }}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </article>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endif %}
+                </div>
+
+                <!-- Right Sidebar -->
+                <div class="col-lg-3">
+                    <!-- Most Read -->
+                    <aside class="sidebar-widget">
+                        <h3 class="widget-title">
+                            <i class="fas fa-fire"></i> Most Read
+                        </h3>
+                        <div class="most-read-list">
+                            <p class="text-muted text-center">Loading...</p>
+                        </div>
+                    </aside>
+                </div>
+            </div>
+        </div>
+    </main>
+{% endblock %}
+
+{% block scripts %}
+{% include 'hot_news.html' %}
+<script>
+    // Handle Save/Unsave News
+    const saveNewsBtn = document.getElementById('saveNewsBtn');
+    if (saveNewsBtn) {
+        saveNewsBtn.addEventListener('click', function() {
+            const newsId = this.getAttribute('data-news-id');
+            const isSaved = this.getAttribute('data-is-saved') === 'true';
+            
+            fetch(`/api/save-news/${newsId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update button state
+                    const saveNewsText = document.getElementById('saveNewsText');
+                    const icon = this.querySelector('i');
+                    
+                    if (data.is_saved) {
+                        this.classList.remove('btn-outline-warning');
+                        this.classList.add('btn-warning');
+                        icon.classList.remove('fa-bookmark-o');
+                        icon.classList.add('fa-bookmark');
+                        saveNewsText.textContent = 'Đã lưu';
+                        this.setAttribute('data-is-saved', 'true');
+                    } else {
+                        this.classList.remove('btn-warning');
+                        this.classList.add('btn-outline-warning');
+                        icon.classList.remove('fa-bookmark');
+                        icon.classList.add('fa-bookmark-o');
+                        saveNewsText.textContent = 'Lưu tin';
+                        this.setAttribute('data-is-saved', 'false');
+                    }
+                    
+                    // Show notification
+                    showNotification(data.message, 'success');
+                } else {
+                    showNotification(data.message || 'Có lỗi xảy ra', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Có lỗi xảy ra khi lưu tin', 'error');
+            });
+        });
+    }
+
+    // Handle Comment Form
+    const commentForm = document.getElementById('commentForm');
+    if (commentForm) {
+        commentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const content = document.getElementById('commentContent').value.trim();
+            const newsId = this.getAttribute('data-news-id');
+            
+            if (!content) {
+                showNotification('Vui lòng nhập nội dung bình luận', 'error');
+                return;
+            }
+            
+            fetch(`/api/comment/${newsId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    content: content
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Clear form
+                    document.getElementById('commentContent').value = '';
+                    
+                    // Add new comment to list
+                    addCommentToDOM(data.comment);
+                    
+                    // Update comment count
+                    updateCommentCount();
+                    
+                    showNotification(data.message, 'success');
+                } else {
+                    showNotification(data.message || 'Có lỗi xảy ra', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Có lỗi xảy ra khi gửi bình luận', 'error');
+            });
+        });
+    }
+
+    // Add comment to DOM
+    function addCommentToDOM(comment) {
+        const commentsList = document.getElementById('commentsList');
+        
+        // Remove "no comments" message if exists
+        const noCommentsMsg = commentsList.querySelector('.text-muted.text-center');
+        if (noCommentsMsg) {
+            noCommentsMsg.remove();
+        }
+        
+        // Create comment element
+        const commentDiv = document.createElement('div');
+        commentDiv.className = 'comment-item mb-4 pb-3 border-bottom';
+        commentDiv.setAttribute('data-comment-id', comment.id);
+        
+        const avatarUrl = comment.user.avatar ? `/${comment.user.avatar}` : `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user.full_name || 'User')}&size=40&background=007bff&color=fff`;
+        
+        commentDiv.innerHTML = `
+            <div class="d-flex">
+                <div class="comment-avatar me-3">
+                    <img src="${avatarUrl}" 
+                         alt="${comment.user.full_name || 'User'}" 
+                         class="rounded-circle" 
+                         width="40" 
+                         height="40">
+                </div>
+                <div class="comment-content flex-grow-1">
+                    <div class="comment-header mb-2">
+                        <strong>${escapeHtml(comment.user.full_name || 'User')}</strong>
+                        <span class="text-muted ms-2 small">
+                            <i class="far fa-clock"></i> ${comment.created_at}
+                        </span>
+                    </div>
+                    <div class="comment-text">
+                        ${escapeHtml(comment.content).replace(/\n/g, '<br>')}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        // Insert at the top of comments list
+        commentsList.insertBefore(commentDiv, commentsList.firstChild);
+    }
+
+    // Update comment count
+    function updateCommentCount() {
+        const sectionTitle = document.querySelector('.comments-section .section-title span');
+        if (sectionTitle) {
+            const commentCount = document.querySelectorAll('.comment-item').length;
+            sectionTitle.textContent = `Bình luận (${commentCount})`;
+        }
+    }
+
+    // Show notification
+    function showNotification(message, type) {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show position-fixed`;
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        notification.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto remove after 3 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+</script>
+{% endblock %}
+

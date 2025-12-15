@@ -55,6 +55,51 @@ DEFAULT_CATEGORIES = [
     }
 ]
 
+DEFAULT_CATEGORIES_EN = [
+    {
+        'name': 'Technology',
+        'slug': 'technology',
+        'icon': 'phone',
+        'order_display': 1,
+        'parent_id': None,
+    },
+    {
+        'name': 'Kinh tế',
+        'slug': 'economy',
+        'icon': 'economy',
+        'order_display': 2,
+        'parent_id': None,
+    },
+    {
+        'name': 'Sports',
+        'slug': 'sports',
+        'icon': 'sports',
+        'order_display': 3,
+        'parent_id': None,
+    },
+    {
+        'name': 'Entertainment',
+        'slug': 'entertainment',
+        'icon': 'entertainment',
+        'order_display': 4,
+        'parent_id': None,
+    },
+    {
+        'name': 'Education',
+        'slug': 'education',
+        'icon': 'education',
+        'order_display': 5,
+        'parent_id': None,
+    },
+    {
+        'name': 'Sức khỏe',
+        'slug': 'suc-khoe',
+        'icon': 'health',
+        'order_display': 6,
+        'parent_id': None,
+    }
+]
+
 class NewsStatus(enum.Enum):
     
     DRAFT = "draft"           # Bản nháp
@@ -337,6 +382,60 @@ class Comment(Base):
     parent = relationship("Comment", remote_side=[id], backref="replies")
 
 
+class NewsInternational(Base):
+    """Bảng tin tức quốc tế"""
+    __tablename__ = 'news_international'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String(255), nullable=False)
+    slug = Column(String(255), nullable=False, unique=True)
+    summary = Column(Text, nullable=True)
+    content = Column(Text, nullable=False)
+    thumbnail = Column(String(255), nullable=True)
+    images = Column(Text, nullable=True)  # JSON array of image URLs
+    category_id = Column(Integer, ForeignKey('categories_international.id'), nullable=False)
+    created_by = Column(Integer, ForeignKey('users.id'), nullable=False)
+    approved_by = Column(Integer, ForeignKey('users.id'), nullable=True)
+    status = Column(NewsStatusType(), default=NewsStatus.DRAFT)
+    is_featured = Column(Boolean, default=False)
+    is_hot = Column(Boolean, default=False)
+    is_api = Column(Boolean, default=False)  # Đánh dấu bài viết từ API
+    view_count = Column(Integer, default=0)
+    meta_title = Column(String(255), nullable=True)
+    meta_description = Column(Text, nullable=True)
+    meta_keywords = Column(String(255), nullable=True)
+    published_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    # Liên kết tới CategoryInternational (danh mục tin quốc tế)
+    category = relationship("CategoryInternational", back_populates="news")
+    # Quan hệ tới User (không dùng back_populates chung với News để tránh xung đột mapper)
+    creator = relationship("User", foreign_keys=[created_by])
+    approver = relationship("User", foreign_keys=[approved_by])
+
+
+class CategoryInternational(Base):
+    """Bảng danh mục tin tức quốc tế"""
+    __tablename__ = 'categories_international'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True)
+    slug = Column(String(100), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    icon = Column(String(50), nullable=True)
+    order_display = Column(Integer, default=0)
+    parent_id = Column(Integer, ForeignKey('categories_international.id'), nullable=True)
+    level = Column(Integer, default=1)  # Cấp độ menu: 1, 2, 3, 4
+    visible = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    parent = relationship("CategoryInternational", remote_side=[id], backref="children")
+    # Danh sách các bài viết quốc tế thuộc danh mục này
+    news = relationship("NewsInternational", back_populates="category")
 
 
 # Database connection

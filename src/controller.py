@@ -5,8 +5,25 @@ from functools import wraps
 import os
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from database import get_session, NewsStatus, UserRole, SavedNews, ViewedNews, Comment, News, Category
-from models import NewsModel, CategoryModel, UserModel
+from database import (
+    get_session,
+    NewsStatus,
+    UserRole,
+    SavedNews,
+    ViewedNews,
+    Comment,
+    News,
+    Category,
+    NewsInternational,
+    CategoryInternational,
+)
+from models import (
+    NewsModel,
+    CategoryModel,
+    UserModel,
+    InternationalNewsModel,
+    InternationalCategoryModel,
+)
 
 def admin_required(f):
     """Decorator yêu cầu quyền admin"""
@@ -53,6 +70,9 @@ class AdminController:
         self.news_model = NewsModel(self.db_session)
         self.category_model = CategoryModel(self.db_session)
         self.user_model = UserModel(self.db_session)
+        # Model cho tin tức quốc tế
+        self.int_news_model = InternationalNewsModel(self.db_session)
+        self.int_category_model = InternationalCategoryModel(self.db_session)
     
     def login(self):
         """
@@ -484,18 +504,16 @@ class AdminController:
         })
     
     def api_international_articles(self):
-        """API lấy danh sách bài viết quốc tế (đã duyệt)"""
-        # Giả sử bài quốc tế có category với slug 'international' hoặc 'the-gioi'
-        from sqlalchemy import or_
-        articles = self.db_session.query(News).join(Category).filter(
-            News.status == NewsStatus.PUBLISHED,
-            or_(
-                Category.slug.ilike('%international%'),
-                Category.slug.ilike('%the-gioi%'),
-                Category.slug.ilike('%world%')
-            )
-        ).order_by(News.published_at.desc()).limit(100).all()
-        
+        """API lấy danh sách bài viết quốc tế (đã duyệt) từ bảng NewsInternational"""
+        articles = (
+            self.db_session.query(NewsInternational)
+            .join(CategoryInternational)
+            .filter(NewsInternational.status == NewsStatus.PUBLISHED)
+            .order_by(NewsInternational.published_at.desc())
+            .limit(100)
+            .all()
+        )
+
         return jsonify({
             'success': True,
             'data': [{
@@ -510,17 +528,16 @@ class AdminController:
         })
     
     def api_international_pending(self):
-        """API lấy danh sách bài viết quốc tế chờ duyệt"""
-        from sqlalchemy import or_
-        articles = self.db_session.query(News).join(Category).filter(
-            News.status == NewsStatus.PENDING,
-            or_(
-                Category.slug.ilike('%international%'),
-                Category.slug.ilike('%the-gioi%'),
-                Category.slug.ilike('%world%')
-            )
-        ).order_by(News.created_at.desc()).limit(100).all()
-        
+        """API lấy danh sách bài viết quốc tế chờ duyệt từ bảng NewsInternational"""
+        articles = (
+            self.db_session.query(NewsInternational)
+            .join(CategoryInternational)
+            .filter(NewsInternational.status == NewsStatus.PENDING)
+            .order_by(NewsInternational.created_at.desc())
+            .limit(100)
+            .all()
+        )
+
         return jsonify({
             'success': True,
             'data': [{
@@ -902,6 +919,19 @@ class AdminController:
                 'slug': cat.slug
             } for cat in categories]
         })
+
+    def api_international_categories(self):
+        """API lấy danh sách danh mục tin quốc tế (categories_international)"""
+        categories = self.int_category_model.get_all()
+
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': cat.id,
+                'name': cat.name,
+                'slug': cat.slug,
+            } for cat in categories]
+        })
     
     def _generate_slug(self, title: str) -> str:
         """Tạo slug từ tiêu đề"""
@@ -1212,6 +1242,9 @@ class ClientController:
         self.news_model = NewsModel(self.db_session)
         self.category_model = CategoryModel(self.db_session)
         self.user_model = UserModel(self.db_session)
+        # Model cho site quốc tế tiếng Anh
+        self.int_news_model = InternationalNewsModel(self.db_session)
+        self.int_category_model = InternationalCategoryModel(self.db_session)
     
     def index(self):
         """
@@ -1223,7 +1256,7 @@ class ClientController:
         hot_news = self.news_model.get_hot(limit=5)
         categories = self.category_model.get_all()
 
-        return render_template('client/index.html',
+        return render_template('client/vn/index.html',
                              featured_news=featured_news,
                              latest_news=latest_news,
                              hot_news=hot_news,
@@ -1250,7 +1283,7 @@ class ClientController:
 
         categories = self.category_model.get_all()
 
-        return render_template('client/category.html',
+        return render_template('client/vn/category.html',
                              category=category,
                              news_list=news_list,
                              page=page,
@@ -1320,7 +1353,7 @@ class ClientController:
         
         categories = self.category_model.get_all()
         
-        return render_template('client/news_detail.html',
+        return render_template('client/vn/news_detail.html',
                              news=news,
                              category=category,
                              related_news=related_news,
@@ -1340,7 +1373,7 @@ class ClientController:
         categories = self.category_model.get_all()
         
         if not keyword:
-            return render_template('client/search.html',
+            return render_template('client/vn/search.html',
                                  keyword='',
                                  news_list=[],
                                  page=1,
@@ -1352,7 +1385,7 @@ class ClientController:
         news_list = self.news_model.search(keyword, limit=per_page + offset)
         news_list = news_list[offset:offset + per_page]
         
-        return render_template('client/search.html',
+        return render_template('client/vn/search.html',
                              keyword=keyword,
                              news_list=news_list,
                              page=page,
@@ -1462,7 +1495,7 @@ class ClientController:
                 session['role'] = user.role.value
                 
                 flash('Đăng nhập thành công', 'success')
-                return redirect(url_for('client.index'))
+                return redirect(url_for('client.vn.index'))
             else:
                 flash('Tên đăng nhập hoặc mật khẩu không đúng', 'error')
         
@@ -1543,7 +1576,7 @@ class ClientController:
         """Đăng xuất user"""
         session.clear()
         flash('Đã đăng xuất', 'success')
-        return redirect(url_for('client.index'))
+        return redirect(url_for('client.vn.index'))
     
     def profile(self):
         """
@@ -1809,4 +1842,189 @@ class ClientController:
                     'avatar': user.avatar
                 }
             }
+        })
+
+    def en_index(self):
+        """Trang chủ quốc tế viết bằng tiếng Anh - sử dụng bảng NewsInternational"""
+        featured_news = self.int_news_model.get_featured(limit=5)
+        latest_news = self.int_news_model.get_published(limit=10)
+        hot_news = self.int_news_model.get_hot(limit=5)
+        categories = self.int_category_model.get_all()
+
+        return render_template(
+            'client/en/index.html',
+            featured_news=featured_news,
+            latest_news=latest_news,
+            hot_news=hot_news,
+            categories=categories,
+        )
+
+    def en_category(self, category_slug: str):
+        """Trang danh mục quốc tế viết bằng tiếng Anh"""
+        category = self.int_category_model.get_by_slug(category_slug)
+        if not category:
+            abort(404)
+
+        page = request.args.get('page', 1, type=int)
+        per_page = 20
+        offset = (page - 1) * per_page
+
+        news_list = self.int_news_model.get_by_category(
+            category_id=category.id,
+            limit=per_page,
+            offset=offset,
+        )
+
+        categories = self.int_category_model.get_all()
+
+        return render_template(
+            'client/en/category.html',
+            category=category,
+            news_list=news_list,
+            page=page,
+            categories=categories,
+        )
+
+    def en_news_detail(self, news_slug: str):
+        """Trang chi tiết bài viết quốc tế (tiếng Anh)"""
+        news = self.int_news_model.get_by_slug(news_slug)
+        if not news or news.status != NewsStatus.PUBLISHED:
+            abort(404)
+
+        category = self.int_category_model.get_by_id(news.category_id)
+
+        # Tăng lượt xem
+        news.view_count += 1
+        self.db_session.commit()
+
+        # Bài viết liên quan trong cùng danh mục
+        related_news = self.int_news_model.get_by_category(
+            category_id=news.category_id,
+            limit=5,
+        )
+        related_news = [n for n in related_news if n.id != news.id][:5]
+
+        categories = self.int_category_model.get_all()
+
+        return render_template(
+            'client/en/news_detail.html',
+            news=news,
+            category=category,
+            related_news=related_news,
+            categories=categories,
+        )
+
+    def en_search(self):
+        """Tìm kiếm tin tức quốc tế (tiếng Anh)"""
+        keyword = request.args.get('q', '').strip()
+        page = request.args.get('page', 1, type=int)
+        categories = self.int_category_model.get_all()
+
+        if not keyword:
+            return render_template(
+                'client/en/search.html',
+                keyword='',
+                news_list=[],
+                page=1,
+                categories=categories,
+            )
+
+        per_page = 20
+        offset = (page - 1) * per_page
+
+        # Tìm kiếm đơn giản theo title/summary/content
+        from sqlalchemy import or_
+
+        query = self.db_session.query(NewsInternational).filter(
+            NewsInternational.status == NewsStatus.PUBLISHED,
+            or_(
+                NewsInternational.title.ilike(f'%{keyword}%'),
+                NewsInternational.summary.ilike(f'%{keyword}%'),
+                NewsInternational.content.ilike(f'%{keyword}%'),
+            ),
+        ).order_by(NewsInternational.created_at.desc())
+
+        news_list = query.limit(per_page + offset).all()
+        news_list = news_list[offset:offset + per_page]
+
+        return render_template(
+            'client/en/search.html',
+            keyword=keyword,
+            news_list=news_list,
+            page=page,
+            categories=categories,
+        )
+
+    def en_api_latest_news(self):
+        """API lấy tin tức quốc tế mới nhất (tiếng Anh)"""
+        limit = request.args.get('limit', 10, type=int)
+        offset = request.args.get('offset', 0, type=int)
+
+        news_list = self.int_news_model.get_published(limit=limit, offset=offset)
+
+        return jsonify({
+            'success': True,
+            'data': [self._news_to_dict(news) for news in news_list],
+        })
+
+    def en_api_featured_news(self):
+        """API lấy tin quốc tế nổi bật (tiếng Anh)"""
+        limit = request.args.get('limit', 5, type=int)
+        news_list = self.int_news_model.get_featured(limit=limit)
+
+        return jsonify({
+            'success': True,
+            'data': [self._news_to_dict(news) for news in news_list],
+        })
+
+    def en_api_hot_news(self):
+        """API lấy tin quốc tế nóng (tiếng Anh)"""
+        limit = request.args.get('limit', 5, type=int)
+        news_list = self.int_news_model.get_hot(limit=limit)
+
+        return jsonify({
+            'success': True,
+            'data': [self._news_to_dict(news) for news in news_list],
+        })
+
+    def en_api_categories(self):
+        """API lấy danh sách danh mục quốc tế (tiếng Anh)"""
+        categories = self.int_category_model.get_all()
+
+        return jsonify({
+            'success': True,
+            'data': [self._category_to_dict(cat) for cat in categories],
+        })
+
+    def en_api_article_detail(self, article_id: int):
+        """API lấy chi tiết bài viết quốc tế (tiếng Anh)"""
+        article = self.db_session.query(NewsInternational).filter(
+            NewsInternational.id == article_id
+        ).first()
+
+        if not article:
+            return jsonify({
+                'success': False,
+                'message': 'Article not found',
+            }), 404
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': article.id,
+                'title': article.title,
+                'slug': article.slug,
+                'summary': article.summary or '',
+                'content': article.content or '',
+                'thumbnail': article.thumbnail or '',
+                'category': article.category.name if article.category else 'N/A',
+                'category_id': article.category_id,
+                'status': article.status.value,
+                'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'published_at': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
+                'updated_at': article.updated_at.strftime('%d/%m/%Y %H:%M') if article.updated_at else '',
+                'view_count': article.view_count,
+                'is_featured': article.is_featured,
+                'is_hot': article.is_hot,
+            },
         })

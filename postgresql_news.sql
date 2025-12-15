@@ -169,3 +169,18 @@ CREATE TABLE IF NOT EXISTS news_international (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS categories_international (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    slug VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    icon VARCHAR(50),
+    language VARCHAR(20) DEFAULT 'english',
+    order_display INTEGER DEFAULT 0,
+    parent_id INTEGER REFERENCES categories(id),
+    visible BOOLEAN DEFAULT TRUE,
+    level INTEGER DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

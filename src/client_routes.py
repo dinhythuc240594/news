@@ -15,11 +15,11 @@ client_bp = Blueprint('client', __name__,
 # Khởi tạo client controller
 client_controller = ClientController()
 
+# Trang chủ viết bằng tiếng Việt
 @client_bp.route('/')
 def index():
     """Trang chủ"""
     return client_controller.index()
-
 
 @client_bp.route('/category/<category_slug>')
 def category(category_slug: str):
@@ -104,3 +104,35 @@ def save_news(news_id: int):
 def submit_comment(news_id: int):
     """API gửi bình luận"""
     return client_controller.submit_comment(news_id)
+
+# Trang chủ viết bằng tiếng Anh
+@client_bp.route('/en')
+def en_index():
+    """Trang chủ viết bằng tiếng Anh"""
+    return client_controller.en_index()
+
+@client_bp.route('/en/category/<category_slug>')
+def en_category(category_slug: str):
+    """Trang danh mục"""
+    return client_controller.en_category(category_slug)
+
+@client_bp.route('/en/news/<news_slug>')
+def en_news_detail(news_slug: str):
+    """Trang chi tiết bài viết"""
+    return client_controller.en_news_detail(news_slug)
+
+@client_bp.route('/en/search')
+def en_search():
+    """Tìm kiếm tin tức"""
+    return client_controller.en_search()
+
+
+@client_bp.route('/en/api/latest-news')
+def en_api_latest_news():
+    """API lấy tin tức mới nhất"""
+    return client_controller.en_api_latest_news()
+
+@client_bp.route('/en/api/featured-news')
+def en_api_featured_news():
+    """API lấy tin nổi bật"""
+    return client_controller.en_api_featured_news()

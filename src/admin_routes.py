@@ -190,6 +190,13 @@ def api_categories():
     return admin_controller.api_categories()
 
 
+@admin_bp.route('/api/international-categories')
+@controller.admin_required
+def api_international_categories():
+    """API lấy danh sách danh mục tin quốc tế (categories_international)"""
+    return admin_controller.api_international_categories()
+
+
 @admin_bp.route('/api/menu-items')
 @controller.admin_required
 def api_menu_items():
