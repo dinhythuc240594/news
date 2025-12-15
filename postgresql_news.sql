@@ -141,15 +141,31 @@ CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
 CREATE INDEX IF NOT EXISTS idx_comments_news ON comments(news_id);
 CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);
 
--- -- 6. Tạo bảng menu_items (menu động)
--- CREATE TABLE IF NOT EXISTS menu_items (
---     id SERIAL PRIMARY KEY,
---     name VARCHAR(100) NOT NULL,
---     slug VARCHAR(100) NOT NULL UNIQUE,
---     icon VARCHAR(50),
---     order_display INTEGER DEFAULT 0,
---     parent_id INTEGER REFERENCES menu_items(id),
---     visible BOOLEAN DEFAULT TRUE,
---     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
---     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
--- );
+CREATE TABLE IF NOT EXISTS news_international (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) NOT NULL UNIQUE,
+    summary TEXT,
+    content TEXT NOT NULL,
+    thumbnail VARCHAR(255),
+    images TEXT, -- JSON array of image URLs
+    
+    category_id INTEGER NOT NULL REFERENCES categories(id),
+    created_by INTEGER NOT NULL REFERENCES users(id),
+    approved_by INTEGER REFERENCES users(id),
+    
+    status VARCHAR(20) DEFAULT 'draft', -- 'draft', 'pending', 'published', 'hidden', 'rejected'
+    is_featured BOOLEAN DEFAULT FALSE,
+    is_hot BOOLEAN DEFAULT FALSE,
+    view_count INTEGER DEFAULT 0,
+    
+    meta_title VARCHAR(255),
+    meta_description TEXT,
+    meta_keywords VARCHAR(255),
+    language VARCHAR(20) DEFAULT 'english',
+    source VARCHAR(255),
+    source_url VARCHAR(255),
+    published_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
