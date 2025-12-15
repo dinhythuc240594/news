@@ -533,25 +533,74 @@ class AdminController:
         })
     
     def api_fetch_api_news(self):
-        """API lấy bài viết mới từ API bên ngoài (chỉ lấy dữ liệu, không lưu)"""
+        """API lấy bài viết mới từ RSS Feed hoặc API bên ngoài"""
+        import feedparser
         import requests
         from datetime import datetime, timedelta
+        import re
         
         try:
             # Lấy thông tin từ request
             data = request.json if request.is_json else {}
+            source_type = data.get('source_type', 'rss')  # 'rss' hoặc 'api'
+            rss_url = data.get('rss_url', 'https://vnexpress.net/rss/tin-moi-nhat.rss')
             api_key = data.get('api_key')
             api_url = data.get('api_url', 'https://newsapi.org/v2/top-headlines')
             country = data.get('country', '')
             category = data.get('category', '')
             limit = data.get('limit', 20)
-            start_date = data.get('start_date')
-            end_date = data.get('end_date')
             
             articles = []
             
+            # Nếu là RSS feed
+            if source_type == 'rss' and rss_url:
+                try:
+                    feed = feedparser.parse(rss_url)
+                    
+                    if feed.bozo and feed.bozo_exception:
+                        return jsonify({
+                            'success': False,
+                            'error': f'Lỗi parse RSS: {feed.bozo_exception}'
+                        }), 400
+                    
+                    for entry in feed.entries[:limit]:
+                        # Extract image từ description hoặc enclosure
+                        image_url = ''
+                        if 'enclosures' in entry and entry.enclosures:
+                            image_url = entry.enclosures[0].get('url', '')
+                        elif 'media_content' in entry and entry.media_content:
+                            image_url = entry.media_content[0].get('url', '')
+                        else:
+                            # Try to extract image from description HTML
+                            desc = entry.get('description', '')
+                            img_match = re.search(r'<img[^>]+src="([^"]+)"', desc)
+                            if img_match:
+                                image_url = img_match.group(1)
+                        
+                        # Clean description HTML tags
+                        description = entry.get('description', '')
+                        description = re.sub(r'<[^>]+>', '', description)
+                        description = description.replace('&nbsp;', ' ').strip()
+                        
+                        articles.append({
+                            'title': entry.get('title', 'No title'),
+                            'description': description[:500] if description else 'No description',
+                            'url': entry.get('link', ''),
+                            'urlToImage': image_url,
+                            'source': {'name': feed.feed.get('title', 'RSS Feed')},
+                            'author': entry.get('author', 'Unknown'),
+                            'publishedAt': entry.get('published', datetime.utcnow().isoformat()),
+                            'content': description
+                        })
+                    
+                except Exception as e:
+                    return jsonify({
+                        'success': False,
+                        'error': f'Lỗi fetch RSS: {str(e)}'
+                    }), 500
+            
             # Nếu có API key và URL, fetch từ API thật
-            if api_key and api_url:
+            elif api_key and api_url:
                 try:
                     # Ví dụ với NewsAPI.org
                     params = {

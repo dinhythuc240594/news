@@ -584,3 +584,185 @@ function showToast(title, message, type) {
         toastEl.remove();
     }, 5000);
 }
+
+// RSS Feed handlers
+$(document).on('click', '.rss-preset', function(e) {
+    e.preventDefault();
+    $('#rssFeedUrl').val($(this).data('url'));
+});
+
+$('#fetchRssBtn').click(function() {
+    const rssUrl = $('#rssFeedUrl').val().trim();
+    const limit = $('#rssLimit').val() || 20;
+    
+    if (!rssUrl) {
+        alert('Vui lòng nhập URL RSS feed');
+        return;
+    }
+    
+    $(this).prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Đang tải...');
+    
+    $.ajax({
+        url: '/admin/api/fetch-api-news',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            source_type: 'rss',
+            rss_url: rssUrl,
+            limit: parseInt(limit)
+        }),
+        success: function(response) {
+            if (response.success) {
+                displayRssArticles(response.data);
+                showToast('Thành công', `Đã tải ${response.count} bài viết từ RSS`, 'success');
+            } else {
+                alert('Lỗi: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            const error = xhr.responseJSON ? xhr.responseJSON.error : 'Không thể kết nối đến server';
+            alert('Lỗi: ' + error);
+        },
+        complete: function() {
+            $('#fetchRssBtn').prop('disabled', false).html('<i class="fas fa-download"></i> Tải bài');
+        }
+    });
+});
+
+function displayRssArticles(articles) {
+    if (!articles || articles.length === 0) {
+        $('#rssArticlesList').html('<p class="text-muted text-center">Không có bài viết nào</p>');
+        return;
+    }
+    
+    let html = '<div class="row">';
+    articles.forEach((article, index) => {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">${article.title}</h6>
+                        <p class="card-text small text-muted">${article.summary.substring(0, 150)}...</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted"><i class="fas fa-calendar"></i> ${new Date(article.published_at).toLocaleString('vi-VN')}</small>
+                            <button class="btn btn-sm btn-primary save-rss-article" data-index="${index}">
+                                <i class="fas fa-save"></i> Lưu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    $('#rssArticlesList').html(html);
+    window.rssArticlesData = articles;
+}
+
+// API News handlers
+$('#fetchApiBtn').click(function() {
+    const apiUrl = $('#apiUrl').val().trim();
+    const apiKey = $('#apiKey').val().trim();
+    const country = $('#apiCountry').val();
+    const category = $('#apiCategory').val();
+    const limit = $('#apiLimit').val() || 20;
+    
+    if (!apiKey) {
+        alert('Vui lòng nhập API key');
+        return;
+    }
+    
+    $(this).prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Đang tải...');
+    
+    $.ajax({
+        url: '/admin/api/fetch-api-news',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            source_type: 'api',
+            api_url: apiUrl,
+            api_key: apiKey,
+            country: country,
+            category: category,
+            limit: parseInt(limit)
+        }),
+        success: function(response) {
+            if (response.success) {
+                displayApiArticles(response.data);
+                showToast('Thành công', `Đã tải ${response.count} bài viết từ API`, 'success');
+            } else {
+                alert('Lỗi: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            const error = xhr.responseJSON ? xhr.responseJSON.error : 'Không thể kết nối đến server';
+            alert('Lỗi: ' + error);
+        },
+        complete: function() {
+            $('#fetchApiBtn').prop('disabled', false).html('<i class="fas fa-download"></i> Tải bài từ API');
+        }
+    });
+});
+
+function displayApiArticles(articles) {
+    if (!articles || articles.length === 0) {
+        $('#apiArticlesList').html('<p class="text-muted text-center">Không có bài viết nào</p>');
+        return;
+    }
+    
+    let html = '<div class="row">';
+    articles.forEach((article, index) => {
+        html += `
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    ${article.thumbnail ? `<img src="${article.thumbnail}" class="card-img-top" alt="thumbnail" style="height: 200px; object-fit: cover;">` : ''}
+                    <div class="card-body">
+                        <h6 class="card-title">${article.title}</h6>
+                        <p class="card-text small text-muted">${article.summary.substring(0, 150)}...</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted"><i class="fas fa-calendar"></i> ${new Date(article.published_at).toLocaleString('vi-VN')}</small>
+                            <button class="btn btn-sm btn-primary save-api-article" data-index="${index}">
+                                <i class="fas fa-save"></i> Lưu
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    $('#apiArticlesList').html(html);
+    window.apiArticlesData = articles;
+}
+
+// Save RSS article
+$(document).on('click', '.save-rss-article', function() {
+    const index = $(this).data('index');
+    const article = window.rssArticlesData[index];
+    
+    if (!article) {
+        alert('Không tìm thấy bài viết');
+        return;
+    }
+    
+    // TODO: Show modal to select category and status, then save
+    console.log('Save RSS article:', article);
+    alert('Chức năng lưu bài sẽ được hoàn thiện sau. Bài viết: ' + article.title);
+});
+
+// Save API article
+$(document).on('click', '.save-api-article', function() {
+    const index = $(this).data('index');
+    const article = window.apiArticlesData[index];
+    
+    if (!article) {
+        alert('Không tìm thấy bài viết');
+        return;
+    }
+    
+    // TODO: Show modal to select category and status, then save
+    console.log('Save API article:', article);
+    alert('Chức năng lưu bài sẽ được hoàn thiện sau. Bài viết: ' + article.title);
+});
