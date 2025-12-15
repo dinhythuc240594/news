@@ -115,7 +115,7 @@ $(document).ready(function() {
     $('#approveBtn').click(function() {
         const articleId = $(this).data('id');
         approveArticle(articleId);
-        $('#previewModal').modal('hide');
+        $('#previewArticleModal').modal('hide');
     });
     
     $('#rejectBtn').click(function() {
@@ -123,7 +123,7 @@ $(document).ready(function() {
         const reason = prompt('Lý do từ chối:');
         if (reason) {
             rejectArticle(articleId, reason);
-            $('#previewModal').modal('hide');
+            $('#previewArticleModal').modal('hide');
         }
     });
 });
@@ -412,7 +412,7 @@ async function loadPendingArticles() {
                         <td><span class="badge bg-primary">${article.category}</span></td>
                         <td>${article.date}</td>
                         <td>
-                            <button class="btn btn-sm btn-info btn-action btn-preview" data-id="${article.id}" title="Xem trước">
+                            <button class="btn btn-sm btn-info btn-action btn-preview" data-bs-target="#previewArticleModal" data-id="${article.id}" title="Xem trước">
                                 <i class="fas fa-eye"></i>
                             </button>
                             <button class="btn btn-sm btn-success btn-action btn-approve" data-id="${article.id}" title="Duyệt">
@@ -848,7 +848,7 @@ function previewAPIArticle(articleData) {
     
     $('#previewContent').html(content);
     
-    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    const modal = new bootstrap.Modal(document.getElementById('previewAPIArticleModal'));
     modal.show();
 }
 
@@ -915,12 +915,7 @@ async function previewArticle(articleId) {
 
         // Show loading state
         $('#previewContent').html(htmlState);
-        
-        // Get modal element and show it
-        var modalElement = document.getElementById('previewModal');
-        var modal = bootstrap.Modal.getOrCreateInstance(modalElement);
-        modal.show();
-        
+
         // Fetch article data from API
         const response = await fetch(`/admin/api/article/${articleId}`);
         const result = await response.json();
@@ -1026,6 +1021,11 @@ async function previewArticle(articleId) {
         errorHtml += '</div>';
         $('#previewContent').html(errorHtml);
     } 
+
+    // Get modal element and show it
+    const modal = new bootstrap.Modal(document.getElementById('previewArticleModal'));
+    modal.show();
+
 }
 
 // Initialize chart
