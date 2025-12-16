@@ -6,14 +6,14 @@
                 {% for category in parent_categories %}
                     {% set child_categories = categories|selectattr('parent_id', 'equalto', category.id)|list %}
                     <li class="{% if child_categories %}has-submenu{% endif %} {% if loop.index == 1 %}active{% endif %}" data-slug="{{ category.slug }}">
-                        <a href="{{ url_for('client.category', category_slug=category.slug) }}">
+                        <a href="{{ url_for('client.en_category', category_slug=category.slug) }}">
                             {% if category.icon %}<i class="{{ category.icon }}"></i> {% endif %}{{ category.name }}
                         </a>
                         {% if child_categories %}
                         <ul class="submenu">
                             {% for child in child_categories %}
                             <li data-slug="{{ child.slug }}">
-                                <a href="{{ url_for('client.category', category_slug=child.slug) }}">
+                                <a href="{{ url_for('client.en_category', category_slug=child.slug) }}">
                                     {% if child.icon %}<i class="{{ child.icon }}"></i> {% endif %}{{ child.name }}
                                 </a>
                             </li>

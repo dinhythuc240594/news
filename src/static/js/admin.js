@@ -168,6 +168,8 @@ function updatePageTitle(section) {
         'api': 'Bài viết từ API',
         'international': 'Bài báo Quốc tế',
         'international-pending': 'Quốc tế chờ duyệt',
+        'menu-manager': 'Quản lý Menu',
+        'en-menu-manager': 'Menu Categories EN',
         'users': 'Quản lý người dùng',
         'statistics': 'Thống kê'
     };

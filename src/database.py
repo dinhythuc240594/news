@@ -342,6 +342,7 @@ class SavedNews(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    site = Column(String(10), default='vn')  # Phân biệt site: vn / en
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -356,6 +357,7 @@ class ViewedNews(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    site = Column(String(10), default='vn')  # Phân biệt site: vn / en
     viewed_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -372,6 +374,7 @@ class Comment(Base):
     news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
     content = Column(Text, nullable=False)
     parent_id = Column(Integer, ForeignKey('comments.id'), nullable=True)  # For reply comments
+    site = Column(String(10), default='vn')  # Phân biệt site: vn / en
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

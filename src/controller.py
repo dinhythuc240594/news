@@ -1232,6 +1232,306 @@ class AdminController:
                 'success': False,
                 'error': str(e)
             }), 500
+    
+    def api_international_menu_items(self):
+        """API lấy danh sách international categories (menu items)"""
+        categories = self.db_session.query(CategoryInternational).order_by(
+            CategoryInternational.order_display, CategoryInternational.parent_id
+        ).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': item.id,
+                'name': item.name,
+                'slug': item.slug,
+                'icon': item.icon,
+                'order': item.order_display,
+                'parent_id': item.parent_id,
+                'level': item.level if hasattr(item, 'level') else 1,
+                'visible': item.visible
+            } for item in categories]
+        })
+    
+    def api_create_international_menu_item(self):
+        """API tạo international category mới (menu item)"""
+        data = request.json if request.is_json else request.form
+        
+        name = data.get('name')
+        slug = data.get('slug')
+        icon = data.get('icon')
+        order = data.get('order', 0)
+        parent_id = data.get('parent_id')
+        visible = data.get('visible', True)
+        description = data.get('description')
+        
+        if not name:
+            return jsonify({'success': False, 'error': 'Tên danh mục không được để trống'}), 400
+        
+        if not slug:
+            # Tự động tạo slug
+            slug = self._generate_slug(name)
+        
+        # Kiểm tra slug trùng
+        existing = self.db_session.query(CategoryInternational).filter(CategoryInternational.slug == slug).first()
+        if existing:
+            return jsonify({'success': False, 'error': 'Slug đã tồn tại'}), 400
+        
+        # Tính toán level
+        level = self._calculate_international_level(parent_id)
+        
+        # Kiểm tra level không được vượt quá 4
+        if level > 4:
+            return jsonify({'success': False, 'error': 'Không thể tạo menu quá 4 cấp. Menu hiện tại đã đạt cấp tối đa.'}), 400
+        
+        category = CategoryInternational(
+            name=name,
+            slug=slug,
+            icon=icon if icon else None,
+            order_display=order,
+            parent_id=int(parent_id) if parent_id else None,
+            level=level,
+            visible=visible,
+            description=description if description else None
+        )
+        
+        self.db_session.add(category)
+        self.db_session.commit()
+        self.db_session.refresh(category)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Đã tạo danh mục mới',
+            'data': {
+                'id': category.id,
+                'name': category.name,
+                'slug': category.slug,
+                'level': category.level
+            }
+        })
+    
+    def api_update_international_menu_item(self, menu_id: int):
+        """API cập nhật international category (menu item)"""
+        category = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == menu_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Không tìm thấy danh mục'}), 404
+        
+        data = request.json if request.is_json else request.form
+        
+        if 'name' in data:
+            category.name = data['name']
+        if 'slug' in data:
+            # Kiểm tra slug trùng (trừ chính nó)
+            existing = self.db_session.query(CategoryInternational).filter(
+                CategoryInternational.slug == data['slug'],
+                CategoryInternational.id != menu_id
+            ).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'Slug đã tồn tại'}), 400
+            category.slug = data['slug']
+        if 'icon' in data:
+            category.icon = data['icon'] if data['icon'] else None
+        if 'order' in data:
+            category.order_display = int(data['order'])
+        if 'parent_id' in data:
+            parent_id = data['parent_id']
+            # Kiểm tra không được set parent là chính nó
+            if parent_id == menu_id:
+                return jsonify({'success': False, 'error': 'Không thể set parent là chính nó'}), 400
+            
+            # Kiểm tra không được set parent là con cháu của chính nó (tránh vòng lặp)
+            if parent_id:
+                # Kiểm tra xem parent_id có phải là con cháu của menu_id không
+                def is_descendant(parent_candidate_id, ancestor_id):
+                    if parent_candidate_id == ancestor_id:
+                        return True
+                    parent_candidate = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == parent_candidate_id).first()
+                    if not parent_candidate or not parent_candidate.parent_id:
+                        return False
+                    return is_descendant(parent_candidate.parent_id, ancestor_id)
+                
+                if is_descendant(int(parent_id), menu_id):
+                    return jsonify({'success': False, 'error': 'Không thể set parent là con cháu của chính nó'}), 400
+            
+            category.parent_id = int(parent_id) if parent_id else None
+            
+            # Tính toán lại level khi parent_id thay đổi
+            new_level = self._calculate_international_level(category.parent_id)
+            if new_level > 4:
+                return jsonify({'success': False, 'error': 'Không thể tạo menu quá 4 cấp. Menu hiện tại đã đạt cấp tối đa.'}), 400
+            category.level = new_level
+        if 'visible' in data:
+            category.visible = bool(data['visible'])
+        if 'description' in data:
+            category.description = data['description'] if data['description'] else None
+        
+        category.updated_at = datetime.utcnow()
+        self.db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Đã cập nhật danh mục',
+            'data': {
+                'id': category.id,
+                'name': category.name,
+                'level': category.level
+            }
+        })
+    
+    def api_delete_international_menu_item(self, menu_id: int):
+        """API xóa international category (menu item)"""
+        category = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == menu_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Không tìm thấy danh mục'}), 404
+        
+        # Kiểm tra xem có tin tức nào đang sử dụng category này không
+        news_count = self.db_session.query(NewsInternational).filter(NewsInternational.category_id == menu_id).count()
+        if news_count > 0:
+            return jsonify({
+                'success': False,
+                'error': f'Không thể xóa danh mục vì có {news_count} tin tức đang sử dụng'
+            }), 400
+        
+        # Xóa các category con trước (cascade)
+        children = self.db_session.query(CategoryInternational).filter(CategoryInternational.parent_id == menu_id).all()
+        for child in children:
+            # Kiểm tra tin tức của child category
+            child_news_count = self.db_session.query(NewsInternational).filter(NewsInternational.category_id == child.id).count()
+            if child_news_count == 0:
+                self.db_session.delete(child)
+        
+        self.db_session.delete(category)
+        self.db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Đã xóa danh mục'
+        })
+    
+    def _calculate_international_level(self, parent_id):
+        """Tính toán level dựa trên parent_id cho international categories"""
+        if not parent_id:
+            return 1
+        
+        parent = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == parent_id).first()
+        if not parent:
+            return 1
+        
+        return parent.level + 1
+    
+    def api_init_default_international_menu_items(self):
+        """API khởi tạo international categories mặc định (menu items)"""
+        # Kiểm tra xem đã có categories chưa
+        count = self.db_session.query(CategoryInternational).count()
+        if count > 0:
+            return jsonify({
+                'success': False,
+                'error': 'Đã có categories trong database'
+            }), 400
+        
+        # Sử dụng DEFAULT_CATEGORIES_EN từ database.py
+        from database import DEFAULT_CATEGORIES_EN
+        
+        # Tạo categories (tạo parent trước)
+        created_items = {}  # Map slug -> real_id
+        
+        # Tạo parent categories trước
+        parent_categories = [c for c in DEFAULT_CATEGORIES_EN if c['parent_id'] is None]
+        parent_categories.sort(key=lambda x: x['order_display'])
+        
+        for cat_data in parent_categories:
+            category = CategoryInternational(
+                name=cat_data['name'],
+                slug=cat_data['slug'],
+                icon=cat_data['icon'],
+                order_display=cat_data['order_display'],
+                parent_id=None,
+                level=1,
+                visible=True
+            )
+            self.db_session.add(category)
+            self.db_session.flush()  # Để lấy ID
+            created_items[cat_data['slug']] = category.id
+        
+        # Tạo child categories (nếu có trong DEFAULT_CATEGORIES_EN)
+        child_categories = [c for c in DEFAULT_CATEGORIES_EN if c['parent_id'] is not None]
+        child_categories.sort(key=lambda x: (x['parent_id'], x['order_display']))
+        
+        for cat_data in child_categories:
+            # Tìm parent_id từ slug của parent
+            parent_slug = None
+            for parent_cat in DEFAULT_CATEGORIES_EN:
+                if parent_cat.get('id') == cat_data['parent_id']:
+                    parent_slug = parent_cat['slug']
+                    break
+            
+            if parent_slug and parent_slug in created_items:
+                parent_id = created_items[parent_slug]
+                parent_category = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == parent_id).first()
+                level = parent_category.level + 1 if parent_category else 2
+                
+                category = CategoryInternational(
+                    name=cat_data['name'],
+                    slug=cat_data['slug'],
+                    icon=cat_data['icon'],
+                    order_display=cat_data['order_display'],
+                    parent_id=parent_id,
+                    level=level,
+                    visible=True
+                )
+                self.db_session.add(category)
+                self.db_session.flush()
+                created_items[cat_data['slug']] = category.id
+        
+        self.db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Đã khởi tạo {len(DEFAULT_CATEGORIES_EN)} categories mặc định',
+            'count': len(DEFAULT_CATEGORIES_EN)
+        })
+    
+    def api_update_international_menu_order(self):
+        """API cập nhật thứ tự international categories (drag & drop)"""
+        data = request.json if request.is_json else {}
+        items = data.get('items', [])
+        
+        if not items:
+            return jsonify({'success': False, 'error': 'Thiếu dữ liệu'}), 400
+        
+        try:
+            for item_data in items:
+                category_id = item_data.get('id')
+                new_order = item_data.get('order', 0)
+                parent_id = item_data.get('parent_id')
+                
+                category = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == category_id).first()
+                if category:
+                    category.order_display = new_order
+                    if parent_id is not None:
+                        # Kiểm tra không được set parent là chính nó
+                        if parent_id == category_id:
+                            continue
+                        category.parent_id = int(parent_id) if parent_id else None
+                        # Tính toán lại level
+                        category.level = self._calculate_international_level(category.parent_id)
+                    else:
+                        category.parent_id = None
+                        category.level = 1
+                    category.updated_at = datetime.utcnow()
+            
+            self.db_session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Đã cập nhật thứ tự danh mục'
+            })
+        except Exception as e:
+            self.db_session.rollback()
+            return jsonify({
+                'success': False,
+                'error': str(e)
+            }), 500
 
 
 class ClientController:
@@ -1318,7 +1618,8 @@ class ClientController:
             if not existing_viewed:
                 viewed_news = ViewedNews(
                     user_id=user_id,
-                    news_id=news.id
+                    news_id=news.id,
+                    site='vn'
                 )
                 self.db_session.add(viewed_news)
                 self.db_session.commit()
@@ -1595,17 +1896,20 @@ class ClientController:
         
         # Lấy tin đã lưu
         saved_news = self.db_session.query(SavedNews).filter(
-            SavedNews.user_id == user.id
+            SavedNews.user_id == user.id,
+            (SavedNews.site == 'vn') | (SavedNews.site.is_(None))
         ).order_by(SavedNews.created_at.desc()).limit(20).all()
         
         # Lấy tin đã xem
         viewed_news = self.db_session.query(ViewedNews).filter(
-            ViewedNews.user_id == user.id
+            ViewedNews.user_id == user.id,
+            (ViewedNews.site == 'vn') | (ViewedNews.site.is_(None))
         ).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
         
         # Lấy bình luận
         comments = self.db_session.query(Comment).filter(
-            Comment.user_id == user.id
+            Comment.user_id == user.id,
+            (Comment.site == 'vn') | (Comment.site.is_(None))
         ).order_by(Comment.created_at.desc()).limit(20).all()
         
         # Tính số bình luận cho mỗi bài viết
@@ -1786,7 +2090,8 @@ class ClientController:
             # Lưu
             new_saved = SavedNews(
                 user_id=user_id,
-                news_id=news_id
+                news_id=news_id,
+                site='vn'
             )
             self.db_session.add(new_saved)
             self.db_session.commit()
@@ -1821,6 +2126,7 @@ class ClientController:
             news_id=news_id,
             content=content,
             parent_id=int(parent_id) if parent_id else None,
+            site='vn',
             is_active=True
         )
         self.db_session.add(comment)

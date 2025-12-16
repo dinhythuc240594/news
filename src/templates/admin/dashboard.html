@@ -78,6 +78,11 @@
                 </a>
             </li>
             <li>
+                <a href="#" data-section="en-menu-manager">
+                    <i class="fas fa-bars"></i> Quản lý Menu Quốc tế
+                </a>
+            </li>
+            <li>
                 <a href="#" data-section="users">
                     <i class="fas fa-users"></i> Quản lý người dùng
                 </a>
@@ -514,207 +519,207 @@
         <div class="content-section" id="menu-manager">
             {% include 'admin/menu-manager.html' %}
         </div>
-    </div>
-
-    <!-- International Articles Section -->
-    <div class="content-section" id="international">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5><i class="fas fa-globe"></i> Bài báo Quốc tế</h5>
-                <button class="btn btn-sm btn-primary" data-section="international-pending">
-                    <i class="fas fa-clock"></i> Xem chờ duyệt
-                </button>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th width="5%">#</th>
-                                <th width="30%">Title</th>
-                                <th width="12%">Category</th>
-                                <th width="10%">Author</th>
-                                <th width="10%">Status</th>
-                                <th width="8%">Views</th>
-                                <th width="10%">Published</th>
-                                <th width="15%">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>1</td>
-                                <td>Global Leaders Meet to Discuss Climate Action</td>
-                                <td><span class="badge bg-info">World</span></td>
-                                <td>John Smith</td>
-                                <td><span class="badge bg-success">Approved</span></td>
-                                <td>15,234</td>
-                                <td>13/12/2025</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
-                                    <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>Tech Giants Report Record Earnings</td>
-                                <td><span class="badge bg-primary">Business</span></td>
-                                <td>Mary Johnson</td>
-                                <td><span class="badge bg-success">Approved</span></td>
-                                <td>12,456</td>
-                                <td>12/12/2025</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
-                                    <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>3</td>
-                                <td>AI Revolution in Healthcare Industry</td>
-                                <td><span class="badge bg-success">Technology</span></td>
-                                <td>Editor A</td>
-                                <td><span class="badge bg-success">Approved</span></td>
-                                <td>9,876</td>
-                                <td>11/12/2025</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
-                                    <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+ 
+        <div class="content-section" id="international">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5><i class="fas fa-globe"></i> Bài báo Quốc tế</h5>
+                    <button class="btn btn-sm btn-primary" data-section="international-pending">
+                        <i class="fas fa-clock"></i> Xem chờ duyệt
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th width="5%">#</th>
+                                    <th width="30%">Title</th>
+                                    <th width="12%">Category</th>
+                                    <th width="10%">Author</th>
+                                    <th width="10%">Status</th>
+                                    <th width="8%">Views</th>
+                                    <th width="10%">Published</th>
+                                    <th width="15%">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td>Global Leaders Meet to Discuss Climate Action</td>
+                                    <td><span class="badge bg-info">World</span></td>
+                                    <td>John Smith</td>
+                                    <td><span class="badge bg-success">Approved</span></td>
+                                    <td>15,234</td>
+                                    <td>13/12/2025</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>Tech Giants Report Record Earnings</td>
+                                    <td><span class="badge bg-primary">Business</span></td>
+                                    <td>Mary Johnson</td>
+                                    <td><span class="badge bg-success">Approved</span></td>
+                                    <td>12,456</td>
+                                    <td>12/12/2025</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>3</td>
+                                    <td>AI Revolution in Healthcare Industry</td>
+                                    <td><span class="badge bg-success">Technology</span></td>
+                                    <td>Editor A</td>
+                                    <td><span class="badge bg-success">Approved</span></td>
+                                    <td>9,876</td>
+                                    <td>11/12/2025</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- International Pending Articles Section -->
-    <div class="content-section" id="international-pending">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-clock"></i> Bài báo Quốc tế chờ duyệt</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th width="5%">#</th>
-                                <th width="35%">Title</th>
-                                <th width="12%">Category</th>
-                                <th width="12%">Author</th>
-                                <th width="12%">Submitted</th>
-                                <th width="24%">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>1</td>
-                                <td>Election Results Show Shift in Political Landscape</td>
-                                <td><span class="badge bg-warning">Politics</span></td>
-                                <td>Editor B</td>
-                                <td>13/12/2025 08:30</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> Review</button>
-                                    <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> Approve</button>
-                                    <button class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Reject</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>Champions League Quarterfinals Results</td>
-                                <td><span class="badge bg-danger">Sports</span></td>
-                                <td>Editor C</td>
-                                <td>13/12/2025 07:15</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> Review</button>
-                                    <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> Approve</button>
-                                    <button class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Reject</button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+        <!-- International Pending Articles Section -->
+        <div class="content-section" id="international-pending">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-clock"></i> Bài báo Quốc tế chờ duyệt</h5>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Article Preview Modal -->
-    <div class="modal fade" id="previewArticleModal" tabindex="-1" aria-labelledby="previewArticleModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-scrollable">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="previewArticleModalLabel">
-                        <i class="fas fa-eye me-2"></i>Xem trước bài viết
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
-                </div>
-                <div class="modal-body" id="previewContent">
-                    <!-- Preview content will be loaded here -->
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="fas fa-times me-1"></i>Đóng
-                    </button>
-                    <button type="button" class="btn btn-danger" id="rejectBtn" style="display: none;">
-                        <i class="fas fa-times me-1"></i>Từ chối
-                    </button>
-                    <button type="button" class="btn btn-success" id="approveBtn" style="display: none;">
-                        <i class="fas fa-check me-1"></i>Duyệt bài
-                    </button>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th width="5%">#</th>
+                                    <th width="35%">Title</th>
+                                    <th width="12%">Category</th>
+                                    <th width="12%">Author</th>
+                                    <th width="12%">Submitted</th>
+                                    <th width="24%">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>1</td>
+                                    <td>Election Results Show Shift in Political Landscape</td>
+                                    <td><span class="badge bg-warning">Politics</span></td>
+                                    <td>Editor B</td>
+                                    <td>13/12/2025 08:30</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> Review</button>
+                                        <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> Approve</button>
+                                        <button class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Reject</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>Champions League Quarterfinals Results</td>
+                                    <td><span class="badge bg-danger">Sports</span></td>
+                                    <td>Editor C</td>
+                                    <td>13/12/2025 07:15</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> Review</button>
+                                        <button class="btn btn-sm btn-success"><i class="fas fa-check"></i> Approve</button>
+                                        <button class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Reject</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Save API Article Modal -->
-    <div class="modal fade" id="saveAPIArticleModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Lưu bài viết từ API</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="saveAPIArticleData">
-                    <div class="mb-3">
-                        <label class="form-label">Tiêu đề</label>
-                        <input type="text" class="form-control" id="saveAPITitle" readonly>
+        <div class="content-section" id="en-menu-manager">
+            {% include 'admin/en-menu-manager.html' %}
+        </div>
+
+        <!-- Article Preview Modal -->
+        <div class="modal fade" id="previewArticleModal" tabindex="-1" aria-labelledby="previewArticleModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="previewArticleModalLabel">
+                            <i class="fas fa-eye me-2"></i>Xem trước bài viết
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Tóm tắt</label>
-                        <textarea class="form-control" id="saveAPISummary" rows="3" readonly></textarea>
+                    <div class="modal-body" id="previewContent">
+                        <!-- Preview content will be loaded here -->
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Danh mục <span class="text-danger">*</span></label>
-                        <select class="form-select" id="saveAPICategory" required>
-                            <option value="">-- Chọn danh mục --</option>
-                        </select>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>Đóng
+                        </button>
+                        <button type="button" class="btn btn-danger" id="rejectBtn" style="display: none;">
+                            <i class="fas fa-times me-1"></i>Từ chối
+                        </button>
+                        <button type="button" class="btn btn-success" id="approveBtn" style="display: none;">
+                            <i class="fas fa-check me-1"></i>Duyệt bài
+                        </button>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Trạng thái</label>
-                        <select class="form-select" id="saveAPIStatus">
-                            <option value="draft">Bản nháp</option>
-                            <option value="pending">Chờ duyệt</option>
-                            <option value="published">Đã xuất bản</option>
-                        </select>
-                        <small class="text-muted">Bài viết sẽ được lưu với trạng thái đã chọn và đánh dấu là từ API</small>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
-                    <button type="button" class="btn btn-primary" id="saveAPIArticleBtn">
-                        <i class="fas fa-save"></i> Lưu bài viết
-                    </button>
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="content-section" id="en-menu-manager">
-        {% include 'admin/en-menu-manager.html' %}
+        <!-- Save API Article Modal -->
+        <div class="modal fade" id="saveAPIArticleModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Lưu bài viết từ API</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="saveAPIArticleData">
+                        <div class="mb-3">
+                            <label class="form-label">Tiêu đề</label>
+                            <input type="text" class="form-control" id="saveAPITitle" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tóm tắt</label>
+                            <textarea class="form-control" id="saveAPISummary" rows="3" readonly></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Danh mục <span class="text-danger">*</span></label>
+                            <select class="form-select" id="saveAPICategory" required>
+                                <option value="">-- Chọn danh mục --</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Trạng thái</label>
+                            <select class="form-select" id="saveAPIStatus">
+                                <option value="draft">Bản nháp</option>
+                                <option value="pending">Chờ duyệt</option>
+                                <option value="published">Đã xuất bản</option>
+                            </select>
+                            <small class="text-muted">Bài viết sẽ được lưu với trạng thái đã chọn và đánh dấu là từ API</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="button" class="btn btn-primary" id="saveAPIArticleBtn">
+                            <i class="fas fa-save"></i> Lưu bài viết
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
 {% endblock %}

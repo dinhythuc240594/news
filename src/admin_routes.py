@@ -237,3 +237,46 @@ def api_init_default_menu_items():
 def api_update_menu_order():
     """API cập nhật thứ tự menu items (drag & drop)"""
     return admin_controller.api_update_menu_order()
+
+
+# International Menu Items API Routes
+@admin_bp.route('/api/international-menu-items')
+@controller.admin_required
+def api_international_menu_items():
+    """API lấy danh sách international menu items"""
+    return admin_controller.api_international_menu_items()
+
+
+@admin_bp.route('/api/international-menu-items', methods=['POST'])
+@controller.admin_required
+def api_create_international_menu_item():
+    """API tạo international menu item mới"""
+    return admin_controller.api_create_international_menu_item()
+
+
+@admin_bp.route('/api/international-menu-items/<int:menu_id>', methods=['PUT'])
+@controller.admin_required
+def api_update_international_menu_item(menu_id: int):
+    """API cập nhật international menu item"""
+    return admin_controller.api_update_international_menu_item(menu_id)
+
+
+@admin_bp.route('/api/international-menu-items/<int:menu_id>', methods=['DELETE'])
+@controller.admin_required
+def api_delete_international_menu_item(menu_id: int):
+    """API xóa international menu item"""
+    return admin_controller.api_delete_international_menu_item(menu_id)
+
+
+@admin_bp.route('/api/international-menu-items/init-default', methods=['POST'])
+@controller.admin_required
+def api_init_default_international_menu_items():
+    """API khởi tạo international menu items mặc định"""
+    return admin_controller.api_init_default_international_menu_items()
+
+
+@admin_bp.route('/api/international-menu-items/update-order', methods=['POST'])
+@controller.admin_required
+def api_update_international_menu_order():
+    """API cập nhật thứ tự international menu items (drag & drop)"""
+    return admin_controller.api_update_international_menu_order()
