@@ -165,7 +165,7 @@ class AdminController:
         pending_news = [n for n in my_news if n.status == NewsStatus.PENDING]
         published_news = [n for n in my_news if n.status == NewsStatus.PUBLISHED]
         
-        return render_template('admin/editor-dashboard.html',
+        return render_template('editor/editor-dashboard.html',
                              draft_news=draft_news,
                              pending_news=pending_news,
                              published_news=published_news)

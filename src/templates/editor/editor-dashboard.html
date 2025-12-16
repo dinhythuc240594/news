@@ -1,4 +1,4 @@
-{% extends 'base_admin.html' %}
+{% extends '/admin/base_admin.html' %}
 {% block title %}Dashboard - VnNews Editor{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">    <!-- Summernote CSS -->
@@ -205,78 +205,6 @@
                 </div>
             </div>
         </div>
-
-        <!-- Create Article Section -->
-        <div class="content-section" id="create">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="fas fa-plus-circle"></i> Tạo bài viết mới</h5>
-                </div>
-                <div class="card-body">
-                    <form id="articleForm">
-                        <div class="row">
-                            <div class="col-md-8">
-                                <div class="mb-3">
-                                    <label class="form-label">Tiêu đề bài viết *</label>
-                                    <input type="text" class="form-control" id="articleTitle" placeholder="Nhập tiêu đề..." required>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Nội dung *</label>
-                                    <textarea id="articleContent" class="form-control"></textarea>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-4">
-                                <div class="mb-3">
-                                    <label class="form-label">Danh mục *</label>
-                                    <select class="form-select" id="articleCategory" required>
-                                        <option value="">Chọn danh mục</option>
-                                        <option value="thoi-su">Thời sự</option>
-                                        <option value="goc-nhin">Góc nhìn</option>
-                                        <option value="the-gioi">Thế giới</option>
-                                        <option value="kinh-doanh">Kinh doanh</option>
-                                        <option value="giai-tri">Giải trí</option>
-                                        <option value="the-thao">Thể thao</option>
-                                        <option value="phap-luat">Pháp luật</option>
-                                        <option value="giao-duc">Giáo dục</option>
-                                        <option value="suc-khoe">Sức khỏe</option>
-                                        <option value="doi-song">Đời sống</option>
-                                        <option value="du-lich">Du lịch</option>
-                                        <option value="khoa-hoc">Khoa học</option>
-                                    </select>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Ảnh đại diện</label>
-                                    <input type="file" class="form-control" id="articleImage" accept="image/*">
-                                    <div id="imagePreview" class="mt-2"></div>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Mô tả ngắn</label>
-                                    <textarea class="form-control" id="articleDescription" rows="3" placeholder="Mô tả ngắn gọn về bài viết..."></textarea>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Tags</label>
-                                    <input type="text" class="form-control" id="articleTags" placeholder="vd: công nghệ, AI, iPhone">
-                                </div>
-                                
-                                <div class="d-grid gap-2">
-                                    <button type="button" class="btn btn-secondary" id="saveDraftBtn">
-                                        <i class="fas fa-save"></i> Lưu nháp
-                                    </button>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-paper-plane"></i> Gửi duyệt
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Edit Modal -->
@@ -319,57 +247,8 @@
         </div>
     </div>
 
-    <!-- International Articles Section -->
-    <div class="content-section" id="international-articles">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-globe"></i> Bài báo Quốc tế của tôi</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th width="5%">#</th>
-                                <th width="35%">Title</th>
-                                <th width="12%">Category</th>
-                                <th width="10%">Status</th>
-                                <th width="10%">Visible</th>
-                                <th width="13%">Created</th>
-                                <th width="15%">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="internationalArticlesTable">
-                            <tr>
-                                <td>1</td>
-                                <td>Global Leaders Meet to Discuss Climate Action</td>
-                                <td>World</td>
-                                <td><span class="badge bg-success">Published</span></td>
-                                <td><span class="badge bg-success">Yes</span></td>
-                                <td>13/12/2025</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>2</td>
-                                <td>Tech Giants Report Record Earnings</td>
-                                <td>Business</td>
-                                <td><span class="badge bg-warning">Pending</span></td>
-                                <td><span class="badge bg-secondary">No</span></td>
-                                <td>12/12/2025</td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include 'editor/article-section.html' %}
+    {% include 'editor/international-section.html' %}
 
     <!-- Create International Article Section -->
     <div class="content-section" id="create-international">

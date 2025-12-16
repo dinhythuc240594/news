@@ -66,7 +66,7 @@ $(document).ready(function() {
 
     // International news button - redirect to English version
     $('#btnInternational').click(function() {
-        window.location.href = 'international.html';
+        window.location.href = 'en/index.html';
     });
 
     // Submenu hover behavior (backup in case CSS hover doesn't work)
