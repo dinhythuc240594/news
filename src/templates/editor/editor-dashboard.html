@@ -1,8 +1,10 @@
 {% extends '/admin/base_admin.html' %}
 {% block title %}Dashboard - VnNews Editor{% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">    <!-- Summernote CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">
+    <!-- Summernote CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+{% endblock %}
 {% block template %}
     <!-- Sidebar -->
     <div class="sidebar">
@@ -187,22 +189,49 @@
                 </div>
                 <div class="modal-body">
                     <form id="editArticleForm">
-                        <input type="hidden" id="editArticleId">
-                        <div class="mb-3">
-                            <label class="form-label">Tiêu đề</label>
-                            <input type="text" class="form-control" id="editArticleTitle">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Nội dung</label>
-                            <textarea id="editArticleContent" class="form-control"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Danh mục</label>
-                            <select class="form-select" id="editArticleCategory">
-                                {% for category in categories %}
-                                    <option value="{{ category.id }}">{{ category.name }}</option>
-                                {% endfor %}
-                            </select>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <input type="hidden" id="editArticleId">
+                                <div class="mb-3">
+                                    <label class="form-label">Tiêu đề</label>
+                                    <input type="text" class="form-control" id="editArticleTitle">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Nội dung</label>
+                                    <textarea id="editArticleContent" class="form-control"></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Danh mục</label>
+                                    <select class="form-select" id="editArticleCategory">
+                                        {% for category in categories %}
+                                            <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Ảnh đại diện</label>
+                                    <div id="imagePreview" class="mt-2">
+                                        <img src="{{ url_for('static', filename='images/default-image.jpg') }}" id="editArticleImagePreview" alt="Ảnh đại diện" class="img-fluid" style="width: 100%; height: 100%; object-fit: cover;">
+                                        <small class="text-muted">Ảnh sẽ được upload tự động khi chọn file</small>
+                                    </div>
+                                    <input type="file" class="form-control" id="editArticleImage" accept="image/*">
+                                    <input type="hidden" id="editArticleImageUrl">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Mô tả ngắn</label>
+                                    <textarea class="form-control" id="editArticleDescription" rows="3" placeholder="Mô tả ngắn gọn về bài viết..."></textarea>
+                                </div>
+                                
+                                <div class="mb-3" style="position: relative;">
+                                    <label class="form-label">Tags</label>
+                                    <input type="text" class="form-control" id="editArticleTags" placeholder="Gõ # để gợi ý tag, ví dụ: #công_nghệ #AI #iPhone">
+                                    <small class="text-muted">Nhập tags theo định dạng hashtag: #tên_tag</small>
+                                    <div id="editTagSuggestions" class="tag-suggestions" style="display: none;"></div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -279,10 +308,11 @@
                                 <input type="text" class="form-control" id="intArticleAuthor" placeholder="Author name">
                             </div>
                             
-                            <div class="mb-3">
+                            <div class="mb-3" style="position: relative;">
                                 <label class="form-label">Tags</label>
-                                <input type="text" class="form-control" id="intArticleTags" placeholder="climate, summit, environment">
-                                <small class="text-muted">Separate with commas</small>
+                                <input type="text" class="form-control" id="intArticleTags" placeholder="Type # to suggest tags, e.g: #climate #summit #environment">
+                                <small class="text-muted">Enter tags in hashtag format: #tag_name</small>
+                                <div id="intTagSuggestions" class="tag-suggestions" style="display: none;"></div>
                             </div>
                             
                             <div class="mb-3 form-check">

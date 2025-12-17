@@ -196,6 +196,11 @@ def api_create_article():
     """API tạo bài viết mới từ editor form"""
     return admin_controller.api_create_article()
 
+@admin_bp.route('/api/edit-article/<int:article_id>', methods=['POST'])
+@controller.editor_required
+def api_edit_article(article_id: int):
+    """API chỉnh sửa bài viết theo ID"""
+    return admin_controller.api_edit_article(article_id)
 
 @admin_bp.route('/api/upload-image', methods=['POST'])
 @controller.editor_required
@@ -209,6 +214,13 @@ def api_upload_image():
 def api_categories():
     """API lấy danh sách danh mục"""
     return admin_controller.api_categories()
+
+
+@admin_bp.route('/api/tags')
+@controller.editor_required
+def api_tags():
+    """API lấy danh sách tags để autocomplete"""
+    return admin_controller.api_tags()
 
 
 @admin_bp.route('/api/international-categories')

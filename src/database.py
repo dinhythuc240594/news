@@ -305,6 +305,10 @@ class News(Base):
     meta_description = Column(Text, nullable=True)
     meta_keywords = Column(String(255), nullable=True)
     
+
+    is_deleted = Column(Boolean, default=False)
+    tags_string = Column(Text, nullable=True)
+
     # Timestamps
     published_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -411,6 +415,9 @@ class NewsInternational(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    is_deleted = Column(Boolean, default=False)
+    tags_string = Column(Text, nullable=True)
+
     # Relationships
     # Liên kết tới CategoryInternational (danh mục tin quốc tế)
     category = relationship("CategoryInternational", back_populates="news")

@@ -213,6 +213,31 @@ $(document).ready(function() {
     $('#saveEditBtn').click(function() {
         saveEdit();
     });
+    
+    // Edit article image upload handler
+    $('#editArticleImage').change(function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#editArticleImagePreview').attr('src', e.target.result);
+            };
+            reader.readAsDataURL(file);
+            
+            // Upload image immediately
+            uploadArticleImage(file, $('#editArticleId').val()).then(function(url) {
+                if (url) {
+                    $('#editArticleImageUrl').val(url);
+                    $('#editArticleImagePreview').attr('src', url);
+                }
+            });
+        }
+    });
+    
+    // Initialize tag autocomplete for all tag inputs
+    initTagAutocomplete('#articleTags', '#tagSuggestions');
+    initTagAutocomplete('#editArticleTags', '#editTagSuggestions');
+    initTagAutocomplete('#intArticleTags', '#intTagSuggestions');
 });
 
 // Check authentication
@@ -714,44 +739,113 @@ async function submitArticle() {
 }
 
 // Edit article
-function editArticle(articleId) {
-    // Simulate loading article data
-    const article = {
-        id: articleId,
-        title: 'Thủ tướng phát biểu tại hội nghị kinh tế quốc tế',
-        content: '<p>Nội dung bài viết...</p>',
-        category: 'thoi-su'
-    };
-    
-    $('#editArticleId').val(article.id);
-    $('#editArticleTitle').val(article.title);
-    $('#editArticleContent').summernote('code', article.content);
-    $('#editArticleCategory').val(article.category);
-    
-    const modal = new bootstrap.Modal(document.getElementById('editModal'));
-    modal.show();
+async function editArticle(articleId) {
+    try {
+        const response = await fetch(`/admin/api/article/${articleId}`);
+        const result = await response.json();
+        if (result.success) {
+            const article = result.data;
+            
+            // Load categories if not already loaded
+            if ($('#editArticleCategory option').length <= 1) {
+                try {
+                    const catResponse = await fetch('/admin/api/categories');
+                    const catResult = await catResponse.json();
+                    if (catResult.success && catResult.data) {
+                        let categoryOptions = '<option value="">Chọn danh mục</option>';
+                        catResult.data.forEach(cat => {
+                            categoryOptions += `<option value="${cat.id}">${cat.name}</option>`;
+                        });
+                        $('#editArticleCategory').html(categoryOptions);
+                    }
+                } catch (error) {
+                    console.error('Lỗi tải danh mục:', error);
+                }
+            }
+            
+            $('#editArticleId').val(article.id);
+            $('#editArticleTitle').val(article.title);
+            $('#editArticleContent').summernote('code', article.content);
+            $('#editArticleCategory').val(article.category_id);
+            $('#editArticleDescription').val(article.summary);
+            $('#editArticleImageUrl').val(article.thumbnail || '');
+            $('#editArticleImagePreview').attr('src', article.thumbnail || '/static/images/default-image.jpg');
+            $('#editArticleTags').val(article.tags || '');
+            
+            const modal = new bootstrap.Modal(document.getElementById('editModal'));
+            modal.show();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể tải bài viết', 'warning');
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải bài viết', 'warning');
+    }
 }
 
 // Save edit
-function saveEdit() {
+async function saveEdit() {
     const articleId = $('#editArticleId').val();
     const title = $('#editArticleTitle').val();
     const content = $('#editArticleContent').summernote('code');
     const category = $('#editArticleCategory').val();
+    const description = $('#editArticleDescription').val();
+    const image = $('#editArticleImageUrl').val();
+    const tags = $('#editArticleTags').val();
+    if (!title) {
+        showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
+        return;
+    }
     
-    showSpinner();
-    
-    // Simulate API call
-    setTimeout(function() {
+    if (!content) {
+        showToast('Cảnh báo', 'Vui lòng nhập nội dung bài viết!', 'warning');
+        return;
+    }
+    if (!category) {
+        showToast('Cảnh báo', 'Vui lòng chọn danh mục!', 'warning');
+        return;
+    }
+    if (!description) {
+        showToast('Cảnh báo', 'Vui lòng nhập mô tả ngắn gọn về bài viết!', 'warning');
+        return;
+    }
+    if (!image) {
+        showToast('Cảnh báo', 'Vui lòng chọn ảnh đại diện!', 'warning');
+        return;
+    }
+    if (!tags) {
+        showToast('Cảnh báo', 'Vui lòng nhập tags!', 'warning');
+        return;
+    }
+    try {
+        const response = await fetch(`/admin/api/edit-article/${articleId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: articleId,
+                title: title,
+                content: content,
+                category_id: parseInt(category),
+                summary: description,
+                thumbnail: image,
+                tags: tags
+            })
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast('Thành công', 'Bài viết đã được cập nhật', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+            loadMyArticles();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể cập nhật bài viết', 'warning');
+        }
+    } catch (error) {
         hideSpinner();
-        showToast('Thành công', 'Bài viết đã được cập nhật', 'success');
-        
-        // Close modal
-        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
-        
-        // Reload articles
-        loadMyArticles();
-    }, 1000);
+        console.error('Lỗi cập nhật bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi cập nhật bài viết', 'warning');
+    }
 }
 
 // Delete article
@@ -1091,3 +1185,159 @@ $(document).on('click', '.save-api-article', function() {
     console.log('Save API article:', article);
     alert('Chức năng lưu bài sẽ được hoàn thiện sau. Bài viết: ' + article.title);
 });
+
+// ===== Tag Autocomplete Functionality =====
+
+let tagSuggestionsCache = [];
+
+// Initialize tag autocomplete for an input
+function initTagAutocomplete(inputSelector, suggestionsSelector) {
+    const $input = $(inputSelector);
+    const $suggestions = $(suggestionsSelector);
+    
+    // Load all tags on first use
+    if (tagSuggestionsCache.length === 0) {
+        loadAllTags();
+    }
+    
+    $input.on('input', function() {
+        const value = $(this).val();
+        const cursorPos = this.selectionStart;
+        const textBeforeCursor = value.substring(0, cursorPos);
+        
+        // Check if user is typing after a #
+        const lastHashIndex = textBeforeCursor.lastIndexOf('#');
+        if (lastHashIndex !== -1) {
+            const textAfterHash = textBeforeCursor.substring(lastHashIndex + 1);
+            // Check if there's no space or comma after the #
+            if (!textAfterHash.match(/[\s,]/)) {
+                const searchTerm = textAfterHash.toLowerCase();
+                showTagSuggestions($input, $suggestions, searchTerm, lastHashIndex);
+                return;
+            }
+        }
+        
+        // Hide suggestions if not typing after #
+        hideTagSuggestions($suggestions);
+    });
+    
+    $input.on('keydown', function(e) {
+        const $activeSuggestion = $suggestions.find('.suggestion-item.active');
+        
+        if ($suggestions.is(':visible') && $activeSuggestion.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const $next = $activeSuggestion.next('.suggestion-item');
+                if ($next.length) {
+                    $activeSuggestion.removeClass('active');
+                    $next.addClass('active');
+                } else {
+                    $suggestions.find('.suggestion-item').first().addClass('active');
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const $prev = $activeSuggestion.prev('.suggestion-item');
+                if ($prev.length) {
+                    $activeSuggestion.removeClass('active');
+                    $prev.addClass('active');
+                } else {
+                    $suggestions.find('.suggestion-item').last().addClass('active');
+                }
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                const tagName = $activeSuggestion.data('tag');
+                if (tagName) {
+                    insertTag($input, tagName);
+                    hideTagSuggestions($suggestions);
+                }
+            } else if (e.key === 'Escape') {
+                hideTagSuggestions($suggestions);
+            }
+        }
+    });
+    
+    // Hide suggestions when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest(inputSelector).length && !$(e.target).closest(suggestionsSelector).length) {
+            hideTagSuggestions($suggestions);
+        }
+    });
+}
+
+// Load all tags from API
+async function loadAllTags() {
+    try {
+        const response = await fetch('/admin/api/tags');
+        const result = await response.json();
+        if (result.success) {
+            tagSuggestionsCache = result.data.map(tag => tag.name);
+        }
+    } catch (error) {
+        console.error('Lỗi tải tags:', error);
+    }
+}
+
+// Show tag suggestions
+function showTagSuggestions($input, $suggestions, searchTerm, hashIndex) {
+    if (!searchTerm) {
+        // Show all tags if no search term
+        const filteredTags = tagSuggestionsCache.slice(0, 10);
+        renderSuggestions($input, $suggestions, filteredTags, hashIndex);
+        return;
+    }
+    
+    // Filter tags by search term
+    const filteredTags = tagSuggestionsCache
+        .filter(tag => tag.toLowerCase().includes(searchTerm))
+        .slice(0, 10);
+    
+    renderSuggestions($input, $suggestions, filteredTags, hashIndex);
+}
+
+// Render suggestions
+function renderSuggestions($input, $suggestions, tags, hashIndex) {
+    if (tags.length === 0) {
+        hideTagSuggestions($suggestions);
+        return;
+    }
+    
+    let html = '<div class="suggestion-list">';
+    tags.forEach((tag, index) => {
+        html += `<div class="suggestion-item ${index === 0 ? 'active' : ''}" data-tag="${tag}">#${tag}</div>`;
+    });
+    html += '</div>';
+    
+    $suggestions.html(html).show();
+    
+    // Handle click on suggestion
+    $suggestions.off('click', '.suggestion-item').on('click', '.suggestion-item', function() {
+        const tagName = $(this).data('tag');
+        insertTag($input, tagName);
+        hideTagSuggestions($suggestions);
+    });
+}
+
+// Insert tag into input
+function insertTag($input, tagName) {
+    const value = $input.val();
+    const cursorPos = $input[0].selectionStart;
+    const textBeforeCursor = value.substring(0, cursorPos);
+    
+    const lastHashIndex = textBeforeCursor.lastIndexOf('#');
+    if (lastHashIndex !== -1) {
+        const beforeHash = value.substring(0, lastHashIndex);
+        const afterCursor = value.substring(cursorPos);
+        const newValue = beforeHash + '#' + tagName + ' ' + afterCursor;
+        $input.val(newValue);
+        
+        // Set cursor position after inserted tag
+        const newCursorPos = beforeHash.length + tagName.length + 2;
+        $input[0].setSelectionRange(newCursorPos, newCursorPos);
+        $input.focus();
+    }
+}
+
+// Hide tag suggestions
+function hideTagSuggestions($suggestions) {
+    $suggestions.hide();
+}

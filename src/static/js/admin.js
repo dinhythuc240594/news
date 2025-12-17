@@ -1,4 +1,12 @@
 $(document).ready(function() {
+    const path = window.location.pathname;
+
+    // Nếu đang ở trang editor dashboard thì không chạy logic dashboard admin,
+    // để tránh gọi các API chỉ dành cho admin (vd: /admin/api/pending-articles)
+    if (path.startsWith('/admin/editor-dashboard')) {
+        return;
+    }
+
     // Check authentication
     checkAuth();
     
@@ -8,16 +16,12 @@ $(document).ready(function() {
     // Initialize chart
     initializeChart();
 
-    if(window.location.pathname != '/admin/editor-dashboard') {
-        // Load initial data
-        loadPendingArticles();
-        // loadAPIArticles(); // Không tự động load API articles
-        loadStatistics();
-        loadHotArticles();
-    }
-    else {
-        loadPendingArticlesEditor();
-    }
+    // Load initial data cho dashboard admin
+    // (editor dashboard sẽ dùng editor.js riêng)
+    loadPendingArticles();
+    // loadAPIArticles(); // Không tự động load API articles
+    loadStatistics();
+    loadHotArticles();
 
     // Menu navigation
     $('.sidebar-menu a[data-section]').click(function(e) {
