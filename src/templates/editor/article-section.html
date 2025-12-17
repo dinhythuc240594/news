@@ -24,25 +24,18 @@
                                     <label class="form-label">Danh mục *</label>
                                     <select class="form-select" id="articleCategory" required>
                                         <option value="">Chọn danh mục</option>
-                                        <option value="thoi-su">Thời sự</option>
-                                        <option value="goc-nhin">Góc nhìn</option>
-                                        <option value="the-gioi">Thế giới</option>
-                                        <option value="kinh-doanh">Kinh doanh</option>
-                                        <option value="giai-tri">Giải trí</option>
-                                        <option value="the-thao">Thể thao</option>
-                                        <option value="phap-luat">Pháp luật</option>
-                                        <option value="giao-duc">Giáo dục</option>
-                                        <option value="suc-khoe">Sức khỏe</option>
-                                        <option value="doi-song">Đời sống</option>
-                                        <option value="du-lich">Du lịch</option>
-                                        <option value="khoa-hoc">Khoa học</option>
+                                        {% for category in categories %}
+                                            <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
                                     </select>
                                 </div>
                                 
                                 <div class="mb-3">
                                     <label class="form-label">Ảnh đại diện</label>
                                     <input type="file" class="form-control" id="articleImage" accept="image/*">
+                                    <input type="hidden" id="articleImageUrl">
                                     <div id="imagePreview" class="mt-2"></div>
+                                    <small class="text-muted">Ảnh sẽ được upload tự động khi chọn file</small>
                                 </div>
                                 
                                 <div class="mb-3">

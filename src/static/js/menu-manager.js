@@ -4,273 +4,57 @@ const menuManager = {
     defaultMenus: [
         {
             id: 1,
-            name: 'Trang chủ',
-            slug: 'trang-chu',
-            icon: 'fas fa-home',
+            name: 'Công Nghệ',
+            slug: 'dien-thoai',
+            icon: 'phone',
             order: 1,
             visible: true,
-            parent_id: null
+            parent_id: null,
         },
         {
             id: 2,
-            name: 'Thời sự',
-            slug: 'thoi-su',
-            icon: null,
+            name: 'Kinh tế',
+            slug: 'kinh-te',
+            icon: 'economy',
             order: 2,
             visible: true,
-            parent_id: null
-        },
-        {
-            id: 21,
-            name: 'Chính trị',
-            slug: 'chinh-tri',
-            icon: null,
-            order: 1,
-            visible: true,
-            parent_id: 2
-        },
-        {
-            id: 22,
-            name: 'Nhân sự',
-            slug: 'nhan-su',
-            icon: null,
-            order: 2,
-            visible: true,
-            parent_id: 2
-        },
-        {
-            id: 23,
-            name: 'Chính sách',
-            slug: 'chinh-sach',
-            icon: null,
-            order: 3,
-            visible: true,
-            parent_id: 2
+            parent_id: null,
         },
         {
             id: 3,
-            name: 'Góc nhìn',
-            slug: 'goc-nhin',
-            icon: null,
+            name: 'Thể thao',
+            slug: 'the-thao',
+            icon: 'sports',
             order: 3,
             visible: true,
-            parent_id: null
+            parent_id: null,
         },
         {
             id: 4,
-            name: 'Thế giới',
-            slug: 'the-gioi',
-            icon: null,
+            name: 'Giải trí',
+            slug: 'giai-tri',
+            icon: 'entertainment',
             order: 4,
             visible: true,
-            parent_id: null
-        },
-        {
-            id: 41,
-            name: 'Châu Á',
-            slug: 'chau-a',
-            icon: null,
-            order: 1,
-            visible: true,
-            parent_id: 4
-        },
-        {
-            id: 42,
-            name: 'Châu Âu',
-            slug: 'chau-au',
-            icon: null,
-            order: 2,
-            visible: true,
-            parent_id: 4
-        },
-        {
-            id: 43,
-            name: 'Châu Mỹ',
-            slug: 'chau-my',
-            icon: null,
-            order: 3,
-            visible: true,
-            parent_id: 4
+            parent_id: null,
         },
         {
             id: 5,
-            name: 'Kinh doanh',
-            slug: 'kinh-doanh',
-            icon: null,
+            name: 'Giáo dục',
+            slug: 'giao-duc',
+            icon: 'education',
             order: 5,
             visible: true,
-            parent_id: null
-        },
-        {
-            id: 51,
-            name: 'Chứng khoán',
-            slug: 'chung-khoan',
-            icon: null,
-            order: 1,
-            visible: true,
-            parent_id: 5
-        },
-        {
-            id: 52,
-            name: 'Bất động sản',
-            slug: 'bat-dong-san',
-            icon: null,
-            order: 2,
-            visible: true,
-            parent_id: 5
-        },
-        {
-            id: 53,
-            name: 'Doanh nghiệp',
-            slug: 'doanh-nghiep',
-            icon: null,
-            order: 3,
-            visible: true,
-            parent_id: 5
+            parent_id: null,
         },
         {
             id: 6,
-            name: 'Giải trí',
-            slug: 'giai-tri',
-            icon: null,
-            order: 6,
-            visible: true,
-            parent_id: null
-        },
-        {
-            id: 61,
-            name: 'Phim ảnh',
-            slug: 'phim-anh',
-            icon: null,
-            order: 1,
-            visible: true,
-            parent_id: 6
-        },
-        {
-            id: 62,
-            name: 'Âm nhạc',
-            slug: 'am-nhac',
-            icon: null,
-            order: 2,
-            visible: true,
-            parent_id: 6
-        },
-        {
-            id: 63,
-            name: 'Sao Việt',
-            slug: 'sao-viet',
-            icon: null,
-            order: 3,
-            visible: true,
-            parent_id: 6
-        },
-        {
-            id: 7,
-            name: 'Thể thao',
-            slug: 'the-thao',
-            icon: null,
-            order: 7,
-            visible: true,
-            parent_id: null
-        },
-        {
-            id: 71,
-            name: 'Bóng đá',
-            slug: 'bong-da',
-            icon: null,
-            order: 1,
-            visible: true,
-            parent_id: 7
-        },
-        {
-            id: 72,
-            name: 'Tennis',
-            slug: 'tennis',
-            icon: null,
-            order: 2,
-            visible: true,
-            parent_id: 7
-        },
-        {
-            id: 73,
-            name: 'Võ thuật',
-            slug: 'vo-thuat',
-            icon: null,
-            order: 3,
-            visible: true,
-            parent_id: 7
-        },
-        {
-            id: 8,
-            name: 'Pháp luật',
-            slug: 'phap-luat',
-            icon: null,
-            order: 8,
-            visible: true,
-            parent_id: null
-        },
-        {
-            id: 9,
-            name: 'Giáo dục',
-            slug: 'giao-duc',
-            icon: null,
-            order: 9,
-            visible: true,
-            parent_id: null
-        },
-        {
-            id: 10,
             name: 'Sức khỏe',
             slug: 'suc-khoe',
-            icon: null,
-            order: 10,
+            icon: 'health',
+            order: 6,
             visible: true,
-            parent_id: null
-        },
-        {
-            id: 11,
-            name: 'Đời sống',
-            slug: 'doi-song',
-            icon: null,
-            order: 11,
-            visible: true,
-            parent_id: null
-        },
-        {
-            id: 12,
-            name: 'Du lịch',
-            slug: 'du-lich',
-            icon: null,
-            order: 12,
-            visible: true,
-            parent_id: null
-        },
-        {
-            id: 13,
-            name: 'Khoa học',
-            slug: 'khoa-hoc',
-            icon: null,
-            order: 13,
-            visible: true,
-            parent_id: null
-        },
-        {
-            id: 14,
-            name: 'Số hóa',
-            slug: 'so-hoa',
-            icon: null,
-            order: 14,
-            visible: true,
-            parent_id: null
-        },
-        {
-            id: 15,
-            name: 'Xe',
-            slug: 'xe',
-            icon: null,
-            order: 15,
-            visible: true,
-            parent_id: null
+            parent_id: null,
         }
     ],
 

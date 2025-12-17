@@ -16,6 +16,8 @@ from database import (
     Category,
     NewsInternational,
     CategoryInternational,
+    Tag,
+    NewsTag,
 )
 from models import (
     NewsModel,
@@ -164,11 +166,13 @@ class AdminController:
         draft_news = [n for n in my_news if n.status == NewsStatus.DRAFT]
         pending_news = [n for n in my_news if n.status == NewsStatus.PENDING]
         published_news = [n for n in my_news if n.status == NewsStatus.PUBLISHED]
+        categories = self.category_model.get_all()
         
         return render_template('editor/editor-dashboard.html',
                              draft_news=draft_news,
                              pending_news=pending_news,
-                             published_news=published_news)
+                             published_news=published_news,
+                             categories=categories)
     
     def news_list(self):
         """
@@ -933,13 +937,247 @@ class AdminController:
             } for cat in categories]
         })
     
-    def _generate_slug(self, title: str) -> str:
-        """Tạo slug từ tiêu đề"""
+    def _generate_slug(self, title: str, status: str = None) -> str:
+        """Tạo slug từ tiêu đề và trạng thái"""
         import re
+        
+        # Mapping tiếng Việt sang không dấu
+        vietnamese_map = {
+            'à': 'a', 'á': 'a', 'ạ': 'a', 'ả': 'a', 'ã': 'a', 'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ậ': 'a', 'ẩ': 'a', 'ẫ': 'a',
+            'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ặ': 'a', 'ẳ': 'a', 'ẵ': 'a',
+            'è': 'e', 'é': 'e', 'ẹ': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ê': 'e', 'ề': 'e', 'ế': 'e', 'ệ': 'e', 'ể': 'e', 'ễ': 'e',
+            'ì': 'i', 'í': 'i', 'ị': 'i', 'ỉ': 'i', 'ĩ': 'i',
+            'ò': 'o', 'ó': 'o', 'ọ': 'o', 'ỏ': 'o', 'õ': 'o', 'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ộ': 'o', 'ổ': 'o', 'ỗ': 'o',
+            'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ợ': 'o', 'ở': 'o', 'ỡ': 'o',
+            'ù': 'u', 'ú': 'u', 'ụ': 'u', 'ủ': 'u', 'ũ': 'u', 'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ự': 'u', 'ử': 'u', 'ữ': 'u',
+            'ỳ': 'y', 'ý': 'y', 'ỵ': 'y', 'ỷ': 'y', 'ỹ': 'y',
+            'đ': 'd',
+            'À': 'a', 'Á': 'a', 'Ạ': 'a', 'Ả': 'a', 'Ã': 'a', 'Â': 'a', 'Ầ': 'a', 'Ấ': 'a', 'Ậ': 'a', 'Ẩ': 'a', 'Ẫ': 'a',
+            'Ă': 'a', 'Ằ': 'a', 'Ắ': 'a', 'Ặ': 'a', 'Ẳ': 'a', 'Ẵ': 'a',
+            'È': 'e', 'É': 'e', 'Ẹ': 'e', 'Ẻ': 'e', 'Ẽ': 'e', 'Ê': 'e', 'Ề': 'e', 'Ế': 'e', 'Ệ': 'e', 'Ể': 'e', 'Ễ': 'e',
+            'Ì': 'i', 'Í': 'i', 'Ị': 'i', 'Ỉ': 'i', 'Ĩ': 'i',
+            'Ò': 'o', 'Ó': 'o', 'Ọ': 'o', 'Ỏ': 'o', 'Õ': 'o', 'Ô': 'o', 'Ồ': 'o', 'Ố': 'o', 'Ộ': 'o', 'Ổ': 'o', 'Ỗ': 'o',
+            'Ơ': 'o', 'Ờ': 'o', 'Ớ': 'o', 'Ợ': 'o', 'Ở': 'o', 'Ỡ': 'o',
+            'Ù': 'u', 'Ú': 'u', 'Ụ': 'u', 'Ủ': 'u', 'Ũ': 'u', 'Ư': 'u', 'Ừ': 'u', 'Ứ': 'u', 'Ự': 'u', 'Ử': 'u', 'Ữ': 'u',
+            'Ỳ': 'y', 'Ý': 'y', 'Ỵ': 'y', 'Ỷ': 'y', 'Ỹ': 'y',
+            'Đ': 'd'
+        }
+        
         slug = title.lower()
+        
+        # Chuyển đổi tiếng Việt có dấu sang không dấu
+        for viet_char, eng_char in vietnamese_map.items():
+            slug = slug.replace(viet_char, eng_char)
+        
+        # Loại bỏ ký tự đặc biệt, chỉ giữ chữ, số, khoảng trắng và dấu gạch ngang
         slug = re.sub(r'[^\w\s-]', '', slug)
+        # Thay nhiều khoảng trắng hoặc dấu gạch ngang bằng một dấu gạch ngang
         slug = re.sub(r'[-\s]+', '-', slug)
-        return slug.strip('-')
+        # Loại bỏ dấu gạch ngang ở đầu và cuối
+        slug = slug.strip('-')
+        
+        # Thêm prefix trạng thái nếu cần (tùy chọn)
+        if status and status != 'published':
+            slug = f"{slug}-{status}"
+        
+        return slug
+    
+    def api_create_article(self):
+        """API tạo bài viết mới từ editor form"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        data = request.json if request.is_json else request.form
+        
+        # Lấy dữ liệu từ form
+        title = data.get('title', '').strip()
+        content = data.get('content', '').strip()
+        category_id = data.get('category_id') or data.get('category')
+        summary = data.get('summary') or data.get('description', '').strip()
+        thumbnail = data.get('thumbnail', '').strip()
+        tags = data.get('tags', '').strip()
+        status = data.get('status', NewsStatus.DRAFT.value)
+        
+        # Validation
+        if not title:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập tiêu đề bài viết'}), 400
+        
+        if not content:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập nội dung bài viết'}), 400
+        
+        if not category_id:
+            return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+        
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Danh mục không hợp lệ'}), 400
+        
+        # Kiểm tra category tồn tại
+        category = self.db_session.query(Category).filter(Category.id == category_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+        
+        try:
+            news_status = NewsStatus(status)
+        except ValueError:
+            news_status = NewsStatus.DRAFT
+        
+        # Tạo slug từ tiêu đề và trạng thái
+        base_slug = self._generate_slug(title, status)
+        slug = base_slug
+        
+        # Kiểm tra slug trùng và thêm số nếu cần
+        counter = 1
+        while self.db_session.query(News).filter(News.slug == slug).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        # Extract images từ HTML content
+        import re
+        image_urls = []
+        img_pattern = r'<img[^>]+src=["\']([^"\']+)["\']'
+        matches = re.findall(img_pattern, content)
+        for img_url in matches:
+            if img_url and img_url not in image_urls:
+                image_urls.append(img_url)
+        
+        # Lưu images dưới dạng JSON
+        images_json = None
+        if image_urls:
+            import json
+            images_json = json.dumps(image_urls)
+        
+        # Tạo bài viết mới
+        news = News(
+            title=title,
+            slug=slug,
+            content=content,
+            summary=summary,
+            thumbnail=thumbnail,
+            images=images_json,
+            category_id=category_id,
+            created_by=user_id,
+            status=news_status,
+            published_at=datetime.utcnow() if news_status == NewsStatus.PUBLISHED else None
+        )
+        
+        self.db_session.add(news)
+        self.db_session.commit()
+        self.db_session.refresh(news)
+        
+        # Di chuyển ảnh từ temp folder sang folder của bài viết nếu có
+        if news.id:
+            temp_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
+            news_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{news.id}')
+            
+            if os.path.exists(temp_folder):
+                os.makedirs(news_folder, exist_ok=True)
+                # Di chuyển các file từ temp sang news folder
+                import shutil
+                for filename in os.listdir(temp_folder):
+                    src_path = os.path.join(temp_folder, filename)
+                    dst_path = os.path.join(news_folder, filename)
+                    if os.path.isfile(src_path):
+                        shutil.move(src_path, dst_path)
+                        # Cập nhật URL trong thumbnail và content nếu cần
+                        if thumbnail and 'temp' in thumbnail:
+                            thumbnail = thumbnail.replace('temp', f'news_{news.id}')
+                            news.thumbnail = thumbnail
+                        if images_json:
+                            import json
+                            images = json.loads(images_json)
+                            updated_images = [img.replace('temp', f'news_{news.id}') if 'temp' in img else img for img in images]
+                            news.images = json.dumps(updated_images)
+                            # Cập nhật content với URL mới
+                            for old_url, new_url in zip(images, updated_images):
+                                if old_url != new_url:
+                                    content = content.replace(old_url, new_url)
+                                    news.content = content
+                self.db_session.commit()
+        
+        # Xử lý tags nếu có
+        if tags:
+            tag_names = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            for tag_name in tag_names:
+                # Tìm hoặc tạo tag
+                tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
+                if not tag:
+                    tag_slug = self._generate_slug(tag_name)
+                    tag = Tag(name=tag_name, slug=tag_slug)
+                    self.db_session.add(tag)
+                    self.db_session.flush()
+                
+                # Kiểm tra xem đã có NewsTag chưa
+                existing_news_tag = self.db_session.query(NewsTag).filter(
+                    NewsTag.news_id == news.id,
+                    NewsTag.tag_id == tag.id
+                ).first()
+                
+                if not existing_news_tag:
+                    news_tag = NewsTag(news_id=news.id, tag_id=tag.id)
+                    self.db_session.add(news_tag)
+        
+        self.db_session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Tạo bài viết thành công',
+            'data': {
+                'id': news.id,
+                'slug': news.slug,
+                'title': news.title
+            }
+        })
+    
+    def api_upload_image(self):
+        """API upload ảnh cho bài viết"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'error': 'Không có file được chọn'}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'Không có file được chọn'}), 400
+        
+        # Kiểm tra file hợp lệ
+        if not self._allowed_file(file.filename):
+            return jsonify({'success': False, 'error': 'File không hợp lệ. Chỉ chấp nhận: png, jpg, jpeg, gif, webp'}), 400
+        
+        # Lấy news_id từ request (nếu có) để lưu vào thư mục tương ứng
+        news_id = request.form.get('news_id')
+        
+        # Tạo thư mục lưu ảnh
+        if news_id:
+            upload_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{news_id}')
+        else:
+            # Nếu chưa có news_id, lưu vào thư mục temp
+            upload_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
+        
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        # Tạo tên file an toàn
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(upload_folder, filename)
+        
+        # Lưu file
+        file.save(filepath)
+        
+        # Tạo URL trả về (relative to static folder)
+        image_url = f"static/uploads/news/vn/{'news_' + str(news_id) if news_id else 'temp'}/{filename}"
+        
+        return jsonify({
+            'success': True,
+            'message': 'Upload ảnh thành công',
+            'url': f'/{image_url}',
+            'image_url': image_url
+        })
     
     def api_menu_items(self):
         """API lấy danh sách categories (menu items)"""
@@ -1533,6 +1771,10 @@ class AdminController:
                 'error': str(e)
             }), 500
 
+    def _allowed_file(self, filename):
+        """Kiểm tra file có được phép upload không"""
+        return '.' in filename and \
+               filename.rsplit('.', 1)[1].lower() in current_app.config.get('ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'gif', 'webp'})
 
 class ClientController:
     """Quản lý các route của client"""

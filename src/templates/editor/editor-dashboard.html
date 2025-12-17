@@ -205,6 +205,10 @@
                 </div>
             </div>
         </div>
+
+        {% include 'editor/article-section.html' %}
+        {% include 'editor/international-section.html' %}
+
     </div>
 
     <!-- Edit Modal -->
@@ -229,10 +233,9 @@
                         <div class="mb-3">
                             <label class="form-label">Danh mục</label>
                             <select class="form-select" id="editArticleCategory">
-                                <option value="thoi-su">Thời sự</option>
-                                <option value="kinh-doanh">Kinh doanh</option>
-                                <option value="giai-tri">Giải trí</option>
-                                <option value="the-thao">Thể thao</option>
+                                {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
                             </select>
                         </div>
                     </form>
@@ -246,9 +249,6 @@
             </div>
         </div>
     </div>
-
-    {% include 'editor/article-section.html' %}
-    {% include 'editor/international-section.html' %}
 
     <!-- Create International Article Section -->
     <div class="content-section" id="create-international">

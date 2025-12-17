@@ -183,6 +183,20 @@ def api_article_detail(article_id: int):
     return admin_controller.api_article_detail(article_id)
 
 
+@admin_bp.route('/api/create-article', methods=['POST'])
+@controller.editor_required
+def api_create_article():
+    """API tạo bài viết mới từ editor form"""
+    return admin_controller.api_create_article()
+
+
+@admin_bp.route('/api/upload-image', methods=['POST'])
+@controller.editor_required
+def api_upload_image():
+    """API upload ảnh cho bài viết"""
+    return admin_controller.api_upload_image()
+
+
 @admin_bp.route('/api/categories')
 @controller.admin_required
 def api_categories():
