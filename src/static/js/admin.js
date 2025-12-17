@@ -7,13 +7,18 @@ $(document).ready(function() {
     
     // Initialize chart
     initializeChart();
-    
-    // Load initial data
-    loadPendingArticles();
-    // loadAPIArticles(); // Không tự động load API articles
-    loadStatistics();
-    loadHotArticles();
-    
+
+    if(window.location.pathname != '/admin/editor-dashboard') {
+        // Load initial data
+        loadPendingArticles();
+        // loadAPIArticles(); // Không tự động load API articles
+        loadStatistics();
+        loadHotArticles();
+    }
+    else {
+        loadPendingArticlesEditor();
+    }
+
     // Menu navigation
     $('.sidebar-menu a[data-section]').click(function(e) {
         e.preventDefault();

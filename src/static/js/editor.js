@@ -46,8 +46,7 @@ $(document).ready(function() {
     });
     
     // Load initial data
-    loadMyArticles();
-    loadStatistics();
+    loadMyArticles(); // Bài viết của tôi (tất cả trạng thái, trang 1)
     
     // Menu navigation
     $('.sidebar-menu a[data-section]').click(function(e) {
@@ -64,6 +63,17 @@ $(document).ready(function() {
         
         // Update page title
         updatePageTitle(section);
+
+        // Lazy load dữ liệu cho các tab khi được mở
+        if (section === 'my-articles') {
+            loadMyArticles(1, $('#filterStatus').val(), $('#searchMyArticles').val().trim());
+        } else if (section === 'drafts') {
+            loadDrafts();
+        } else if (section === 'pending') {
+            loadPendingArticlesEditor();
+        } else if (section === 'published') {
+            loadPublishedArticles();
+        }
     });
     
     // Header create button
@@ -140,10 +150,42 @@ $(document).ready(function() {
         previewInternationalArticle();
     });
     
-    // Filter articles
+    // Filter articles trong tab "Bài viết của tôi"
     $('#filterStatus').change(function() {
         const status = $(this).val();
-        filterArticles(status);
+        loadMyArticles(1, status, $('#searchMyArticles').val().trim());
+    });
+
+    // Tìm kiếm trong "Bài viết của tôi"
+    $('#searchMyArticles').on('keypress', function (e) {
+        if (e.which === 13) { // Enter
+            e.preventDefault();
+            loadMyArticles(1, $('#filterStatus').val(), $(this).val().trim());
+        }
+    });
+
+    // Tìm kiếm ở tab Bản nháp
+    $('#searchDrafts').on('keypress', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadDrafts(1);
+        }
+    });
+
+    // Tìm kiếm ở tab Chờ duyệt
+    $('#searchPending').on('keypress', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadPendingArticlesEditor(1);
+        }
+    });
+
+    // Tìm kiếm ở tab Đã xuất bản
+    $('#searchPublished').on('keypress', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadPublishedArticles(1);
+        }
     });
     
     // Edit article
@@ -216,33 +258,24 @@ function updatePageTitle(section) {
     $('#pageTitle').text(titles[section] || 'Dashboard');
 }
 
-// Load statistics
-function loadStatistics() {
-    const stats = {
-        total: 24,
-        pending: 5,
-        published: 16,
-        drafts: 3
-    };
-    
-    $('#statTotal').text(stats.total);
-    $('#statPending').text(stats.pending);
-    $('#statPublished').text(stats.published);
-    $('#statDrafts').text(stats.drafts);
-    $('#pendingCount').text(stats.pending);
-    $('#draftCount').text(stats.drafts);
-}
-
-// Load my articles from API (database, joined with categories)
-async function loadMyArticles() {
+// Load my articles from API (database, joined with categories) với phân trang & lọc
+async function loadMyArticles(page = 1, status = null, search = null) {
     try {
         showSpinner();
 
-        const response = await fetch('/api/my-articles', {
+        const params = new URLSearchParams();
+        params.append('page', page);
+        params.append('per_page', 10);
+        if (status && status !== 'all') {
+            params.append('status', status);
+        }
+        if (search) {
+            params.append('search', search);
+        }
+
+        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
             method: 'GET',
-            headers: {
-                'Accept': 'application/json'
-            }
+            headers: { 'Accept': 'application/json' }
         });
 
         const result = await response.json();
@@ -263,10 +296,17 @@ async function loadMyArticles() {
             status: item.status, // ví dụ: 'draft' | 'pending' | 'published'
             visible: item.visible !== undefined ? item.visible : true,
             // Chuyển ngày về string hiển thị
-            date: item.created_at || item.updated_at || ''
+            date: item.created_at || item.published_at || ''
         }));
 
-        displayArticles(articles);
+        const pagination = result.pagination || {};
+        displayArticles(articles, 'myArticlesTable');
+        updatePagination(
+            pagination,
+            'myArticlesPagination',
+            (newPage) => loadMyArticles(newPage, $('#filterStatus').val(), $('#searchMyArticles').val().trim())
+        );
+        updateInfoText(pagination, 'myArticlesInfo');
     } catch (error) {
         console.error('Lỗi tải bài viết:', error);
         hideSpinner();
@@ -274,44 +314,126 @@ async function loadMyArticles() {
     }
 }
 
-// Display articles
-function displayArticles(articles) {
+// Load danh sách bản nháp
+function loadDrafts(page = 1) {
+    const search = $('#searchDrafts').val() ? $('#searchDrafts').val().trim() : null;
+    fetchMyArticlesForSection('draft', page, search, 'draftsTable', 'draftsPagination', 'draftsInfo');
+}
+
+// Load danh sách chờ duyệt
+function loadPendingArticlesEditor(page = 1) {
+    const search = $('#searchPending').val() ? $('#searchPending').val().trim() : null;
+    fetchMyArticlesForSection('pending', page, search, 'pendingTable', 'pendingPagination', 'pendingInfo');
+}
+
+// Load danh sách đã xuất bản
+function loadPublishedArticles(page = 1) {
+    const search = $('#searchPublished').val() ? $('#searchPublished').val().trim() : null;
+    fetchMyArticlesForSection('published', page, search, 'publishedTable', 'publishedPagination', 'publishedInfo');
+}
+
+// Hàm dùng chung để load bài viết cho từng section
+async function fetchMyArticlesForSection(status, page, search, tableId, paginationId, infoId) {
+    try {
+        showSpinner();
+
+        const params = new URLSearchParams();
+        params.append('page', page);
+        params.append('per_page', 10);
+        if (status) {
+            params.append('status', status);
+        }
+        if (search) {
+            params.append('search', search);
+        }
+
+        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        const result = await response.json();
+        hideSpinner();
+
+        if (!result.success) {
+            showToast('Lỗi', result.error || 'Không thể tải danh sách bài viết', 'warning');
+            return;
+        }
+
+        const articles = (result.data || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            category: item.category_name || (item.category && item.category.name) || '',
+            status: item.status,
+            visible: item.visible !== undefined ? item.visible : true,
+            date: item.created_at || item.published_at || ''
+        }));
+
+        const pagination = result.pagination || {};
+        displayArticles(articles, tableId);
+        updatePagination(
+            pagination,
+            paginationId,
+            (newPage) => fetchMyArticlesForSection(status, newPage, search, tableId, paginationId, infoId)
+        );
+        updateInfoText(pagination, infoId);
+    } catch (error) {
+        console.error('Lỗi tải bài viết:', error);
+        hideSpinner();
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải danh sách bài viết', 'warning');
+    }
+}
+
+// Display articles vào bảng theo ID
+function displayArticles(articles, tableBodyId) {
     let html = '';
     articles.forEach((article, index) => {
         const statusBadge = getStatusBadge(article.status);
         const checked = article.visible ? 'checked' : '';
         
-        html += `
-            <tr>
-                <td>${index + 1}</td>
-                <td><strong>${article.title}</strong></td>
-                <td><span class="badge bg-primary">${article.category}</span></td>
-                <td>${statusBadge}</td>
-                <td>
-                    <label class="visibility-switch">
-                        <input type="checkbox" class="visibility-toggle" data-id="${article.id}" ${checked}>
-                        <span class="visibility-slider"></span>
-                    </label>
-                </td>
-                <td>${article.date}</td>
-                <td>
-                    <button class="btn btn-sm btn-info btn-action btn-edit" data-id="${article.id}" title="Chỉnh sửa">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    ${article.status === 'draft' ? `
-                        <button class="btn btn-sm btn-success btn-action btn-submit" data-id="${article.id}" title="Gửi duyệt">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    ` : ''}
-                    <button class="btn btn-sm btn-danger btn-action btn-delete" data-id="${article.id}" title="Xóa">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
+        const date = new Date(article.date + 'Z');
+
+        const dateVN = date.toLocaleString('sv-SE', {
+            timeZone: 'Asia/Ho_Chi_Minh', // Chuyển sang múi giờ VN
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false // Sử dụng định dạng 24h
+        });
+
+        html += '';
+        html += '<tr>';
+        // html += '<td>' + (index + 1) + '</td>';
+        html += '<td><strong>' + article.title + '</strong></td>';
+        html += '<td><span class="badge bg-primary">' + article.category + '</span></td>';
+        if (tableBodyId != 'draftsTable' && tableBodyId != 'publishedTable') {
+            html += '<td>' + statusBadge + '</td>';
+        } else {
+            html += '<td style="display: none;">'+ statusBadge +'</td>';
+        }
+        html += '<td style="display: none;">';
+        html += '<label class="visibility-switch">';
+        html += '<input type="checkbox" class="visibility-toggle" data-id="' + article.id + '" ' + checked + '>';
+        html += '<span class="visibility-slider"></span>';
+        html += '</label>';
+        html += '</td>';
+        html += '<td>' + (dateVN) + '</td>';
+        html += '<td>';
+        if (article.status === 'draft') {
+            html += '<button class="btn btn-sm btn-info btn-action btn-edit" data-id="' + article.id + '" title="Chỉnh sửa">';
+            html += '<i class="fas fa-edit"></i>';
+            html += '</button>';
+        }
+        html += '<button class="btn btn-sm btn-danger btn-action btn-delete" data-id="' + article.id + '" title="Xóa">';
+        html += '<i class="fas fa-trash"></i>';
+        html += '</button>';
+        html += '</td>';
+        html += '</tr>';
     });
     
-    $('#myArticlesTable').html(html);
+    $('#' + tableBodyId).html(html);
 }
 
 // Get status badge
@@ -325,10 +447,64 @@ function getStatusBadge(status) {
     return badges[status] || status;
 }
 
-// Filter articles
-function filterArticles(status) {
-    // In a real application, this would filter the articles
-    showToast('Thông báo', `Lọc bài viết: ${status}`, 'info');
+// Cập nhật thanh phân trang
+function updatePagination(pagination, containerId, onPageClick) {
+    const container = $('#' + containerId);
+    container.empty();
+
+    const page = pagination.page || 1;
+    const totalPages = pagination.pages || 1;
+
+    if (totalPages <= 1) {
+        return;
+    }
+
+    const createPageItem = (p, label = null, disabled = false, active = false) => {
+        const li = $('<li>').addClass('page-item');
+        if (disabled) li.addClass('disabled');
+        if (active) li.addClass('active');
+
+        const a = $('<a>')
+            .addClass('page-link')
+            .attr('href', '#')
+            .attr('data-page', p)
+            .text(label || p);
+
+        a.on('click', function (e) {
+            e.preventDefault();
+            if (!disabled && !active) {
+                onPageClick(p);
+            }
+        });
+
+        li.append(a);
+        container.append(li);
+    };
+
+    createPageItem(page - 1, '«', page <= 1, false);
+
+    for (let p = 1; p <= totalPages; p++) {
+        createPageItem(p, null, false, p === page);
+    }
+
+    createPageItem(page + 1, '»', page >= totalPages, false);
+}
+
+// Hiển thị thông tin phân trang
+function updateInfoText(pagination, infoElementId) {
+    const infoEl = $('#' + infoElementId);
+    const page = pagination.page || 1;
+    const perPage = pagination.per_page || 10;
+    const total = pagination.total || 0;
+
+    if (!total) {
+        infoEl.text('Không có bản ghi nào.');
+        return;
+    }
+
+    const start = (page - 1) * perPage + 1;
+    const end = Math.min(page * perPage, total);
+    infoEl.text(`Hiển thị ${start}-${end} trên tổng ${total} bài viết`);
 }
 
 // Upload article image

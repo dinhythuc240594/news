@@ -37,13 +37,13 @@
             <li>
                 <a href="#" data-section="drafts">
                     <i class="fas fa-save"></i> Bản nháp
-                    <span class="badge bg-secondary" id="draftCount">3</span>
+                    <span class="badge bg-secondary" id="draftCount">{{ stat_draft }}</span>
                 </a>
             </li>
             <li>
                 <a href="#" data-section="pending">
                     <i class="fas fa-clock"></i> Chờ duyệt
-                    <span class="badge bg-warning" id="pendingCount">5</span>
+                    <span class="badge bg-warning" id="pendingCount">{{ stat_pending }}</span>
                 </a>
             </li>
             <li>
@@ -93,7 +93,7 @@
                             <i class="fas fa-file-alt"></i>
                         </div>
                         <div class="stat-details">
-                            <h3 id="statTotal">24</h3>
+                            <h3 id="statTotal">{{ stat_total }}</h3>
                             <p>Tổng bài viết</p>
                         </div>
                     </div>
@@ -104,7 +104,7 @@
                             <i class="fas fa-clock"></i>
                         </div>
                         <div class="stat-details">
-                            <h3 id="statPending">5</h3>
+                            <h3 id="statPending">{{ stat_pending }}</h3>
                             <p>Chờ duyệt</p>
                         </div>
                     </div>
@@ -115,7 +115,7 @@
                             <i class="fas fa-check"></i>
                         </div>
                         <div class="stat-details">
-                            <h3 id="statPublished">16</h3>
+                            <h3 id="statPublished">{{ stat_published }}</h3>
                             <p>Đã xuất bản</p>
                         </div>
                     </div>
@@ -126,7 +126,7 @@
                             <i class="fas fa-save"></i>
                         </div>
                         <div class="stat-details">
-                            <h3 id="statDrafts">3</h3>
+                            <h3 id="statDrafts">{{ stat_draft }}</h3>
                             <p>Bản nháp</p>
                         </div>
                     </div>
@@ -168,45 +168,11 @@
         </div>
 
         <!-- My Articles Section -->
-        <div class="content-section" id="my-articles">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5><i class="fas fa-file-alt"></i> Bài viết của tôi</h5>
-                    <div>
-                        <select class="form-select form-select-sm d-inline-block" style="width: 150px;" id="filterStatus">
-                            <option value="all">Tất cả</option>
-                            <option value="draft">Bản nháp</option>
-                            <option value="pending">Chờ duyệt</option>
-                            <option value="published">Đã xuất bản</option>
-                            <option value="hidden">Đã ẩn</option>
-                        </select>
-                        <input type="text" class="form-control form-control-sm d-inline-block" style="width: 200px;" placeholder="Tìm kiếm...">
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th width="5%">#</th>
-                                    <th width="35%">Tiêu đề</th>
-                                    <th width="12%">Danh mục</th>
-                                    <th width="10%">Trạng thái</th>
-                                    <th width="10%">Hiển thị</th>
-                                    <th width="13%">Ngày tạo</th>
-                                    <th width="15%">Hành động</th>
-                                </tr>
-                            </thead>
-                            <tbody id="myArticlesTable">
-                                <!-- Data will be loaded by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
-
+        {% include 'editor/my-articles-section.html' %}
         {% include 'editor/article-section.html' %}
+        {% include 'editor/drafts-section.html' %}
+        {% include 'editor/pending-section.html' %}
+        {% include 'editor/published-section.html' %}
         {% include 'editor/international-section.html' %}
 
     </div>

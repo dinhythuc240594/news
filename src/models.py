@@ -101,6 +101,52 @@ class NewsModel:
             query = query.limit(limit).offset(offset)
         
         return query.all()
+
+    def get_by_creator(
+        self,
+        creator_id: int,
+        limit: int | None = None,
+        offset: int = 0,
+        status: NewsStatus | None = None,
+        search: str | None = None,
+    ) -> tuple[list[News], int]:
+        """
+        Lấy danh sách bài viết theo người tạo (editor), hỗ trợ phân trang và tìm kiếm.
+
+        Args:
+            creator_id: ID người tạo (editor)
+            limit: Số lượng bài viết mỗi trang
+            offset: Vị trí bắt đầu
+            status: Lọc theo trạng thái
+            search: Từ khóa tìm kiếm theo tiêu đề / tóm tắt
+
+        Returns:
+            (items, total) - danh sách bài viết và tổng số bản ghi
+        """
+        query = self.db.query(News).filter(News.created_by == creator_id)
+
+        if status:
+            query = query.filter(News.status == status)
+
+        if search:
+            like_pattern = f"%{search}%"
+            query = query.filter(
+                or_(
+                    News.title.ilike(like_pattern),
+                    News.summary.ilike(like_pattern),
+                )
+            )
+
+        # Tính tổng trước khi limit/offset
+        total = query.count()
+
+        query = query.order_by(desc(News.created_at))
+
+        if limit:
+            query = query.limit(limit).offset(offset)
+
+        items = query.all()
+        return items, total
     
     def get_published(self, limit: int = None, offset: int = 0) -> List[News]:
         """Lấy danh sách bài viết đã xuất bản"""

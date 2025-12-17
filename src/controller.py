@@ -159,7 +159,7 @@ class AdminController:
         """
         user_id = session.get('user_id')
         
-        # Lấy bài viết của editor
+        # Lấy bài viết của editor (chỉ dùng để thống kê nhanh)
         all_news = self.news_model.get_all()
         my_news = [n for n in all_news if n.created_by == user_id]
         
@@ -172,7 +172,11 @@ class AdminController:
                              draft_news=draft_news,
                              pending_news=pending_news,
                              published_news=published_news,
-                             categories=categories)
+                             categories=categories,
+                             stat_total=len(my_news),
+                             stat_draft=len(draft_news),
+                             stat_pending=len(pending_news),
+                             stat_published=len(published_news))
     
     def news_list(self):
         """
@@ -371,6 +375,64 @@ class AdminController:
             'success': True,
             'data': [self._news_to_dict(news) for news in news_list]
         })
+
+    def api_my_articles(self):
+        """
+        API lấy danh sách bài viết của editor hiện tại (JSON)
+        Route: GET /admin/api/my-articles
+        Query params:
+            status: draft|pending|published|rejected|all (mặc định: all)
+            page: trang hiện tại (mặc định: 1)
+            per_page: số bài mỗi trang (mặc định: 10)
+            search: từ khóa tìm kiếm
+        """
+        if "user_id" not in session:
+            return jsonify({"success": False, "error": "Chưa đăng nhập"}), 401
+
+        user_id = session["user_id"]
+
+        status_str = request.args.get("status", "all")
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 10, type=int)
+        search = request.args.get("search", None)
+
+        # Chuẩn hóa tham số
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 100:
+            per_page = 10
+
+        status = None
+        if status_str and status_str != "all":
+            try:
+                status = NewsStatus(status_str)
+            except ValueError:
+                status = None
+
+        offset = (page - 1) * per_page
+
+        items, total = self.news_model.get_by_creator(
+            creator_id=user_id,
+            limit=per_page,
+            offset=offset,
+            status=status,
+            search=search,
+        )
+
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+        return jsonify(
+            {
+                "success": True,
+                "data": [self._news_to_dict(news) for news in items],
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": total,
+                    "pages": total_pages,
+                },
+            }
+        )
     
     def api_current_user(self):
         """
@@ -409,13 +471,16 @@ class AdminController:
             'slug': news.slug,
             'status': news.status.value,
             'category': {
-                'id': news.category.id,
-                'name': news.category.name
+                'id': news.category.id if getattr(news, "category", None) else None,
+                'name': news.category.name if getattr(news, "category", None) else None,
             },
-            'created_by': news.creator.username if news.creator else None,
-            'approved_by': news.approver.username if news.approver else None,
-            'created_at': news.created_at.isoformat(),
-            'published_at': news.published_at.isoformat() if news.published_at else None
+            # Các field phẳng phục vụ cho UI editor
+            'category_name': news.category.name if getattr(news, "category", None) else None,
+            'visible': getattr(news, "visible", True),
+            'created_by': news.creator.username if getattr(news, "creator", None) else None,
+            'approved_by': news.approver.username if getattr(news, "approver", None) else None,
+            'created_at': news.created_at.isoformat() if getattr(news, "created_at", None) else None,
+            'published_at': news.published_at.isoformat() if getattr(news, "published_at", None) else None,
         }
     
     def api_statistics(self):
