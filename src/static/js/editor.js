@@ -596,7 +596,7 @@ async function saveDraft() {
     const category = $('#articleCategory').val();
     const description = $('#articleDescription').val().trim();
     const thumbnail = $('#articleImageUrl').val() || '';
-    const tags = $('#articleTags').val().trim();
+    const tags = normalizeTagString($('#articleTags').val());
     
     if (!title) {
         showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
@@ -662,6 +662,10 @@ async function saveDraft() {
     }
 }
 
+function normalizeTagString(tagsString) {
+    return tagsString.trim().replace(/[,;]+/g, ',');
+}
+
 // Submit article
 async function submitArticle() {
     const title = $('#articleTitle').val().trim();
@@ -669,7 +673,7 @@ async function submitArticle() {
     const category = $('#articleCategory').val();
     const description = $('#articleDescription').val().trim();
     const thumbnail = $('#articleImageUrl').val() || '';
-    const tags = $('#articleTags').val().trim();
+    const tags = normalizeTagString($('#articleTags').val());
     
     // Validation
     if (!title) {

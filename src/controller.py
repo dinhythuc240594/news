@@ -1037,8 +1037,8 @@ class AdminController:
         import re
         tag_names = []
         
-        # Tách theo dấu phẩy hoặc khoảng trắng
-        parts = re.split(r'[,\s]+', tags_string)
+        # Tách theo dấu phẩy hoặc dấu chấm phẩy
+        parts = re.split(r'[,;]+', tags_string)
         
         for part in parts:
             part = part.strip()
