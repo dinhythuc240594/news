@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash, session, current_app
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from typing import Optional
 from functools import wraps
 import os
@@ -1033,12 +1034,15 @@ class AdminController:
         })
     
     def _parse_tags(self, tags_string: str) -> list:
-        """Parse tags từ string có thể chứa hashtag format (#tag_name) hoặc comma-separated"""
+        """Parse tags từ string có thể chứa hashtag format (#tag_name), comma-separated hoặc cách nhau bằng khoảng trắng"""
         import re
         tag_names = []
+
+        if not tags_string:
+            return []
         
-        # Tách theo dấu phẩy hoặc dấu chấm phẩy
-        parts = re.split(r'[,;]+', tags_string)
+        # Tách theo dấu phẩy, dấu chấm phẩy HOẶC khoảng trắng
+        parts = re.split(r'[,\s;]+', tags_string)
         
         for part in parts:
             part = part.strip()
@@ -1171,75 +1175,85 @@ class AdminController:
             import json
             images_json = json.dumps(image_urls)
         
-        # Tạo bài viết mới
-        article = News(
-            title=title,
-            slug=slug,
-            content=content,
-            summary=summary,
-            thumbnail=thumbnail,
-            images=images_json,
-            category_id=category_id,
-            created_by=user_id,
-            status=news_status,
-            published_at=datetime.utcnow() if news_status == NewsStatus.PUBLISHED else None
-        )
-        
-        self.db_session.add(article)
-        self.db_session.commit()
-        self.db_session.refresh(article)
-        
-        # Di chuyển ảnh từ temp folder sang folder của bài viết nếu có
-        if article.id:
-            temp_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
-            news_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{article.id}')
+        try:
+            # Tạo bài viết mới
+            article = News(
+                title=title,
+                slug=slug,
+                content=content,
+                summary=summary,
+                thumbnail=thumbnail,
+                images=images_json,
+                category_id=category_id,
+                created_by=user_id,
+                status=news_status,
+                published_at=datetime.utcnow() if news_status == NewsStatus.PUBLISHED else None
+            )
             
-            if os.path.exists(temp_folder):
-                os.makedirs(news_folder, exist_ok=True)
-                # Di chuyển các file từ temp sang news folder
-                import shutil
-                for filename in os.listdir(temp_folder):
-                    src_path = os.path.join(temp_folder, filename)
-                    dst_path = os.path.join(news_folder, filename)
-                    if os.path.isfile(src_path):
-                        shutil.move(src_path, dst_path)
-                        # Cập nhật URL trong thumbnail và content nếu cần
-                        if thumbnail and 'temp' in thumbnail:
-                            thumbnail = thumbnail.replace('temp', f'news_{article.id}')
-                            article.thumbnail = thumbnail
-                        if images_json:
-                            import json
-                            images = json.loads(images_json)
-                            updated_images = [img.replace('temp', f'news_{article.id}') if 'temp' in img else img for img in images]
-                            article.images = json.dumps(updated_images)
-                            # Cập nhật content với URL mới
-                            for old_url, new_url in zip(images, updated_images):
-                                if old_url != new_url:
-                                    content = content.replace(old_url, new_url)
-                                    article.content = content
-                self.db_session.commit()
-        
-        # Xử lý tags nếu có
-        if tags:
-            # Xóa các tags cũ của bài viết
-            self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).delete()
+            self.db_session.add(article)
+            self.db_session.commit()
+            self.db_session.refresh(article)
             
-            tag_names = self._parse_tags(tags)
-            for tag_name in tag_names:
-                # Tìm hoặc tạo tag
-                tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
-                if not tag:
-                    tag_slug = self._generate_slug(tag_name)
-                    tag = Tag(name=tag_name, slug=tag_slug)
-                    self.db_session.add(tag)
-                    self.db_session.flush()
+            # Di chuyển ảnh từ temp folder sang folder của bài viết nếu có
+            if article.id:
+                temp_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
+                news_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{article.id}')
                 
-                # Tạo NewsTag mới
-                news_tag = NewsTag(news_id=article.id, tag_id=tag.id)
-                self.db_session.add(news_tag)
-        
-        self.db_session.commit()
-        
+                if os.path.exists(temp_folder):
+                    os.makedirs(news_folder, exist_ok=True)
+                    # Di chuyển các file từ temp sang news folder
+                    import shutil
+                    for filename in os.listdir(temp_folder):
+                        src_path = os.path.join(temp_folder, filename)
+                        dst_path = os.path.join(news_folder, filename)
+                        if os.path.isfile(src_path):
+                            shutil.move(src_path, dst_path)
+                            # Cập nhật URL trong thumbnail và content nếu cần
+                            if thumbnail and 'temp' in thumbnail:
+                                thumbnail = thumbnail.replace('temp', f'news_{article.id}')
+                                article.thumbnail = thumbnail
+                            if images_json:
+                                import json
+                                images = json.loads(images_json)
+                                updated_images = [img.replace('temp', f'news_{article.id}') if 'temp' in img else img for img in images]
+                                article.images = json.dumps(updated_images)
+                                # Cập nhật content với URL mới
+                                for old_url, new_url in zip(images, updated_images):
+                                    if old_url != new_url:
+                                        content = content.replace(old_url, new_url)
+                                        article.content = content
+                    self.db_session.commit()
+            
+            # Xử lý tags nếu có
+            if tags:
+                # Xóa các tags cũ của bài viết
+                self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).delete()
+                
+                tag_names = self._parse_tags(tags)
+                for tag_name in tag_names:
+                    # Tìm hoặc tạo tag
+                    tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
+                    if not tag:
+                        tag_slug = self._generate_slug(tag_name)
+                        tag = Tag(name=tag_name, slug=tag_slug)
+                        self.db_session.add(tag)
+                        self.db_session.flush()
+                    
+                    # Tạo NewsTag mới
+                    news_tag = NewsTag(news_id=article.id, tag_id=tag.id)
+                    self.db_session.add(news_tag)
+            
+            self.db_session.commit()
+        except IntegrityError as e:
+            self.db_session.rollback()
+            # Trả về thông điệp lỗi gốc từ DB (ví dụ: Key (slug)=... already exists.)
+            message = getattr(e, "orig", None)
+            message = str(message) if message else str(e)
+            return jsonify({'success': False, 'error': message}), 400
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
         return jsonify({
             'success': True,
             'message': 'Tạo bài viết thành công',
@@ -1320,70 +1334,79 @@ class AdminController:
             import json
             images_json = json.dumps(image_urls)
         
-        # Cập nhật bài viết
-        article.title = title
-        article.slug = slug
-        article.content = content
-        article.summary = summary
-        article.thumbnail = thumbnail
-        article.images = images_json
-        article.category_id = category_id
-        article.status = news_status
-        article.published_at = datetime.utcnow() if news_status == NewsStatus.PUBLISHED else article.published_at
-        
-        self.db_session.commit()
-        self.db_session.refresh(article)
-        
-        # Di chuyển ảnh từ temp folder sang folder của bài viết nếu có
-        if article.id:
-            temp_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
-            news_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{article.id}')
+        try:
+            # Cập nhật bài viết
+            article.title = title
+            article.slug = slug
+            article.content = content
+            article.summary = summary
+            article.thumbnail = thumbnail
+            article.images = images_json
+            article.category_id = category_id
+            article.status = news_status
+            article.published_at = datetime.utcnow() if news_status == NewsStatus.PUBLISHED else article.published_at
             
-            if os.path.exists(temp_folder):
-                os.makedirs(news_folder, exist_ok=True)
-                # Di chuyển các file từ temp sang news folder
-                import shutil
-                for filename in os.listdir(temp_folder):
-                    src_path = os.path.join(temp_folder, filename)
-                    dst_path = os.path.join(news_folder, filename)
-                    if os.path.isfile(src_path):
-                        shutil.move(src_path, dst_path)
-                        # Cập nhật URL trong thumbnail và content nếu cần
-                        if thumbnail and 'temp' in thumbnail:
-                            thumbnail = thumbnail.replace('temp', f'news_{article.id}')
-                            article.thumbnail = thumbnail
-                        if images_json:
-                            import json
-                            images = json.loads(images_json)
-                            updated_images = [img.replace('temp', f'news_{article.id}') if 'temp' in img else img for img in images]
-                            article.images = json.dumps(updated_images)
-                            # Cập nhật content với URL mới
-                            for old_url, new_url in zip(images, updated_images):
-                                if old_url != new_url:
-                                    content = content.replace(old_url, new_url)
-                                    article.content = content
-                self.db_session.commit()
-        
-        # Xử lý tags nếu có
-        if tags:
-            # Xóa các tags cũ của bài viết
-            self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).delete()
+            self.db_session.commit()
+            self.db_session.refresh(article)
             
-            tag_names = self._parse_tags(tags)
-            for tag_name in tag_names:
-                # Tìm hoặc tạo tag
-                tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
-                if not tag:
-                    tag_slug = self._generate_slug(tag_name)
-                    tag = Tag(name=tag_name, slug=tag_slug)
-                    self.db_session.add(tag)
-                    self.db_session.flush()
+            # Di chuyển ảnh từ temp folder sang folder của bài viết nếu có
+            if article.id:
+                temp_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
+                news_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{article.id}')
                 
-                # Tạo NewsTag mới
-                news_tag = NewsTag(news_id=article.id, tag_id=tag.id)
-                self.db_session.add(news_tag)
-        
-        self.db_session.commit()
+                if os.path.exists(temp_folder):
+                    os.makedirs(news_folder, exist_ok=True)
+                    # Di chuyển các file từ temp sang news folder
+                    import shutil
+                    for filename in os.listdir(temp_folder):
+                        src_path = os.path.join(temp_folder, filename)
+                        dst_path = os.path.join(news_folder, filename)
+                        if os.path.isfile(src_path):
+                            shutil.move(src_path, dst_path)
+                            # Cập nhật URL trong thumbnail và content nếu cần
+                            if thumbnail and 'temp' in thumbnail:
+                                thumbnail = thumbnail.replace('temp', f'news_{article.id}')
+                                article.thumbnail = thumbnail
+                            if images_json:
+                                import json
+                                images = json.loads(images_json)
+                                updated_images = [img.replace('temp', f'news_{article.id}') if 'temp' in img else img for img in images]
+                                article.images = json.dumps(updated_images)
+                                # Cập nhật content với URL mới
+                                for old_url, new_url in zip(images, updated_images):
+                                    if old_url != new_url:
+                                        content = content.replace(old_url, new_url)
+                                        article.content = content
+                    self.db_session.commit()
+            
+            # Xử lý tags nếu có
+            if tags:
+                # Xóa các tags cũ của bài viết
+                self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).delete()
+                
+                tag_names = self._parse_tags(tags)
+                for tag_name in tag_names:
+                    # Tìm hoặc tạo tag
+                    tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
+                    if not tag:
+                        tag_slug = self._generate_slug(tag_name)
+                        tag = Tag(name=tag_name, slug=tag_slug)
+                        self.db_session.add(tag)
+                        self.db_session.flush()
+                    
+                    # Tạo NewsTag mới
+                    news_tag = NewsTag(news_id=article.id, tag_id=tag.id)
+                    self.db_session.add(news_tag)
+            
+            self.db_session.commit()
+        except IntegrityError as e:
+            self.db_session.rollback()
+            message = getattr(e, "orig", None)
+            message = str(message) if message else str(e)
+            return jsonify({'success': False, 'error': message}), 400
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
         
         return jsonify({
             'success': True,

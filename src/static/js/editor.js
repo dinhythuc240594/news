@@ -213,6 +213,10 @@ $(document).ready(function() {
     $('#saveEditBtn').click(function() {
         saveEdit();
     });
+    // Submit draft for review from edit modal
+    $('#submitEditBtn').click(function() {
+        saveEdit('pending');
+    });
     
     // Edit article image upload handler
     $('#editArticleImage').change(function() {
@@ -787,15 +791,15 @@ async function editArticle(articleId) {
     }
 }
 
-// Save edit
-async function saveEdit() {
+// Save edit (có thể kèm theo thay đổi trạng thái, ví dụ: gửi duyệt)
+async function saveEdit(newStatus = null) {
     const articleId = $('#editArticleId').val();
     const title = $('#editArticleTitle').val();
     const content = $('#editArticleContent').summernote('code');
     const category = $('#editArticleCategory').val();
     const description = $('#editArticleDescription').val();
     const image = $('#editArticleImageUrl').val();
-    const tags = $('#editArticleTags').val();
+    const tags = normalizeTagString($('#editArticleTags').val());
     if (!title) {
         showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
         return;
@@ -822,20 +826,25 @@ async function saveEdit() {
         return;
     }
     try {
+        const payload = {
+            id: articleId,
+            title: title,
+            content: content,
+            category_id: parseInt(category),
+            summary: description,
+            thumbnail: image,
+            tags: tags
+        };
+        if (newStatus) {
+            payload.status = newStatus;
+        }
+
         const response = await fetch(`/admin/api/edit-article/${articleId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                id: articleId,
-                title: title,
-                content: content,
-                category_id: parseInt(category),
-                summary: description,
-                thumbnail: image,
-                tags: tags
-            })
+            body: JSON.stringify(payload)
         });
         const result = await response.json();
         if (result.success) {
