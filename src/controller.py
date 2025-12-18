@@ -681,10 +681,10 @@ class AdminController:
             data = request.json if request.is_json else {}
             source_type = data.get('source_type', 'rss')  # 'rss' hoặc 'api'
             rss_url = data.get('rss_url', 'https://vnexpress.net/rss/tin-moi-nhat.rss')
-            api_key = data.get('api_key')
-            api_url = data.get('api_url', 'https://newsapi.org/v2/top-headlines')
-            country = data.get('country', '')
-            category = data.get('category', '')
+            api_token = data.get('api_key')  # Đổi tên từ api_key thành api_token
+            urls = data.get('urls', [])  # Danh sách URLs để fetch
+            region = data.get('region', 'domestic')  # 'domestic' hoặc 'international'
+            category_id = data.get('category_id', '')  # ID danh mục
             limit = data.get('limit', 20)
             
             articles = []
@@ -736,44 +736,116 @@ class AdminController:
                         'error': f'Lỗi fetch RSS: {str(e)}'
                     }), 500
             
-            # Nếu có API key và URL, fetch từ API thật
-            elif api_key and api_url:
+            # Nếu là API với token
+            elif source_type == 'api' and api_token:
                 try:
-                    # Ví dụ với NewsAPI.org
-                    params = {
-                        'apiKey': api_key
+                    # Kiểm tra mode
+                    mode = data.get('mode', 'urls')
+                    headers = {
+                        'Authorization': f'Bearer {api_token}',
+                        'Content-Type': 'application/json'
                     }
-                    if country:
-                        params['country'] = country
-                    if category:
-                        params['category'] = category
-                    if limit:
-                        params['pageSize'] = min(limit, 100)  # Max 100 per request
                     
-                    # Nếu có ngày, sử dụng everything endpoint
-                    if start_date or end_date:
-                        api_url = 'https://newsapi.org/v2/everything'
-                        if start_date:
-                            params['from'] = start_date
-                        if end_date:
-                            params['to'] = end_date
-                        if not category and not country:
-                            params['q'] = 'news'  # Default query
+                    if mode == 'category':
+                        # Mode: Theo khu vực & danh mục - Gọi 2 endpoints tuần tự
+                        if not category_id:
+                            return jsonify({
+                                'success': False,
+                                'error': 'Vui lòng chọn danh mục'
+                            }), 400
+                        
+                        # Bước 1: Gọi endpoint để lấy danh sách URLs
+                        rss_endpoint = f'https://news-api.techreview.pro/rss/{category_id}/urls'
+                        rss_params = {'limit': limit}
+                        if region == 'international':
+                            rss_params['source'] = 'en'
+                        
+                        rss_response = requests.get(rss_endpoint, headers=headers, params=rss_params, timeout=30)
+                        
+                        if rss_response.status_code != 200:
+                            return jsonify({
+                                'success': False,
+                                'error': f'Lỗi lấy danh sách URLs: {rss_response.status_code}'
+                            }), rss_response.status_code
+                        
+                        rss_data = rss_response.json()
+                        if not rss_data.get('success') or not rss_data.get('data', {}).get('urls'):
+                            return jsonify({
+                                'success': False,
+                                'error': 'Không tìm thấy URLs từ danh mục này'
+                            }), 400
+                        
+                        # Lấy danh sách URLs từ response
+                        urls = rss_data['data']['urls']
+                        
+                        # Bước 2: Gọi endpoint articles với URLs vừa lấy được
+                        api_endpoint = 'https://news-api.techreview.pro/articles'
+                        payload = {'urls': urls}
+                        
+                    elif mode == 'urls':
+                        # Mode: Theo danh sách URL
+                        if not urls:
+                            return jsonify({
+                                'success': False,
+                                'error': 'Vui lòng cung cấp danh sách URLs'
+                            }), 400
+                        
+                        api_endpoint = 'https://news-api.techreview.pro/articles'
+                        payload = {'urls': urls}
+                        
+                    else:
+                        return jsonify({
+                            'success': False,
+                            'error': 'Mode không hợp lệ'
+                        }), 400
                     
-                    response = requests.get(api_url, params=params, timeout=10)
+                    response = requests.post(api_endpoint, json=payload, headers=headers)
+                    
                     if response.status_code == 200:
                         api_data = response.json()
-                        articles = api_data.get('articles', [])
+                        
+                        # Kiểm tra response format
+                        if api_data.get('success') and api_data.get('data', {}).get('articles'):
+                            api_articles = api_data['data']['articles']
+                            
+                            # Format articles theo cấu trúc mới
+                            for api_article in api_articles[:limit]:
+                                # Join description array thành string
+                                description_text = ' '.join(api_article.get('description', []))
+                                
+                                # Lấy main image hoặc first image
+                                main_image = api_article.get('mainImage', '')
+                                if not main_image and api_article.get('images'):
+                                    main_image = api_article['images'][0]
+                                
+                                articles.append({
+                                    'title': api_article.get('title', 'No title'),
+                                    'description': api_article.get('summary', description_text[:500]),
+                                    'url': api_article.get('link', ''),
+                                    'urlToImage': main_image,
+                                    'source': {'name': 'Custom API'},
+                                    'author': api_article.get('author', 'Unknown'),
+                                    'publishedAt': api_article.get('pubDate', datetime.utcnow().isoformat()),
+                                    'content': description_text,
+                                    'images': api_article.get('images', [])
+                                })
+                        else:
+                            return jsonify({
+                                'success': False,
+                                'error': f"API trả về lỗi: {api_data.get('message', 'Unknown error')}"
+                            }), 400
+                            
                     elif response.status_code == 401:
                         return jsonify({
                             'success': False,
-                            'error': 'API key không hợp lệ hoặc đã hết hạn'
+                            'error': 'API token không hợp lệ hoặc đã hết hạn'
                         }), 401
                     else:
                         return jsonify({
                             'success': False,
                             'error': f'Lỗi API: {response.status_code} - {response.text}'
                         }), response.status_code
+                        
                 except requests.exceptions.RequestException as e:
                     return jsonify({
                         'success': False,
@@ -785,44 +857,12 @@ class AdminController:
                         'error': f'Lỗi khi fetch từ API: {str(e)}'
                     }), 500
             
-            # Nếu không có API key hoặc không fetch được, dùng mock data
-            if not articles:
-                # Tạo mock data với số lượng và ngày tháng phù hợp
-                mock_count = min(limit, 50)
-                articles = []
-                base_date = datetime.utcnow()
-                
-                for i in range(mock_count):
-                    published_date = base_date - timedelta(days=i % 7, hours=i % 24)
-                    if start_date:
-                        try:
-                            start_dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
-                            if published_date < start_dt:
-                                continue
-                        except:
-                            pass
-                    if end_date:
-                        try:
-                            end_dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
-                            if published_date > end_dt:
-                                continue
-                        except:
-                            pass
-                    
-                    sources = ['TechCrunch', 'Reuters', 'ESPN', 'BBC', 'CNN', 'The Guardian']
-                    categories_list = ['Technology', 'Business', 'Sports', 'Entertainment', 'Health', 'Science']
-                    authors_list = ['John Doe', 'Jane Smith', 'Mike Johnson', 'Sarah Williams', 'David Brown']
-                    
-                    articles.append({
-                        'title': f'Breaking News {i+1}: Major development in {categories_list[i % len(categories_list)]}',
-                        'description': f'This is a detailed description of the news article number {i+1}...',
-                        'url': f'https://example.com/news{i+1}',
-                        'urlToImage': f'https://via.placeholder.com/400x300?text=News+{i+1}',
-                        'source': {'name': sources[i % len(sources)]},
-                        'author': authors_list[i % len(authors_list)],
-                        'publishedAt': published_date.isoformat(),
-                        'content': f'Full content of article {i+1}. This is a comprehensive news article covering important topics...'
-                    })
+            # Nếu không có articles
+            elif not articles:
+                return jsonify({
+                    'success': False,
+                    'error': 'Không có bài viết nào được tìm thấy'
+                }), 400
             
             # Format dữ liệu để trả về
             formatted_articles = []
@@ -830,17 +870,28 @@ class AdminController:
                 source_name = article.get('source', {}).get('name', 'Unknown') if isinstance(article.get('source'), dict) else str(article.get('source', 'Unknown'))
                 published_at = article.get('publishedAt', datetime.utcnow().isoformat())
                 
+                # Lấy content, nếu là RSS thì fetch full content từ URL
+                content = article.get('content', article.get('description', ''))
+                article_url = article.get('url', '')
+                
+                # Nếu là RSS và có URL, fetch full content
+                if source_type == 'rss' and article_url:
+                    full_content = self._fetch_article_content(article_url)
+                    if full_content:
+                        content = full_content
+                
+                # Nếu là API, content đã có đầy đủ rồi
                 formatted_articles.append({
                     'id': f'api_{idx}_{datetime.utcnow().timestamp()}',  # Temporary ID
                     'title': article.get('title', 'No title'),
                     'summary': article.get('description', ''),
-                    'content': article.get('content', article.get('description', '')),
+                    'content': content,
                     'thumbnail': article.get('urlToImage', ''),
                     'source': source_name,
-                    'source_url': article.get('url', ''),
+                    'source_url': article_url,
                     'author': article.get('author', 'Unknown'),
                     'published_at': published_at,
-                    'category_name': category or 'General'
+                    'images': article.get('images', [])  # Thêm images array cho API articles
                 })
             
             # Lưu vào session để sử dụng sau (tạm thời)
@@ -848,7 +899,7 @@ class AdminController:
             
             return jsonify({
                 'success': True,
-                'message': f'Đã lấy {len(formatted_articles)} bài viết từ API',
+                'message': f'Đã lấy {len(formatted_articles)} bài viết',
                 'count': len(formatted_articles),
                 'data': formatted_articles
             })
@@ -861,67 +912,84 @@ class AdminController:
     
     def api_save_api_article(self):
         """API lưu bài viết từ API vào bảng news với trạng thái được chọn"""
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
-        
-        data = request.json if request.is_json else request.form
-        
-        # Lấy dữ liệu bài viết từ request
-        article_data = data.get('article')
-        if not article_data:
-            return jsonify({'success': False, 'error': 'Thiếu dữ liệu bài viết'}), 400
-        
-        # Lấy thông tin từ request
-        category_id = data.get('category_id', type=int)
-        status = data.get('status', NewsStatus.DRAFT.value)
-        
-        if not category_id:
-            return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+        # Tạo session mới để tránh lỗi "transaction closed"
+        db_session = get_session()
         
         try:
-            news_status = NewsStatus(status)
-        except ValueError:
-            news_status = NewsStatus.DRAFT
-        
-        # Kiểm tra category tồn tại
-        category = self.db_session.query(Category).filter(Category.id == category_id).first()
-        if not category:
-            return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
-        
-        # Parse published_at nếu có
-        published_at = None
-        if article_data.get('published_at'):
+            user_id = session.get('user_id')
+            if not user_id:
+                return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+            
+            data = request.json if request.is_json else request.form
+            
+            # Lấy dữ liệu bài viết từ request
+            article_data = data.get('article')
+            if not article_data:
+                return jsonify({'success': False, 'error': 'Thiếu dữ liệu bài viết'}), 400
+            
+            # Lấy thông tin từ request
+            category_id = data.get('category_id')
+            if category_id:
+                category_id = int(category_id)
+            
+            status = data.get('status', NewsStatus.DRAFT.value)
+            
+            if not category_id:
+                return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+            
             try:
-                from dateutil import parser
-                published_at = parser.parse(article_data['published_at'])
-            except:
-                published_at = datetime.utcnow()
-        
-        # Tạo bài viết mới từ API article
-        news = News(
-            title=article_data.get('title', ''),
-            slug=self._generate_slug(article_data.get('title', 'Untitled')),
-            summary=article_data.get('summary', ''),
-            content=article_data.get('content', article_data.get('summary', '')),
-            thumbnail=article_data.get('thumbnail'),
-            category_id=category_id,
-            created_by=user_id,
-            approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
-            status=news_status,
-            is_api=True,  # Đánh dấu bài từ API
-            published_at=published_at if news_status == NewsStatus.PUBLISHED else None
-        )
-        
-        self.db_session.add(news)
-        self.db_session.commit()
-        self.db_session.refresh(news)
-        
-        return jsonify({
-            'success': True,
-            'message': f'Đã lưu bài viết với trạng thái {news_status.value}',
-            'news_id': news.id
-        })
+                news_status = NewsStatus(status)
+            except ValueError:
+                news_status = NewsStatus.DRAFT
+            
+            # Kiểm tra category tồn tại
+            category = db_session.query(Category).filter(Category.id == category_id).first()
+            if not category:
+                return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+            
+            # Parse published_at nếu có
+            published_at = None
+            if article_data.get('published_at'):
+                try:
+                    from dateutil import parser
+                    published_at = parser.parse(article_data['published_at'])
+                except:
+                    published_at = datetime.utcnow()
+            
+            # Tạo bài viết mới từ API article
+            news = News(
+                title=article_data.get('title', ''),
+                slug=self._generate_slug(article_data.get('title', 'Untitled')),
+                summary=article_data.get('summary', ''),
+                content=article_data.get('content', article_data.get('summary', '')),
+                thumbnail=article_data.get('thumbnail'),
+                category_id=category_id,
+                created_by=user_id,
+                approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
+                status=news_status,
+                is_api=True,  # Đánh dấu bài từ API
+                published_at=published_at if news_status == NewsStatus.PUBLISHED else None
+            )
+            
+            db_session.add(news)
+            db_session.commit()
+            
+            news_id = news.id
+            
+            return jsonify({
+                'success': True,
+                'message': f'Đã lưu bài viết với trạng thái {news_status.value}',
+                'news_id': news_id
+            })
+            
+        except Exception as e:
+            db_session.rollback()
+            return jsonify({
+                'success': False,
+                'error': f'Lỗi khi lưu bài viết: {str(e)}'
+            }), 500
+        finally:
+            db_session.close()
     
     def api_chart_data(self):
         """API lấy dữ liệu cho biểu đồ"""
@@ -1631,6 +1699,43 @@ class AdminController:
             'url': f'/{image_url}',
             'image_url': image_url
         })
+
+    def _generate_slug(self, title: str) -> str:
+        """Tạo slug từ tiêu đề - chuyển tiếng Việt có dấu thành không dấu"""
+        import re
+        import unicodedata
+        
+        # Chuyển thành chữ thường
+        slug = title.lower()
+        
+        # Bảng chuyển đổi tiếng Việt có dấu sang không dấu
+        vietnamese_map = {
+            'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+            'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+            'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+            'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+            'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+            'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+            'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+            'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+            'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+            'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+            'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+            'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+            'đ': 'd',
+        }
+        
+        # Thay thế các ký tự tiếng Việt
+        for viet, latin in vietnamese_map.items():
+            slug = slug.replace(viet, latin)
+        
+        # Xóa các ký tự không phải chữ cái, số, khoảng trắng, dấu gạch ngang
+        slug = re.sub(r'[^\w\s-]', '', slug)
+        
+        # Thay thế nhiều khoảng trắng hoặc dấu gạch ngang liên tiếp bằng một dấu gạch ngang
+        slug = re.sub(r'[-\s]+', '-', slug)
+        
+        return slug.strip('-')
     
     def api_menu_items(self):
         """API lấy danh sách categories (menu items)"""
@@ -2233,212 +2338,293 @@ class ClientController:
     """Quản lý các route của client"""
     
     def __init__(self):
-        self.db_session = get_session()
-        self.news_model = NewsModel(self.db_session)
-        self.category_model = CategoryModel(self.db_session)
-        self.user_model = UserModel(self.db_session)
-        # Model cho site quốc tế tiếng Anh
-        self.int_news_model = InternationalNewsModel(self.db_session)
-        self.int_category_model = InternationalCategoryModel(self.db_session)
+        # Don't store session - create fresh one per request
+        pass
     
     def index(self):
         """
         Trang chủ - Hiển thị tin tức mới nhất và nổi bật
         Route: GET /
         """
-        featured_news = self.news_model.get_featured(limit=5)
-        latest_news = self.news_model.get_published(limit=10)
-        hot_news = self.news_model.get_hot(limit=5)
-        categories = self.category_model.get_all()
+        db_session = get_session()
+        try:
+            news_model = NewsModel(db_session)
+            category_model = CategoryModel(db_session)
+            
+            featured_news = news_model.get_featured(limit=5)
+            latest_news = news_model.get_published(limit=10)
+            hot_news = news_model.get_hot(limit=5)
+            categories = category_model.get_all()
 
-        return render_template('client/vn/index.html',
-                             featured_news=featured_news,
-                             latest_news=latest_news,
-                             hot_news=hot_news,
-                             categories=categories)
+            return render_template('client/vn/index.html',
+                                 featured_news=featured_news,
+                                 latest_news=latest_news,
+                                 hot_news=hot_news,
+                                 categories=categories)
+        finally:
+            db_session.close()
     
     def category(self, category_slug: str):
         """
         Trang danh mục - Hiển thị tin tức theo danh mục
         Route: GET /category/<category_slug>
         """
-        category = self.category_model.get_by_slug(category_slug)
-        if not category:
+        db_session = get_session()
+        try:
+            print(f"=== DEBUG category ===")
+            print(f"Category slug received: {category_slug}")
+            
+            category_model = CategoryModel(db_session)
+            news_model = NewsModel(db_session)
+            
+            category = category_model.get_by_slug(category_slug)
+            print(f"Category found: {category}")
+            
+            if not category:
+                print("Category not found, aborting with 404")
+                abort(404)
+            
+            page = request.args.get('page', 1, type=int)
+            per_page = 20
+            offset = (page - 1) * per_page
+            
+            print(f"Getting news for category_id={category.id}, page={page}")
+            news_list = news_model.get_by_category(
+                category_id=category.id,
+                limit=per_page,
+                offset=offset
+            )
+            print(f"Found {len(news_list)} news articles")
+
+            categories = category_model.get_all()
+            print(f"Total categories: {len(categories)}")
+
+            return render_template('client/vn/category.html',
+                                 category=category,
+                                 news_list=news_list,
+                                 page=page,
+                                 categories=categories)
+        except Exception as e:
+            print(f"ERROR in category(): {str(e)}")
+            print(f"Exception type: {type(e).__name__}")
+            import traceback
+            traceback.print_exc()
+            db_session.rollback()
             abort(404)
-        
-        page = request.args.get('page', 1, type=int)
-        per_page = 20
-        offset = (page - 1) * per_page
-        
-        news_list = self.news_model.get_by_category(
-            category_id=category.id,
-            limit=per_page,
-            offset=offset
-        )
-
-        categories = self.category_model.get_all()
-
-        return render_template('client/vn/category.html',
-                             category=category,
-                             news_list=news_list,
-                             page=page,
-                             categories=categories)
+        finally:
+            db_session.close()
     
     def news_detail(self, news_slug: str):
         """
         Trang chi tiết bài viết
         Route: GET /news/<news_slug>
         """
-        news = self.news_model.get_by_slug(news_slug)
-        if not news or news.status != NewsStatus.PUBLISHED:
+        db_session = get_session()
+        try:
+            print(f"=== DEBUG news_detail ===")
+            print(f"Slug received: {news_slug}")
+            
+            news_model = NewsModel(db_session)
+            category_model = CategoryModel(db_session)
+            
+            news = news_model.get_by_slug(news_slug)
+            print(f"News found: {news}")
+            
+            if not news:
+                print(f"News not found for slug: {news_slug}")
+                abort(404)
+            
+            print(f"News status: {news.status}")
+            if news.status != NewsStatus.PUBLISHED:
+                print(f"News not published, status: {news.status}")
+                abort(404)
+            
+            # Lấy category của news dựa trên category_id
+            category = category_model.get_by_id(news.category_id)
+            
+            # Tăng số lượt xem
+            news_model.increment_view(news.id)
+            
+            # Xử lý cho user đã đăng nhập
+            is_saved = False
+            user_id = None
+            if 'user_id' in session:
+                user_id = session['user_id']
+                # Lưu vào tin đã xem
+                existing_viewed = db_session.query(ViewedNews).filter(
+                    ViewedNews.user_id == user_id,
+                    ViewedNews.news_id == news.id
+                ).first()
+                
+                if not existing_viewed:
+                    viewed_news = ViewedNews(
+                        user_id=user_id,
+                        news_id=news.id,
+                        site='vn'
+                    )
+                    db_session.add(viewed_news)
+                    db_session.commit()
+                else:
+                    # Cập nhật thời gian xem
+                    existing_viewed.viewed_at = datetime.utcnow()
+                    db_session.commit()
+                
+                # Kiểm tra xem tin đã được lưu chưa
+                saved_news = db_session.query(SavedNews).filter(
+                    SavedNews.user_id == user_id,
+                    SavedNews.news_id == news.id
+                ).first()
+                is_saved = saved_news is not None
+            
+            # Lấy bình luận
+            from sqlalchemy.orm import joinedload
+            comments = db_session.query(Comment).options(
+                joinedload(Comment.user)
+            ).filter(
+                Comment.news_id == news.id,
+                Comment.is_active == True,
+                Comment.parent_id == None  # Chỉ lấy comment gốc, không lấy reply
+            ).order_by(Comment.created_at.desc()).all()
+            
+            # Lấy bài viết liên quan
+            related_news = news_model.get_by_category(
+                category_id=news.category_id,
+                limit=5
+            )
+            related_news = [n for n in related_news if n.id != news.id][:5]
+            
+            categories = category_model.get_all()
+            
+            return render_template('client/vn/news_detail.html',
+                                 news=news,
+                                 category=category,
+                                 related_news=related_news,
+                                 categories=categories,
+                                 is_saved=is_saved,
+                                 comments=comments,
+                                 user_id=user_id)
+        except Exception as e:
+            # Rollback nếu có lỗi database
+            db_session.rollback()
+            
+            # Log lỗi
+            import traceback
+            print(f"Error in news_detail: {str(e)}")
+            traceback.print_exc()
+            
+            # Trả về 404 thay vì 500 để user-friendly hơn
             abort(404)
-        
-        # Lấy category của news dựa trên category_id
-        category = self.category_model.get_by_id(news.category_id)
-        
-        # Tăng số lượt xem
-        self.news_model.increment_view(news.id)
-        
-        # Xử lý cho user đã đăng nhập
-        is_saved = False
-        user_id = None
-        if 'user_id' in session:
-            user_id = session['user_id']
-            # Lưu vào tin đã xem
-            existing_viewed = self.db_session.query(ViewedNews).filter(
-                ViewedNews.user_id == user_id,
-                ViewedNews.news_id == news.id
-            ).first()
-            
-            if not existing_viewed:
-                viewed_news = ViewedNews(
-                    user_id=user_id,
-                    news_id=news.id,
-                    site='vn'
-                )
-                self.db_session.add(viewed_news)
-                self.db_session.commit()
-            else:
-                # Cập nhật thời gian xem
-                existing_viewed.viewed_at = datetime.utcnow()
-                self.db_session.commit()
-            
-            # Kiểm tra xem tin đã được lưu chưa
-            saved_news = self.db_session.query(SavedNews).filter(
-                SavedNews.user_id == user_id,
-                SavedNews.news_id == news.id
-            ).first()
-            is_saved = saved_news is not None
-        
-        # Lấy bình luận
-        from sqlalchemy.orm import joinedload
-        comments = self.db_session.query(Comment).options(
-            joinedload(Comment.user)
-        ).filter(
-            Comment.news_id == news.id,
-            Comment.is_active == True,
-            Comment.parent_id == None  # Chỉ lấy comment gốc, không lấy reply
-        ).order_by(Comment.created_at.desc()).all()
-        
-        # Lấy bài viết liên quan
-        related_news = self.news_model.get_by_category(
-            category_id=news.category_id,
-            limit=5
-        )
-        related_news = [n for n in related_news if n.id != news.id][:5]
-        
-        categories = self.category_model.get_all()
-        
-        return render_template('client/vn/news_detail.html',
-                             news=news,
-                             category=category,
-                             related_news=related_news,
-                             categories=categories,
-                             is_saved=is_saved,
-                             comments=comments,
-                             user_id=user_id)
+        finally:
+            db_session.close()
     
     def search(self):
         """
         Tìm kiếm tin tức
         Route: GET /search?q=<keyword>
         """
-        keyword = request.args.get('q', '').strip()
-        page = request.args.get('page', 1, type=int)
-        
-        categories = self.category_model.get_all()
-        
-        if not keyword:
+        db_session = get_session()
+        try:
+            keyword = request.args.get('q', '').strip()
+            page = request.args.get('page', 1, type=int)
+            
+            news_model = NewsModel(db_session)
+            category_model = CategoryModel(db_session)
+            
+            categories = category_model.get_all()
+            
+            if not keyword:
+                return render_template('client/vn/search.html',
+                                     keyword='',
+                                     news_list=[],
+                                     page=1,
+                                     categories=categories)
+            
+            per_page = 20
+            offset = (page - 1) * per_page
+            
+            news_list = news_model.search(keyword, limit=per_page + offset)
+            news_list = news_list[offset:offset + per_page]
+            
             return render_template('client/vn/search.html',
-                                 keyword='',
-                                 news_list=[],
-                                 page=1,
+                                 keyword=keyword,
+                                 news_list=news_list,
+                                 page=page,
                                  categories=categories)
-        
-        per_page = 20
-        offset = (page - 1) * per_page
-        
-        news_list = self.news_model.search(keyword, limit=per_page + offset)
-        news_list = news_list[offset:offset + per_page]
-        
-        return render_template('client/vn/search.html',
-                             keyword=keyword,
-                             news_list=news_list,
-                             page=page,
-                             categories=categories)
+        finally:
+            db_session.close()
     
     def api_latest_news(self):
         """
         API lấy tin tức mới nhất (JSON)
         Route: GET /api/latest-news
         """
-        limit = request.args.get('limit', 10, type=int)
-        offset = request.args.get('offset', 0, type=int)
-        
-        news_list = self.news_model.get_published(limit=limit, offset=offset)
-        
-        return jsonify({
-            'success': True,
-            'data': [self._news_to_dict(news) for news in news_list]
-        })
+        db_session = get_session()
+        try:
+            limit = request.args.get('limit', 10, type=int)
+            offset = request.args.get('offset', 0, type=int)
+            
+            news_model = NewsModel(db_session)
+            news_list = news_model.get_published(limit=limit, offset=offset)
+            
+            return jsonify({
+                'success': True,
+                'data': [self._news_to_dict(news) for news in news_list]
+            })
+        finally:
+            db_session.close()
     
     def api_featured_news(self):
         """
         API lấy tin nổi bật (JSON)
         Route: GET /api/featured-news
         """
-        limit = request.args.get('limit', 5, type=int)
-        news_list = self.news_model.get_featured(limit=limit)
-        
-        return jsonify({
-            'success': True,
-            'data': [self._news_to_dict(news) for news in news_list]
-        })
+        db_session = get_session()
+        try:
+            limit = request.args.get('limit', 5, type=int)
+            news_model = NewsModel(db_session)
+            news_list = news_model.get_featured(limit=limit)
+            
+            return jsonify({
+                'success': True,
+                'data': [self._news_to_dict(news) for news in news_list]
+            })
+        finally:
+            db_session.close()
     
     def api_hot_news(self):
         """
         API lấy tin nóng (JSON)
         Route: GET /api/hot-news
         """
-        limit = request.args.get('limit', 5, type=int)
-        news_list = self.news_model.get_hot(limit=limit)
+        db_session = get_session()
+        try:
+            limit = request.args.get('limit', 5, type=int)
+            news_model = NewsModel(db_session)
+            news_list = news_model.get_hot(limit=limit)
         
-        return jsonify({
-            'success': True,
-            'data': [self._news_to_dict(news) for news in news_list]
-        })
+            return jsonify({
+                'success': True,
+                'data': [self._news_to_dict(news) for news in news_list]
+            })
+        finally:
+            db_session.close()
     
     def api_categories(self):
         """
         API lấy danh sách danh mục (JSON)
         Route: GET /api/categories
         """
-        categories = self.category_model.get_all()
-        
-        return jsonify({
-            'success': True,
-            'data': [self._category_to_dict(cat) for cat in categories]
-        })
+        db_session = get_session()
+        try:
+            category_model = CategoryModel(db_session)
+            categories = category_model.get_all()
+            
+            return jsonify({
+                'success': True,
+                'data': [self._category_to_dict(cat) for cat in categories]
+            })
+        finally:
+            db_session.close()
     
     def _news_to_dict(self, news) -> dict:
         """Chuyển đổi News object thành dictionary"""

@@ -10,7 +10,7 @@ from controller import ClientController
 # Tạo Blueprint cho client để chỉ đường dẫn file tĩnh trong dự án
 client_bp = Blueprint('client', __name__, 
                      url_prefix='',
-                     template_folder='templates/client')
+                     template_folder='templates')
 
 # Khởi tạo client controller
 client_controller = ClientController()
@@ -24,6 +24,7 @@ def index():
 @client_bp.route('/category/<category_slug>')
 def category(category_slug: str):
     """Trang danh mục"""
+    print(f"=== ROUTE CALLED: /category/{category_slug} ===")
     return client_controller.category(category_slug)
 
 
