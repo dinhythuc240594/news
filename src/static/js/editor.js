@@ -48,6 +48,14 @@ $(document).ready(function() {
     // Load initial data
     loadMyArticles(); // Bài viết của tôi (tất cả trạng thái, trang 1)
     
+    // Load notifications khi mở dropdown
+    $('#notificationDropdown').on('click', function() {
+        loadNotifications(false); // Không hiển thị toast khi click vào dropdown
+    });
+    
+    // Khởi tạo thống kê editor & polling thông báo duyệt / từ chối
+    initEditorStats();
+
     // Menu navigation
     $('.sidebar-menu a[data-section]').click(function(e) {
         e.preventDefault();
@@ -243,6 +251,262 @@ $(document).ready(function() {
     initTagAutocomplete('#editArticleTags', '#editTagSuggestions');
     initTagAutocomplete('#intArticleTags', '#intTagSuggestions');
 });
+
+// ===== Editor statistics & notifications =====
+
+let editorStats = {
+    total: 0,
+    draft: 0,
+    pending: 0,
+    published: 0,
+    rejected: 0
+};
+
+// Lưu trữ danh sách ID bài viết đã thông báo
+let notifiedArticleIds = new Set();
+
+// Khởi tạo thống kê từ DOM và đồng bộ với API
+function initEditorStats() {
+    editorStats.total = parseInt($('#statTotal').text()) || 0;
+    editorStats.draft = parseInt($('#statDrafts').text()) || 0;
+    editorStats.pending = parseInt($('#statPending').text()) || 0;
+    editorStats.published = parseInt($('#statPublished').text()) || 0;
+
+    // Load danh sách ID đã thông báo từ localStorage
+    const savedIds = localStorage.getItem('editor_notified_ids');
+    if (savedIds) {
+        try {
+            notifiedArticleIds = new Set(JSON.parse(savedIds));
+        } catch (e) {
+            console.error('Lỗi load notified IDs:', e);
+            notifiedArticleIds = new Set();
+        }
+    }
+
+    // Đồng bộ lần đầu từ API (không cần thông báo)
+    refreshEditorStats(false);
+    loadNotifications(false);
+
+    // Polling mỗi 30s để phát hiện bài được duyệt / bị từ chối
+    setInterval(function () {
+        refreshEditorStats(true);
+        loadNotifications(true);
+    }, 30000);
+}
+
+// Lấy tổng bài theo trạng thái cho editor hiện tại (dựa trên pagination.total)
+async function fetchCountByStatus(status) {
+    try {
+        const params = new URLSearchParams();
+        params.append('page', 1);
+        params.append('per_page', 1);
+        if (status && status !== 'all') {
+            params.append('status', status);
+        }
+
+        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const result = await response.json();
+        if (!result.success || !result.pagination) {
+            return null;
+        }
+
+        return result.pagination.total || 0;
+    } catch (error) {
+        console.error('Lỗi tải thống kê bài viết editor:', error);
+        return null;
+    }
+}
+
+// Cập nhật lại thống kê & hiển thị toast khi có bài được duyệt / từ chối
+async function refreshEditorStats(showNotifications) {
+    try {
+        const [total, draft, pending, published, rejected] = await Promise.all([
+            fetchCountByStatus('all'),
+            fetchCountByStatus('draft'),
+            fetchCountByStatus('pending'),
+            fetchCountByStatus('published'),
+            fetchCountByStatus('rejected')
+        ]);
+
+        // Bỏ qua nếu API lỗi
+        if (total === null || draft === null || pending === null || published === null || rejected === null) {
+            return;
+        }
+
+        const prevStats = { ...editorStats };
+
+        editorStats.total = total;
+        editorStats.draft = draft;
+        editorStats.pending = pending;
+        editorStats.published = published;
+        editorStats.rejected = rejected;
+
+        // Cập nhật DOM dashboard
+        $('#statTotal').text(total);
+        $('#statDrafts').text(draft);
+        $('#statPending').text(pending);
+        $('#statPublished').text(published);
+
+        // Cập nhật badge menu trái
+        $('#draftCount').text(draft);
+        $('#pendingCount').text(pending);
+    } catch (error) {
+        console.error('Lỗi cập nhật thống kê editor:', error);
+    }
+}
+
+// Load notifications từ API và hiển thị
+async function loadNotifications(showToastNotifications) {
+    try {
+        const response = await fetch('/admin/api/editor-notifications?limit=20', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        const result = await response.json();
+        if (!result.success || !result.data) {
+            return;
+        }
+
+        const notifications = result.data || [];
+        const newNotifications = [];
+
+        // Phát hiện các bài viết mới được duyệt/từ chối
+        notifications.forEach(notif => {
+            const articleId = notif.id.toString();
+            if (!notifiedArticleIds.has(articleId)) {
+                newNotifications.push(notif);
+                notifiedArticleIds.add(articleId);
+            }
+        });
+
+        // Lưu danh sách ID đã thông báo vào localStorage
+        if (newNotifications.length > 0) {
+            localStorage.setItem('editor_notified_ids', JSON.stringify(Array.from(notifiedArticleIds)));
+        }
+
+        // Hiển thị toast cho các bài viết mới
+        if (showToastNotifications && newNotifications.length > 0) {
+            newNotifications.forEach(notif => {
+                if (notif.status === 'published') {
+                    showToast('Thông báo', `Bài viết "${notif.title}" đã được duyệt và xuất bản`, 'success');
+                } else if (notif.status === 'rejected') {
+                    showToast('Thông báo', `Bài viết "${notif.title}" đã bị từ chối`, 'warning');
+                }
+            });
+        }
+
+        // Hiển thị notifications trong dropdown
+        displayNotifications(notifications);
+    } catch (error) {
+        console.error('Lỗi tải notifications:', error);
+    }
+}
+
+// Hiển thị notifications trong dropdown
+function displayNotifications(notifications) {
+    const $notificationList = $('#notificationList');
+    const $notificationEmpty = $('#notificationEmpty');
+    const $notificationCount = $('#notificationCount');
+
+    if (!notifications || notifications.length === 0) {
+        $notificationList.html('');
+        $notificationEmpty.show().text('Chưa có thông báo mới.');
+        $notificationCount.text('0').hide();
+        return;
+    }
+
+    $notificationEmpty.hide();
+    
+    // Đếm số notification chưa đọc (các bài mới)
+    const unreadCount = notifications.filter(n => !notifiedArticleIds.has(n.id.toString())).length;
+    
+    if (unreadCount > 0) {
+        $notificationCount.text(unreadCount).show();
+    } else {
+        $notificationCount.hide();
+    }
+
+    let html = '';
+    notifications.slice(0, 10).forEach(notif => {
+        const isUnread = !notifiedArticleIds.has(notif.id.toString());
+        const dateStr = notif.published_at || notif.updated_at || '';
+        const date = dateStr ? new Date(dateStr + 'Z').toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : '';
+
+        const statusClass = notif.status === 'published' ? 'success' : 'danger';
+        const statusIcon = notif.status === 'published' ? 'fa-check-circle' : 'fa-times-circle';
+        const statusText = notif.status === 'published' ? 'Đã duyệt' : 'Bị từ chối';
+
+        html += `
+            <li>
+                <div class="dropdown-item ${isUnread ? 'notification-unread' : ''}" style="cursor: pointer;" data-article-id="${notif.id}">
+                    <div class="d-flex align-items-start">
+                        <div class="flex-shrink-0">
+                            <i class="fas ${statusIcon} text-${statusClass}"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-2">
+                            <div class="fw-bold">${escapeHtml(notif.title || 'Không có tiêu đề')}</div>
+                            <small class="text-muted">
+                                <span class="badge bg-${statusClass}">${statusText}</span>
+                                ${date ? ` - ${date}` : ''}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </li>
+        `;
+    });
+
+    $notificationList.html(html);
+    
+    // Xử lý click vào notification để mở edit modal và đánh dấu đã đọc
+    $notificationList.off('click', '.dropdown-item').on('click', '.dropdown-item', function() {
+        const articleId = $(this).data('article-id');
+        if (articleId) {
+            // Đánh dấu đã đọc
+            notifiedArticleIds.add(articleId.toString());
+            localStorage.setItem('editor_notified_ids', JSON.stringify(Array.from(notifiedArticleIds)));
+            
+            // Cập nhật lại hiển thị
+            displayNotifications(notifications);
+            
+            // Mở modal edit
+            editArticle(articleId);
+        }
+    });
+}
+
+// Helper function để escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.toString().replace(/[&<>"']/g, m => map[m]);
+}
 
 // Check authentication
 async function checkAuth() {
@@ -617,6 +881,15 @@ async function saveDraft() {
         return;
     }
     
+    // Validate tags - chỉ chấp nhận tags có sẵn
+    if (tags) {
+        const tagValidation = validateTags(tags);
+        if (!tagValidation.valid) {
+            showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
+            return;
+        }
+    }
+    
     showSpinner();
     
     try {
@@ -649,10 +922,8 @@ async function saveDraft() {
             $('#imagePreview').html('');
             $('#articleImageUrl').val('');
             
-            // Update stats
-            const drafts = parseInt($('#statDrafts').text()) + 1;
-            $('#statDrafts').text(drafts);
-            $('#draftCount').text(drafts);
+            // Đồng bộ lại thống kê từ API
+            refreshEditorStats(false);
             
             // Reload articles
             loadMyArticles();
@@ -668,6 +939,42 @@ async function saveDraft() {
 
 function normalizeTagString(tagsString) {
     return tagsString.trim().replace(/[,;]+/g, ',');
+}
+
+// Validate tags - chỉ chấp nhận tags có sẵn trong tagSuggestionsCache
+function validateTags(tagsString) {
+    if (!tagsString || !tagsString.trim()) {
+        return { valid: true, invalidTags: [] };
+    }
+    
+    // Đảm bảo cache đã được load
+    if (tagSuggestionsCache.length === 0) {
+        console.warn('Tag cache chưa được load, đang tải...');
+        // Không block user, nhưng sẽ validate ở backend
+        return { valid: true, invalidTags: [], warning: 'Cache chưa sẵn sàng, sẽ validate ở server' };
+    }
+    
+    // Parse tags từ string
+    const tagNames = tagsString
+        .split(/[,\s;]+/)
+        .map(tag => tag.trim().replace(/^#/, ''))
+        .filter(tag => tag.length > 0);
+    
+    const invalidTags = [];
+    
+    // Kiểm tra từng tag có trong cache không (case-insensitive)
+    tagNames.forEach(tagName => {
+        const tagLower = tagName.toLowerCase();
+        const found = tagSuggestionsCache.some(cachedTag => cachedTag.toLowerCase() === tagLower);
+        if (!found) {
+            invalidTags.push(tagName);
+        }
+    });
+    
+    return {
+        valid: invalidTags.length === 0,
+        invalidTags: invalidTags
+    };
 }
 
 // Submit article
@@ -692,6 +999,13 @@ async function submitArticle() {
     
     if (!category) {
         showToast('Cảnh báo', 'Vui lòng chọn danh mục!', 'warning');
+        return;
+    }
+    
+    // Validate tags - chỉ chấp nhận tags có sẵn
+    const tagValidation = validateTags(tags);
+    if (!tagValidation.valid) {
+        showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
         return;
     }
     
@@ -727,12 +1041,8 @@ async function submitArticle() {
             $('#imagePreview').html('');
             $('#articleImageUrl').val('');
             
-            // Update stats
-            const pending = parseInt($('#statPending').text()) + 1;
-            const total = parseInt($('#statTotal').text()) + 1;
-            $('#statPending').text(pending);
-            $('#statTotal').text(total);
-            $('#pendingCount').text(pending);
+            // Đồng bộ lại thống kê từ API
+            refreshEditorStats(false);
             
             // Reload articles
             loadMyArticles();
@@ -825,6 +1135,14 @@ async function saveEdit(newStatus = null) {
         showToast('Cảnh báo', 'Vui lòng nhập tags!', 'warning');
         return;
     }
+    
+    // Validate tags - chỉ chấp nhận tags có sẵn
+    const tagValidation = validateTags(tags);
+    if (!tagValidation.valid) {
+        showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
+        return;
+    }
+    
     try {
         const payload = {
             id: articleId,
@@ -875,9 +1193,8 @@ function deleteArticle(articleId) {
             $(this).remove();
         });
         
-        // Update stats
-        const total = parseInt($('#statTotal').text()) - 1;
-        $('#statTotal').text(total);
+        // Đồng bộ lại thống kê từ API sau khi xóa
+        refreshEditorStats(false);
     }, 1000);
 }
 

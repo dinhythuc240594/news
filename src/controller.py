@@ -464,6 +464,56 @@ class AdminController:
             }
         })
     
+    def api_editor_notifications(self):
+        """
+        API lấy các bài viết được duyệt/từ chối gần đây của editor hiện tại (JSON)
+        Route: GET /admin/api/editor-notifications
+        Query params:
+            limit: số lượng bài viết tối đa (mặc định: 20)
+        """
+        if "user_id" not in session:
+            return jsonify({"success": False, "error": "Chưa đăng nhập"}), 401
+
+        user_id = session["user_id"]
+        limit = request.args.get("limit", 20, type=int)
+        
+        if limit < 1 or limit > 100:
+            limit = 20
+
+        # Lấy các bài viết được duyệt hoặc từ chối gần đây của editor này
+        # Sắp xếp theo published_at (nếu có) hoặc updated_at (khi bị từ chối)
+        from sqlalchemy import or_, desc
+        
+        items = self.db_session.query(News).filter(
+            News.created_by == user_id,
+            or_(
+                News.status == NewsStatus.PUBLISHED,
+                News.status == NewsStatus.REJECTED
+            )
+        ).order_by(
+            desc(News.published_at),
+            desc(News.updated_at)
+        ).limit(limit).all()
+
+        notifications = []
+        for news in items:
+            notification = {
+                'id': news.id,
+                'title': news.title,
+                'status': news.status.value,
+                'category_name': news.category.name if getattr(news, "category", None) else None,
+                'published_at': news.published_at.isoformat() if news.published_at else None,
+                'updated_at': news.updated_at.isoformat() if news.updated_at else None,
+                'approved_by': news.approver.username if getattr(news, "approver", None) else None,
+            }
+            notifications.append(notification)
+
+        return jsonify({
+            "success": True,
+            "data": notifications,
+            "count": len(notifications)
+        })
+    
     def _news_to_dict(self, news) -> dict:
         """Chuyển đổi News object thành dictionary"""
         return {
@@ -1324,24 +1374,32 @@ class AdminController:
                                         article.content = content
                     self.db_session.commit()
             
-            # Xử lý tags nếu có
+            # Xử lý tags nếu có - CHỈ chấp nhận tags có sẵn trong bảng tags
             if tags:
-                # Xóa các tags cũ của bài viết
+                # Xóa các tags cũ của bài viết (nếu có)
                 self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).delete()
                 
                 tag_names = self._parse_tags(tags)
+                invalid_tags = []
+                
                 for tag_name in tag_names:
-                    # Tìm hoặc tạo tag
+                    # CHỈ tìm tag có sẵn, KHÔNG tự tạo mới
                     tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
                     if not tag:
-                        tag_slug = self._generate_slug(tag_name)
-                        tag = Tag(name=tag_name, slug=tag_slug)
-                        self.db_session.add(tag)
-                        self.db_session.flush()
+                        invalid_tags.append(tag_name)
+                        continue
                     
                     # Tạo NewsTag mới
                     news_tag = NewsTag(news_id=article.id, tag_id=tag.id)
                     self.db_session.add(news_tag)
+                
+                # Nếu có tags không hợp lệ, trả về lỗi
+                if invalid_tags:
+                    self.db_session.rollback()
+                    return jsonify({
+                        'success': False, 
+                        'error': f'Các tags sau không tồn tại trong hệ thống: {", ".join(invalid_tags)}. Vui lòng chỉ sử dụng tags có sẵn.'
+                    }), 400
             
             self.db_session.commit()
         except IntegrityError as e:
@@ -1479,24 +1537,32 @@ class AdminController:
                                         article.content = content
                     self.db_session.commit()
             
-            # Xử lý tags nếu có
+            # Xử lý tags nếu có - CHỈ chấp nhận tags có sẵn trong bảng tags
             if tags:
                 # Xóa các tags cũ của bài viết
                 self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).delete()
                 
                 tag_names = self._parse_tags(tags)
+                invalid_tags = []
+                
                 for tag_name in tag_names:
-                    # Tìm hoặc tạo tag
+                    # CHỈ tìm tag có sẵn, KHÔNG tự tạo mới
                     tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
                     if not tag:
-                        tag_slug = self._generate_slug(tag_name)
-                        tag = Tag(name=tag_name, slug=tag_slug)
-                        self.db_session.add(tag)
-                        self.db_session.flush()
+                        invalid_tags.append(tag_name)
+                        continue
                     
                     # Tạo NewsTag mới
                     news_tag = NewsTag(news_id=article.id, tag_id=tag.id)
                     self.db_session.add(news_tag)
+                
+                # Nếu có tags không hợp lệ, trả về lỗi
+                if invalid_tags:
+                    self.db_session.rollback()
+                    return jsonify({
+                        'success': False, 
+                        'error': f'Các tags sau không tồn tại trong hệ thống: {", ".join(invalid_tags)}. Vui lòng chỉ sử dụng tags có sẵn.'
+                    }), 400
             
             self.db_session.commit()
         except IntegrityError as e:

@@ -100,6 +100,13 @@ def api_my_articles():
     return admin_controller.api_my_articles()
 
 
+@admin_bp.route('/api/editor-notifications')
+@controller.editor_required
+def api_editor_notifications():
+    """API lấy các bài viết được duyệt/từ chối gần đây của editor"""
+    return admin_controller.api_editor_notifications()
+
+
 @admin_bp.route('/api/current-user')
 def api_current_user():
     """API lấy thông tin user hiện tại từ session"""

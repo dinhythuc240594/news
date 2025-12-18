@@ -80,9 +80,26 @@
         <div class="content-header">
             <h2 id="pageTitle">Dashboard</h2>
             <div class="header-actions">
-                <button class="btn btn-primary" data-section="create">
+                <!-- <button class="btn btn-primary" data-section="create">
                     <i class="fas fa-plus"></i> Tạo bài mới
-                </button>
+                </button> -->
+                <div class="dropdown me-2">
+                    <button class="btn btn-outline-secondary position-relative" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge bg-danger position-absolute top-0 start-100 translate-middle" id="notificationCount">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown" aria-labelledby="notificationDropdown">
+                        <li class="dropdown-header">
+                            <strong>Thông báo</strong>
+                        </li>
+                        <li>
+                            <div class="px-3 py-2 small text-muted" id="notificationEmpty">
+                                Chưa có thông báo mới.
+                            </div>
+                            <div id="notificationList"></div>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
