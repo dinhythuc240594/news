@@ -1,4 +1,4 @@
-{% extends 'base.html' %}
+{% extends '/client/vn/base.html' %}
 {% block title %}{{ category.name }} - VnNews{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_client.css') }}">
@@ -116,5 +116,5 @@
     </main>
 {% endblock %}
 {% block scripts %}
-{% include 'hot_news.html' %}
+{% include 'client/en/hot_news.html' %}
 {% endblock %}

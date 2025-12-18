@@ -1,8 +1,10 @@
 {% extends '/admin/base_admin.html' %}
 {% block title %}Dashboard - VnNews Editor{% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">    <!-- Summernote CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">
+    <!-- Summernote CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+{% endblock %}
 {% block template %}
     <!-- Sidebar -->
     <div class="sidebar">
@@ -37,13 +39,13 @@
             <li>
                 <a href="#" data-section="drafts">
                     <i class="fas fa-save"></i> Bản nháp
-                    <span class="badge bg-secondary" id="draftCount">3</span>
+                    <span class="badge bg-secondary" id="draftCount">{{ stat_draft }}</span>
                 </a>
             </li>
             <li>
                 <a href="#" data-section="pending">
                     <i class="fas fa-clock"></i> Chờ duyệt
-                    <span class="badge bg-warning" id="pendingCount">5</span>
+                    <span class="badge bg-warning" id="pendingCount">{{ stat_pending }}</span>
                 </a>
             </li>
             <li>
@@ -78,9 +80,26 @@
         <div class="content-header">
             <h2 id="pageTitle">Dashboard</h2>
             <div class="header-actions">
-                <button class="btn btn-primary" data-section="create">
+                <!-- <button class="btn btn-primary" data-section="create">
                     <i class="fas fa-plus"></i> Tạo bài mới
-                </button>
+                </button> -->
+                <div class="dropdown me-2">
+                    <button class="btn btn-outline-secondary position-relative" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge bg-danger position-absolute top-0 start-100 translate-middle" id="notificationCount">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown" aria-labelledby="notificationDropdown">
+                        <li class="dropdown-header">
+                            <strong>Thông báo</strong>
+                        </li>
+                        <li>
+                            <div class="px-3 py-2 small text-muted" id="notificationEmpty">
+                                Chưa có thông báo mới.
+                            </div>
+                            <div id="notificationList"></div>
+                        </li>
+                    </ul>
+                </div>
             </div>
         </div>
 
@@ -93,7 +112,7 @@
                             <i class="fas fa-file-alt"></i>
                         </div>
                         <div class="stat-details">
-                            <h3 id="statTotal">24</h3>
+                            <h3 id="statTotal">{{ stat_total }}</h3>
                             <p>Tổng bài viết</p>
                         </div>
                     </div>
@@ -104,7 +123,7 @@
                             <i class="fas fa-clock"></i>
                         </div>
                         <div class="stat-details">
-                            <h3 id="statPending">5</h3>
+                            <h3 id="statPending">{{ stat_pending }}</h3>
                             <p>Chờ duyệt</p>
                         </div>
                     </div>
@@ -115,7 +134,7 @@
                             <i class="fas fa-check"></i>
                         </div>
                         <div class="stat-details">
-                            <h3 id="statPublished">16</h3>
+                            <h3 id="statPublished">{{ stat_published }}</h3>
                             <p>Đã xuất bản</p>
                         </div>
                     </div>
@@ -126,7 +145,7 @@
                             <i class="fas fa-save"></i>
                         </div>
                         <div class="stat-details">
-                            <h3 id="statDrafts">3</h3>
+                            <h3 id="statDrafts">{{ stat_draft }}</h3>
                             <p>Bản nháp</p>
                         </div>
                     </div>
@@ -168,43 +187,13 @@
         </div>
 
         <!-- My Articles Section -->
-        <div class="content-section" id="my-articles">
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5><i class="fas fa-file-alt"></i> Bài viết của tôi</h5>
-                    <div>
-                        <select class="form-select form-select-sm d-inline-block" style="width: 150px;" id="filterStatus">
-                            <option value="all">Tất cả</option>
-                            <option value="draft">Bản nháp</option>
-                            <option value="pending">Chờ duyệt</option>
-                            <option value="published">Đã xuất bản</option>
-                            <option value="hidden">Đã ẩn</option>
-                        </select>
-                        <input type="text" class="form-control form-control-sm d-inline-block" style="width: 200px;" placeholder="Tìm kiếm...">
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th width="5%">#</th>
-                                    <th width="35%">Tiêu đề</th>
-                                    <th width="12%">Danh mục</th>
-                                    <th width="10%">Trạng thái</th>
-                                    <th width="10%">Hiển thị</th>
-                                    <th width="13%">Ngày tạo</th>
-                                    <th width="15%">Hành động</th>
-                                </tr>
-                            </thead>
-                            <tbody id="myArticlesTable">
-                                <!-- Data will be loaded by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
+        {% include 'editor/my-articles-section.html' %}
+        {% include 'editor/article-section.html' %}
+        {% include 'editor/drafts-section.html' %}
+        {% include 'editor/pending-section.html' %}
+        {% include 'editor/published-section.html' %}
+        {% include 'editor/international-section.html' %}
+
     </div>
 
     <!-- Edit Modal -->
@@ -217,28 +206,57 @@
                 </div>
                 <div class="modal-body">
                     <form id="editArticleForm">
-                        <input type="hidden" id="editArticleId">
-                        <div class="mb-3">
-                            <label class="form-label">Tiêu đề</label>
-                            <input type="text" class="form-control" id="editArticleTitle">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Nội dung</label>
-                            <textarea id="editArticleContent" class="form-control"></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Danh mục</label>
-                            <select class="form-select" id="editArticleCategory">
-                                <option value="thoi-su">Thời sự</option>
-                                <option value="kinh-doanh">Kinh doanh</option>
-                                <option value="giai-tri">Giải trí</option>
-                                <option value="the-thao">Thể thao</option>
-                            </select>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <input type="hidden" id="editArticleId">
+                                <div class="mb-3">
+                                    <label class="form-label">Tiêu đề</label>
+                                    <input type="text" class="form-control" id="editArticleTitle">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Nội dung</label>
+                                    <textarea id="editArticleContent" class="form-control"></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Danh mục</label>
+                                    <select class="form-select" id="editArticleCategory">
+                                        {% for category in categories %}
+                                            <option value="{{ category.id }}">{{ category.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Ảnh đại diện</label>
+                                    <div id="imagePreview" class="mt-2">
+                                        <img src="{{ url_for('static', filename='images/default-image.jpg') }}" id="editArticleImagePreview" alt="Ảnh đại diện" class="img-fluid" style="width: 100%; height: 100%; object-fit: cover;">
+                                        <small class="text-muted">Ảnh sẽ được upload tự động khi chọn file</small>
+                                    </div>
+                                    <input type="file" class="form-control" id="editArticleImage" accept="image/*">
+                                    <input type="hidden" id="editArticleImageUrl">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label class="form-label">Mô tả ngắn</label>
+                                    <textarea class="form-control" id="editArticleDescription" rows="3" placeholder="Mô tả ngắn gọn về bài viết..."></textarea>
+                                </div>
+                                
+                                <div class="mb-3" style="position: relative;">
+                                    <label class="form-label">Tags</label>
+                                    <input type="text" class="form-control" id="editArticleTags" placeholder="Gõ # để gợi ý tag, ví dụ: #công_nghệ #AI #iPhone">
+                                    <small class="text-muted">Nhập tags theo định dạng hashtag: #tên_tag</small>
+                                    <div id="editTagSuggestions" class="tag-suggestions" style="display: none;"></div>
+                                </div>
+                            </div>
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                    <button type="button" class="btn btn-outline-primary" id="submitEditBtn">
+                        <i class="fas fa-paper-plane"></i> Gửi duyệt
+                    </button>
                     <button type="button" class="btn btn-primary" id="saveEditBtn">
                         <i class="fas fa-save"></i> Lưu thay đổi
                     </button>
@@ -246,9 +264,6 @@
             </div>
         </div>
     </div>
-
-    {% include 'editor/article-section.html' %}
-    {% include 'editor/international-section.html' %}
 
     <!-- Create International Article Section -->
     <div class="content-section" id="create-international">
@@ -313,10 +328,11 @@
                                 <input type="text" class="form-control" id="intArticleAuthor" placeholder="Author name">
                             </div>
                             
-                            <div class="mb-3">
+                            <div class="mb-3" style="position: relative;">
                                 <label class="form-label">Tags</label>
-                                <input type="text" class="form-control" id="intArticleTags" placeholder="climate, summit, environment">
-                                <small class="text-muted">Separate with commas</small>
+                                <input type="text" class="form-control" id="intArticleTags" placeholder="Type # to suggest tags, e.g: #climate #summit #environment">
+                                <small class="text-muted">Enter tags in hashtag format: #tag_name</small>
+                                <div id="intTagSuggestions" class="tag-suggestions" style="display: none;"></div>
                             </div>
                             
                             <div class="mb-3 form-check">

@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash, session, current_app
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from typing import Optional
 from functools import wraps
 import os
@@ -16,6 +17,8 @@ from database import (
     Category,
     NewsInternational,
     CategoryInternational,
+    Tag,
+    NewsTag,
 )
 from models import (
     NewsModel,
@@ -157,18 +160,24 @@ class AdminController:
         """
         user_id = session.get('user_id')
         
-        # Lấy bài viết của editor
+        # Lấy bài viết của editor (chỉ dùng để thống kê nhanh)
         all_news = self.news_model.get_all()
         my_news = [n for n in all_news if n.created_by == user_id]
         
         draft_news = [n for n in my_news if n.status == NewsStatus.DRAFT]
         pending_news = [n for n in my_news if n.status == NewsStatus.PENDING]
         published_news = [n for n in my_news if n.status == NewsStatus.PUBLISHED]
+        categories = self.category_model.get_all()
         
         return render_template('editor/editor-dashboard.html',
                              draft_news=draft_news,
                              pending_news=pending_news,
-                             published_news=published_news)
+                             published_news=published_news,
+                             categories=categories,
+                             stat_total=len(my_news),
+                             stat_draft=len(draft_news),
+                             stat_pending=len(pending_news),
+                             stat_published=len(published_news))
     
     def news_list(self):
         """
@@ -367,6 +376,64 @@ class AdminController:
             'success': True,
             'data': [self._news_to_dict(news) for news in news_list]
         })
+
+    def api_my_articles(self):
+        """
+        API lấy danh sách bài viết của editor hiện tại (JSON)
+        Route: GET /admin/api/my-articles
+        Query params:
+            status: draft|pending|published|rejected|all (mặc định: all)
+            page: trang hiện tại (mặc định: 1)
+            per_page: số bài mỗi trang (mặc định: 10)
+            search: từ khóa tìm kiếm
+        """
+        if "user_id" not in session:
+            return jsonify({"success": False, "error": "Chưa đăng nhập"}), 401
+
+        user_id = session["user_id"]
+
+        status_str = request.args.get("status", "all")
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 10, type=int)
+        search = request.args.get("search", None)
+
+        # Chuẩn hóa tham số
+        if page < 1:
+            page = 1
+        if per_page < 1 or per_page > 100:
+            per_page = 10
+
+        status = None
+        if status_str and status_str != "all":
+            try:
+                status = NewsStatus(status_str)
+            except ValueError:
+                status = None
+
+        offset = (page - 1) * per_page
+
+        items, total = self.news_model.get_by_creator(
+            creator_id=user_id,
+            limit=per_page,
+            offset=offset,
+            status=status,
+            search=search,
+        )
+
+        total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+        return jsonify(
+            {
+                "success": True,
+                "data": [self._news_to_dict(news) for news in items],
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": total,
+                    "pages": total_pages,
+                },
+            }
+        )
     
     def api_current_user(self):
         """
@@ -397,6 +464,56 @@ class AdminController:
             }
         })
     
+    def api_editor_notifications(self):
+        """
+        API lấy các bài viết được duyệt/từ chối gần đây của editor hiện tại (JSON)
+        Route: GET /admin/api/editor-notifications
+        Query params:
+            limit: số lượng bài viết tối đa (mặc định: 20)
+        """
+        if "user_id" not in session:
+            return jsonify({"success": False, "error": "Chưa đăng nhập"}), 401
+
+        user_id = session["user_id"]
+        limit = request.args.get("limit", 20, type=int)
+        
+        if limit < 1 or limit > 100:
+            limit = 20
+
+        # Lấy các bài viết được duyệt hoặc từ chối gần đây của editor này
+        # Sắp xếp theo published_at (nếu có) hoặc updated_at (khi bị từ chối)
+        from sqlalchemy import or_, desc
+        
+        items = self.db_session.query(News).filter(
+            News.created_by == user_id,
+            or_(
+                News.status == NewsStatus.PUBLISHED,
+                News.status == NewsStatus.REJECTED
+            )
+        ).order_by(
+            desc(News.published_at),
+            desc(News.updated_at)
+        ).limit(limit).all()
+
+        notifications = []
+        for news in items:
+            notification = {
+                'id': news.id,
+                'title': news.title,
+                'status': news.status.value,
+                'category_name': news.category.name if getattr(news, "category", None) else None,
+                'published_at': news.published_at.isoformat() if news.published_at else None,
+                'updated_at': news.updated_at.isoformat() if news.updated_at else None,
+                'approved_by': news.approver.username if getattr(news, "approver", None) else None,
+            }
+            notifications.append(notification)
+
+        return jsonify({
+            "success": True,
+            "data": notifications,
+            "count": len(notifications)
+        })
+    
     def _news_to_dict(self, news) -> dict:
         """Chuyển đổi News object thành dictionary"""
         return {
@@ -405,13 +522,16 @@ class AdminController:
             'slug': news.slug,
             'status': news.status.value,
             'category': {
-                'id': news.category.id,
-                'name': news.category.name
+                'id': news.category.id if getattr(news, "category", None) else None,
+                'name': news.category.name if getattr(news, "category", None) else None,
             },
-            'created_by': news.creator.username if news.creator else None,
-            'approved_by': news.approver.username if news.approver else None,
-            'created_at': news.created_at.isoformat(),
-            'published_at': news.published_at.isoformat() if news.published_at else None
+            # Các field phẳng phục vụ cho UI editor
+            'category_name': news.category.name if getattr(news, "category", None) else None,
+            'visible': getattr(news, "visible", True),
+            'created_by': news.creator.username if getattr(news, "creator", None) else None,
+            'approved_by': news.approver.username if getattr(news, "approver", None) else None,
+            'created_at': news.created_at.isoformat() if getattr(news, "created_at", None) else None,
+            'published_at': news.published_at.isoformat() if getattr(news, "published_at", None) else None,
         }
     
     def api_statistics(self):
@@ -884,6 +1004,13 @@ class AdminController:
                 'message': 'Bài viết không tồn tại'
             }), 404
         
+        # Lấy tags từ NewsTag relationship
+        news_tags = self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).all()
+        tag_ids = [nt.tag_id for nt in news_tags]
+        tags = self.db_session.query(Tag).filter(Tag.id.in_(tag_ids)).all() if tag_ids else []
+        tags_list = [f"#{tag.name}" for tag in tags]
+        tags_string = ' '.join(tags_list) if tags_list else ''
+        
         return jsonify({
             'success': True,
             'data': {
@@ -903,7 +1030,9 @@ class AdminController:
                 'updated_at': article.updated_at.strftime('%d/%m/%Y %H:%M') if article.updated_at else '',
                 'view_count': article.view_count,
                 'is_featured': article.is_featured if hasattr(article, 'is_featured') else False,
-                'is_hot': article.is_hot if hasattr(article, 'is_hot') else False
+                'is_hot': article.is_hot if hasattr(article, 'is_hot') else False,
+                'is_deleted': article.is_deleted if hasattr(article, 'is_deleted') else False,
+                'tags': tags_string
             }
         })
     
@@ -919,6 +1048,127 @@ class AdminController:
                 'slug': cat.slug
             } for cat in categories]
         })
+    
+    def api_tags(self):
+        """API lấy danh sách tags để autocomplete"""
+        search = request.args.get('search', '').strip()
+        
+        query = self.db_session.query(Tag).order_by(Tag.name)
+        
+        if search:
+            # Tìm tags có tên chứa search term (không phân biệt hoa thường)
+            query = query.filter(Tag.name.ilike(f'%{search}%'))
+        
+        tags = query.limit(20).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': tag.id,
+                'name': tag.name,
+                'slug': tag.slug
+            } for tag in tags]
+        })
+
+    def api_create_tag(self):
+        """API tạo hashtag mới"""
+        data = request.get_json(silent=True) or {}
+        name = (data.get('name') or '').strip()
+        slug = (data.get('slug') or '').strip() or None
+
+        if not name:
+            return jsonify({'success': False, 'error': 'Tên hashtag không được để trống'}), 400
+
+        # Chuẩn hóa: bỏ dấu # nếu có
+        if name.startswith('#'):
+            name = name[1:]
+
+        # Nếu không truyền slug, tự sinh từ name
+        if not slug:
+            slug = self._generate_slug(name)
+
+        try:
+            # Kiểm tra trùng slug
+            existing = self.db_session.query(Tag).filter(Tag.slug == slug).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'Hashtag đã tồn tại'}), 400
+
+            tag = Tag(name=name, slug=slug)
+            self.db_session.add(tag)
+            self.db_session.commit()
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'id': tag.id,
+                    'name': tag.name,
+                    'slug': tag.slug
+                }
+            })
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            current_app.logger.exception('Lỗi tạo hashtag: %s', e)
+            return jsonify({'success': False, 'error': 'Không thể tạo hashtag'}), 500
+
+    def api_update_tag(self, tag_id: int):
+        """API cập nhật hashtag"""
+        data = request.get_json(silent=True) or {}
+        name = (data.get('name') or '').strip()
+        slug = (data.get('slug') or '').strip() or None
+
+        if not name:
+            return jsonify({'success': False, 'error': 'Tên hashtag không được để trống'}), 400
+
+        if name.startswith('#'):
+            name = name[1:]
+
+        if not slug:
+            slug = self._generate_slug(name)
+
+        try:
+            tag = self.db_session.query(Tag).filter(Tag.id == tag_id).first()
+            if not tag:
+                return jsonify({'success': False, 'error': 'Không tìm thấy hashtag'}), 404
+
+            # Kiểm tra slug trùng với tag khác
+            existing = self.db_session.query(Tag).filter(Tag.slug == slug, Tag.id != tag_id).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'Slug đã được dùng bởi hashtag khác'}), 400
+
+            tag.name = name
+            tag.slug = slug
+            self.db_session.commit()
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'id': tag.id,
+                    'name': tag.name,
+                    'slug': tag.slug
+                }
+            })
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            current_app.logger.exception('Lỗi cập nhật hashtag: %s', e)
+            return jsonify({'success': False, 'error': 'Không thể cập nhật hashtag'}), 500
+
+    def api_delete_tag(self, tag_id: int):
+        """API xóa hashtag"""
+        try:
+            tag = self.db_session.query(Tag).filter(Tag.id == tag_id).first()
+            if not tag:
+                return jsonify({'success': False, 'error': 'Không tìm thấy hashtag'}), 404
+
+            # Xóa liên kết NewsTag trước khi xóa tag
+            self.db_session.query(NewsTag).where(NewsTag.tag_id == tag_id).delete()
+            self.db_session.delete(tag)
+            self.db_session.commit()
+
+            return jsonify({'success': True})
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            current_app.logger.exception('Lỗi xóa hashtag: %s', e)
+            return jsonify({'success': False, 'error': 'Không thể xóa hashtag'}), 500
 
     def api_international_categories(self):
         """API lấy danh sách danh mục tin quốc tế (categories_international)"""
@@ -933,13 +1183,454 @@ class AdminController:
             } for cat in categories]
         })
     
-    def _generate_slug(self, title: str) -> str:
-        """Tạo slug từ tiêu đề"""
+    def _parse_tags(self, tags_string: str) -> list:
+        """Parse tags từ string có thể chứa hashtag format (#tag_name), comma-separated hoặc cách nhau bằng khoảng trắng"""
         import re
+        tag_names = []
+
+        if not tags_string:
+            return []
+        
+        # Tách theo dấu phẩy, dấu chấm phẩy HOẶC khoảng trắng
+        parts = re.split(r'[,\s;]+', tags_string)
+        
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            
+            # Nếu có dấu # ở đầu, loại bỏ nó
+            if part.startswith('#'):
+                part = part[1:]
+            
+            # Loại bỏ các ký tự đặc biệt không hợp lệ
+            part = re.sub(r'[^\w\s-]', '', part)
+            part = part.strip()
+            
+            if part:
+                tag_names.append(part)
+        
+        # Loại bỏ trùng lặp và trả về
+        return list(dict.fromkeys(tag_names))
+    
+    def _generate_slug(self, title: str, status: str = None) -> str:
+        """Tạo slug từ tiêu đề và trạng thái"""
+        import re
+        
+        # Mapping tiếng Việt sang không dấu
+        vietnamese_map = {
+            'à': 'a', 'á': 'a', 'ạ': 'a', 'ả': 'a', 'ã': 'a', 'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ậ': 'a', 'ẩ': 'a', 'ẫ': 'a',
+            'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ặ': 'a', 'ẳ': 'a', 'ẵ': 'a',
+            'è': 'e', 'é': 'e', 'ẹ': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ê': 'e', 'ề': 'e', 'ế': 'e', 'ệ': 'e', 'ể': 'e', 'ễ': 'e',
+            'ì': 'i', 'í': 'i', 'ị': 'i', 'ỉ': 'i', 'ĩ': 'i',
+            'ò': 'o', 'ó': 'o', 'ọ': 'o', 'ỏ': 'o', 'õ': 'o', 'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ộ': 'o', 'ổ': 'o', 'ỗ': 'o',
+            'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ợ': 'o', 'ở': 'o', 'ỡ': 'o',
+            'ù': 'u', 'ú': 'u', 'ụ': 'u', 'ủ': 'u', 'ũ': 'u', 'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ự': 'u', 'ử': 'u', 'ữ': 'u',
+            'ỳ': 'y', 'ý': 'y', 'ỵ': 'y', 'ỷ': 'y', 'ỹ': 'y',
+            'đ': 'd',
+            'À': 'a', 'Á': 'a', 'Ạ': 'a', 'Ả': 'a', 'Ã': 'a', 'Â': 'a', 'Ầ': 'a', 'Ấ': 'a', 'Ậ': 'a', 'Ẩ': 'a', 'Ẫ': 'a',
+            'Ă': 'a', 'Ằ': 'a', 'Ắ': 'a', 'Ặ': 'a', 'Ẳ': 'a', 'Ẵ': 'a',
+            'È': 'e', 'É': 'e', 'Ẹ': 'e', 'Ẻ': 'e', 'Ẽ': 'e', 'Ê': 'e', 'Ề': 'e', 'Ế': 'e', 'Ệ': 'e', 'Ể': 'e', 'Ễ': 'e',
+            'Ì': 'i', 'Í': 'i', 'Ị': 'i', 'Ỉ': 'i', 'Ĩ': 'i',
+            'Ò': 'o', 'Ó': 'o', 'Ọ': 'o', 'Ỏ': 'o', 'Õ': 'o', 'Ô': 'o', 'Ồ': 'o', 'Ố': 'o', 'Ộ': 'o', 'Ổ': 'o', 'Ỗ': 'o',
+            'Ơ': 'o', 'Ờ': 'o', 'Ớ': 'o', 'Ợ': 'o', 'Ở': 'o', 'Ỡ': 'o',
+            'Ù': 'u', 'Ú': 'u', 'Ụ': 'u', 'Ủ': 'u', 'Ũ': 'u', 'Ư': 'u', 'Ừ': 'u', 'Ứ': 'u', 'Ự': 'u', 'Ử': 'u', 'Ữ': 'u',
+            'Ỳ': 'y', 'Ý': 'y', 'Ỵ': 'y', 'Ỷ': 'y', 'Ỹ': 'y',
+            'Đ': 'd'
+        }
+        
         slug = title.lower()
+        
+        # Chuyển đổi tiếng Việt có dấu sang không dấu
+        for viet_char, eng_char in vietnamese_map.items():
+            slug = slug.replace(viet_char, eng_char)
+        
+        # Loại bỏ ký tự đặc biệt, chỉ giữ chữ, số, khoảng trắng và dấu gạch ngang
         slug = re.sub(r'[^\w\s-]', '', slug)
+        # Thay nhiều khoảng trắng hoặc dấu gạch ngang bằng một dấu gạch ngang
         slug = re.sub(r'[-\s]+', '-', slug)
-        return slug.strip('-')
+        # Loại bỏ dấu gạch ngang ở đầu và cuối
+        slug = slug.strip('-')
+        
+        # Thêm prefix trạng thái nếu cần (tùy chọn)
+        if status and status != 'published':
+            slug = f"{slug}-{status}"
+        
+        return slug
+    
+    def api_create_article(self):
+        """API tạo bài viết mới từ editor form"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        data = request.json if request.is_json else request.form
+        
+        # Lấy dữ liệu từ form
+        title = data.get('title', '').strip()
+        content = data.get('content', '').strip()
+        category_id = data.get('category_id') or data.get('category')
+        summary = data.get('summary') or data.get('description', '').strip()
+        thumbnail = data.get('thumbnail', '').strip()
+        tags = data.get('tags', '').strip()
+        status = data.get('status', NewsStatus.DRAFT.value)
+        
+        # Validation
+        if not title:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập tiêu đề bài viết'}), 400
+        
+        if not content:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập nội dung bài viết'}), 400
+        
+        if not category_id:
+            return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+        
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Danh mục không hợp lệ'}), 400
+        
+        # Kiểm tra category tồn tại
+        category = self.db_session.query(Category).filter(Category.id == category_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+        
+        try:
+            news_status = NewsStatus(status)
+        except ValueError:
+            news_status = NewsStatus.DRAFT
+        
+        # Tạo slug từ tiêu đề và trạng thái
+        base_slug = self._generate_slug(title, status)
+        slug = base_slug
+        
+        # Kiểm tra slug trùng và thêm số nếu cần
+        counter = 1
+        while self.db_session.query(News).filter(News.slug == slug).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        # Extract images từ HTML content
+        import re
+        image_urls = []
+        img_pattern = r'<img[^>]+src=["\']([^"\']+)["\']'
+        matches = re.findall(img_pattern, content)
+        for img_url in matches:
+            if img_url and img_url not in image_urls:
+                image_urls.append(img_url)
+        
+        # Lưu images dưới dạng JSON
+        images_json = None
+        if image_urls:
+            import json
+            images_json = json.dumps(image_urls)
+        
+        try:
+            # Tạo bài viết mới
+            article = News(
+                title=title,
+                slug=slug,
+                content=content,
+                summary=summary,
+                thumbnail=thumbnail,
+                images=images_json,
+                category_id=category_id,
+                created_by=user_id,
+                status=news_status,
+                published_at=datetime.utcnow() if news_status == NewsStatus.PUBLISHED else None
+            )
+            
+            self.db_session.add(article)
+            self.db_session.commit()
+            self.db_session.refresh(article)
+            
+            # Di chuyển ảnh từ temp folder sang folder của bài viết nếu có
+            if article.id:
+                temp_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
+                news_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{article.id}')
+                
+                if os.path.exists(temp_folder):
+                    os.makedirs(news_folder, exist_ok=True)
+                    # Di chuyển các file từ temp sang news folder
+                    import shutil
+                    for filename in os.listdir(temp_folder):
+                        src_path = os.path.join(temp_folder, filename)
+                        dst_path = os.path.join(news_folder, filename)
+                        if os.path.isfile(src_path):
+                            shutil.move(src_path, dst_path)
+                            # Cập nhật URL trong thumbnail và content nếu cần
+                            if thumbnail and 'temp' in thumbnail:
+                                thumbnail = thumbnail.replace('temp', f'news_{article.id}')
+                                article.thumbnail = thumbnail
+                            if images_json:
+                                import json
+                                images = json.loads(images_json)
+                                updated_images = [img.replace('temp', f'news_{article.id}') if 'temp' in img else img for img in images]
+                                article.images = json.dumps(updated_images)
+                                # Cập nhật content với URL mới
+                                for old_url, new_url in zip(images, updated_images):
+                                    if old_url != new_url:
+                                        content = content.replace(old_url, new_url)
+                                        article.content = content
+                    self.db_session.commit()
+            
+            # Xử lý tags nếu có - CHỈ chấp nhận tags có sẵn trong bảng tags
+            if tags:
+                # Xóa các tags cũ của bài viết (nếu có)
+                self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).delete()
+                
+                tag_names = self._parse_tags(tags)
+                invalid_tags = []
+                
+                for tag_name in tag_names:
+                    # CHỈ tìm tag có sẵn, KHÔNG tự tạo mới
+                    tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
+                    if not tag:
+                        invalid_tags.append(tag_name)
+                        continue
+                    
+                    # Tạo NewsTag mới
+                    news_tag = NewsTag(news_id=article.id, tag_id=tag.id)
+                    self.db_session.add(news_tag)
+                
+                # Nếu có tags không hợp lệ, trả về lỗi
+                if invalid_tags:
+                    self.db_session.rollback()
+                    return jsonify({
+                        'success': False, 
+                        'error': f'Các tags sau không tồn tại trong hệ thống: {", ".join(invalid_tags)}. Vui lòng chỉ sử dụng tags có sẵn.'
+                    }), 400
+            
+            self.db_session.commit()
+        except IntegrityError as e:
+            self.db_session.rollback()
+            # Trả về thông điệp lỗi gốc từ DB (ví dụ: Key (slug)=... already exists.)
+            message = getattr(e, "orig", None)
+            message = str(message) if message else str(e)
+            return jsonify({'success': False, 'error': message}), 400
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+        return jsonify({
+            'success': True,
+            'message': 'Tạo bài viết thành công',
+            'data': {
+                'id': article.id,
+                'slug': article.slug,
+                'title': article.title
+            }
+        })
+
+    def api_edit_article(self, article_id: int):
+        """API chỉnh sửa bài viết theo ID"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        data = request.json if request.is_json else request.form
+        article = self.db_session.query(News).filter(News.id == article_id).first()
+        if not article:
+            return jsonify({'success': False, 'error': 'Bài viết không tồn tại'}), 400
+        
+        # Lấy dữ liệu từ form
+        title = data.get('title', '').strip()
+        content = data.get('content', '').strip()
+        category_id = data.get('category_id') or data.get('category')
+        summary = data.get('summary') or data.get('description', '').strip()
+        thumbnail = data.get('thumbnail', '').strip()
+        tags = data.get('tags', '').strip()
+        status = data.get('status', article.status.value)
+        
+        # Validation
+        if not title:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập tiêu đề bài viết'}), 400
+        
+        if not content:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập nội dung bài viết'}), 400
+        
+        if not category_id:
+            return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+        
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Danh mục không hợp lệ'}), 400
+        
+        # Kiểm tra category tồn tại
+        category = self.db_session.query(Category).filter(Category.id == category_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+        
+        try:
+            news_status = NewsStatus(status)
+        except ValueError:
+            news_status = article.status
+        
+        # Tạo slug từ tiêu đề và trạng thái
+        base_slug = self._generate_slug(title, status)
+        slug = base_slug
+        
+        # Kiểm tra slug trùng và thêm số nếu cần (nhưng không trùng với chính nó)
+        counter = 1
+        while self.db_session.query(News).filter(News.slug == slug, News.id != article_id).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        # Extract images từ HTML content
+        import re
+        image_urls = []
+        img_pattern = r'<img[^>]+src=["\']([^"\']+)["\']'
+        matches = re.findall(img_pattern, content)
+        for img_url in matches:
+            if img_url and img_url not in image_urls:
+                image_urls.append(img_url)
+        
+        # Lưu images dưới dạng JSON
+        images_json = None
+        if image_urls:
+            import json
+            images_json = json.dumps(image_urls)
+        
+        try:
+            # Cập nhật bài viết
+            article.title = title
+            article.slug = slug
+            article.content = content
+            article.summary = summary
+            article.thumbnail = thumbnail
+            article.images = images_json
+            article.category_id = category_id
+            article.status = news_status
+            article.published_at = datetime.utcnow() if news_status == NewsStatus.PUBLISHED else article.published_at
+            
+            self.db_session.commit()
+            self.db_session.refresh(article)
+            
+            # Di chuyển ảnh từ temp folder sang folder của bài viết nếu có
+            if article.id:
+                temp_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
+                news_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{article.id}')
+                
+                if os.path.exists(temp_folder):
+                    os.makedirs(news_folder, exist_ok=True)
+                    # Di chuyển các file từ temp sang news folder
+                    import shutil
+                    for filename in os.listdir(temp_folder):
+                        src_path = os.path.join(temp_folder, filename)
+                        dst_path = os.path.join(news_folder, filename)
+                        if os.path.isfile(src_path):
+                            shutil.move(src_path, dst_path)
+                            # Cập nhật URL trong thumbnail và content nếu cần
+                            if thumbnail and 'temp' in thumbnail:
+                                thumbnail = thumbnail.replace('temp', f'news_{article.id}')
+                                article.thumbnail = thumbnail
+                            if images_json:
+                                import json
+                                images = json.loads(images_json)
+                                updated_images = [img.replace('temp', f'news_{article.id}') if 'temp' in img else img for img in images]
+                                article.images = json.dumps(updated_images)
+                                # Cập nhật content với URL mới
+                                for old_url, new_url in zip(images, updated_images):
+                                    if old_url != new_url:
+                                        content = content.replace(old_url, new_url)
+                                        article.content = content
+                    self.db_session.commit()
+            
+            # Xử lý tags nếu có - CHỈ chấp nhận tags có sẵn trong bảng tags
+            if tags:
+                # Xóa các tags cũ của bài viết
+                self.db_session.query(NewsTag).filter(NewsTag.news_id == article.id).delete()
+                
+                tag_names = self._parse_tags(tags)
+                invalid_tags = []
+                
+                for tag_name in tag_names:
+                    # CHỈ tìm tag có sẵn, KHÔNG tự tạo mới
+                    tag = self.db_session.query(Tag).filter(Tag.name == tag_name).first()
+                    if not tag:
+                        invalid_tags.append(tag_name)
+                        continue
+                    
+                    # Tạo NewsTag mới
+                    news_tag = NewsTag(news_id=article.id, tag_id=tag.id)
+                    self.db_session.add(news_tag)
+                
+                # Nếu có tags không hợp lệ, trả về lỗi
+                if invalid_tags:
+                    self.db_session.rollback()
+                    return jsonify({
+                        'success': False, 
+                        'error': f'Các tags sau không tồn tại trong hệ thống: {", ".join(invalid_tags)}. Vui lòng chỉ sử dụng tags có sẵn.'
+                    }), 400
+            
+            self.db_session.commit()
+        except IntegrityError as e:
+            self.db_session.rollback()
+            message = getattr(e, "orig", None)
+            message = str(message) if message else str(e)
+            return jsonify({'success': False, 'error': message}), 400
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cập nhật bài viết thành công',
+            'data': {
+                'id': article.id,
+                'slug': article.slug,
+                'title': article.title
+            }
+        })
+    
+    def api_upload_image(self):
+        """API upload ảnh cho bài viết"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        if 'image' not in request.files:
+            return jsonify({'success': False, 'error': 'Không có file được chọn'}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'Không có file được chọn'}), 400
+        
+        # Kiểm tra file hợp lệ
+        if not self._allowed_file(file.filename):
+            return jsonify({'success': False, 'error': 'File không hợp lệ. Chỉ chấp nhận: png, jpg, jpeg, gif, webp'}), 400
+        
+        # Lấy news_id từ request (nếu có) để lưu vào thư mục tương ứng
+        news_id = request.form.get('news_id')
+        
+        # Tạo thư mục lưu ảnh
+        if news_id:
+            upload_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', f'news_{news_id}')
+        else:
+            # Nếu chưa có news_id, lưu vào thư mục temp
+            upload_folder = os.path.join('src', 'static', 'uploads', 'news', 'vn', 'temp')
+        
+        os.makedirs(upload_folder, exist_ok=True)
+        
+        # Tạo tên file an toàn
+        filename = secure_filename(file.filename)
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{timestamp}_{filename}"
+        filepath = os.path.join(upload_folder, filename)
+        
+        # Lưu file
+        file.save(filepath)
+        
+        # Tạo URL trả về (relative to static folder)
+        image_url = f"static/uploads/news/vn/{'news_' + str(news_id) if news_id else 'temp'}/{filename}"
+        
+        return jsonify({
+            'success': True,
+            'message': 'Upload ảnh thành công',
+            'url': f'/{image_url}',
+            'image_url': image_url
+        })
     
     def api_menu_items(self):
         """API lấy danh sách categories (menu items)"""
@@ -1533,6 +2224,10 @@ class AdminController:
                 'error': str(e)
             }), 500
 
+    def _allowed_file(self, filename):
+        """Kiểm tra file có được phép upload không"""
+        return '.' in filename and \
+               filename.rsplit('.', 1)[1].lower() in current_app.config.get('ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'gif', 'webp'})
 
 class ClientController:
     """Quản lý các route của client"""

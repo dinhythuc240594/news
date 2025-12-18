@@ -1,54 +1,152 @@
+// Menu Manager Configuration - Tự động phát hiện tab hiện tại
+const menuConfig = {
+    // Cấu hình cho menu thường
+    'menu-manager': {
+        apiBase: '/admin/api/menu-items',
+        selectors: {
+            addBtn: '#addMenuBtn',
+            saveBtn: '#saveMenuBtn',
+            resetBtn: '#resetMenuBtn',
+            previewBtn: '#previewMenuBtn',
+            treeList: '#menuTreeList',
+            treeView: '#menuTreeView',
+            modal: '#menuModal',
+            modalTitle: '#menuModalTitle',
+            form: '#menuForm',
+            formId: '#menuId',
+            formName: '#menuName',
+            formSlug: '#menuSlug',
+            formParent: '#menuParent',
+            formIcon: '#menuIcon',
+            formOrder: '#menuOrder',
+            formVisible: '#menuVisible',
+            previewModal: '#previewModal',
+            previewList: '#previewMenuList'
+        }
+    },
+    // Cấu hình cho menu quốc tế
+    'en-menu-manager': {
+        apiBase: '/admin/api/international-menu-items',
+        selectors: {
+            addBtn: '#addEnMenuBtn',
+            saveBtn: '#saveEnMenuBtn',
+            resetBtn: '#resetEnMenuBtn',
+            previewBtn: '#previewEnMenuBtn',
+            treeList: '#enMenuTreeList',
+            treeView: '#enMenuTreeView',
+            modal: '#enMenuModal',
+            modalTitle: '#enMenuModalTitle',
+            form: '#enMenuForm',
+            formId: '#enMenuId',
+            formName: '#enMenuName',
+            formSlug: '#enMenuSlug',
+            formParent: '#enMenuParent',
+            formIcon: '#enMenuIcon',
+            formOrder: '#enMenuOrder',
+            formVisible: '#enMenuVisible',
+            previewModal: '#enPreviewModal',
+            previewList: '#enPreviewMenuList'
+        }
+    }
+};
+
+// Lấy config dựa trên section hiện tại
+function getMenuConfig() {
+    const activeSection = $('.content-section.active').attr('id');
+    return menuConfig[activeSection] || menuConfig['menu-manager'];
+}
+
+// Helper để lấy selector từ config
+function getSelector(key) {
+    const config = getMenuConfig();
+    return config.selectors[key];
+}
+
+// Helper để lấy API base URL
+function getApiBase() {
+    const config = getMenuConfig();
+    return config.apiBase;
+}
+
 $(document).ready(function() {
-    // Check authentication
-    checkAuth();
-    loadUserInfo();
+    // Chỉ khởi tạo khi ở trong section menu manager
+    function initMenuManager() {
+        const activeSection = $('.content-section.active').attr('id');
+        if (activeSection !== 'menu-manager' && activeSection !== 'en-menu-manager') {
+            return;
+        }
+        
+        const config = getMenuConfig();
+        
+        // Check and init default menu items if empty
+        checkAndInitDefaultMenus();
+        
+        // Load menu data
+        loadMenuTable();
+        loadMenuTree();
+        loadParentMenuOptions();
+        
+        // Initialize drag & drop
+        initDragAndDrop();
+        
+        // Add Menu button
+        $(config.selectors.addBtn).off('click').on('click', function() {
+            openMenuModal('add', null);
+        });
+        
+        // Save menu
+        $(config.selectors.saveBtn).off('click').on('click', function() {
+            saveMenu();
+        });
+        
+        // Auto generate slug
+        $(config.selectors.formName).off('input').on('input', function() {
+            const name = $(this).val();
+            const slug = slugify(name);
+            $(config.selectors.formSlug).val(slug);
+        });
+        
+        // Preview menu
+        $(config.selectors.previewBtn).off('click').on('click', function() {
+            previewMenu();
+        });
+        
+        // Reset menu
+        $(config.selectors.resetBtn).off('click').on('click', function() {
+            if (confirm('Bạn có chắc muốn reset tất cả menu về mặc định? Thao tác này sẽ xóa tất cả menu hiện tại và tạo lại menu mặc định!')) {
+                resetMenuToDefault();
+            }
+        });
+    }
     
-    // Check and init default menu items if empty
-    checkAndInitDefaultMenus();
+    // Khởi tạo ngay nếu section đã active
+    initMenuManager();
     
-    // Load menu data
-    loadMenuTable();
-    loadMenuTree();
-    loadParentMenuOptions();
-    
-    // Initialize drag & drop
-    initDragAndDrop();
-    
-    // Add Menu button
-    $('#addMenuBtn').click(function() {
-        openMenuModal('add', null);
+    // Khởi tạo lại khi chuyển section
+    $(document).on('click', '.sidebar-menu a[data-section]', function() {
+        setTimeout(initMenuManager, 100);
     });
     
-    // // Add Submenu button
-    // $('#addSubmenuBtn').click(function() {
-    //     openMenuModal('add-submenu', null);
-    // });
-    
-    // Save menu
-    $('#saveMenuBtn').click(function() {
-        saveMenu();
-    });
-    
-    // Edit menu
+    // Edit menu (delegate event)
     $(document).on('click', '.btn-edit-menu', function() {
         const menuId = parseInt($(this).data('id'));
         openMenuModal('edit', menuId);
     });
     
-    // Delete menu
+    // Delete menu (delegate event)
     $(document).on('click', '.btn-delete-menu', function() {
         const menuId = parseInt($(this).data('id'));
         deleteMenu(menuId);
     });
     
-    // Toggle visibility
+    // Toggle visibility (delegate event)
     $(document).on('change', '.menu-visibility-toggle', function() {
         const menuId = parseInt($(this).data('id'));
         const visible = $(this).is(':checked');
         updateMenuVisibility(menuId, visible);
     });
     
-    // Toggle expand/collapse children
+    // Toggle expand/collapse children (delegate event)
     $(document).on('click', '.menu-item-expand.has-children', function(e) {
         e.stopPropagation();
         const menuId = $(this).data('menu-id');
@@ -64,7 +162,7 @@ $(document).ready(function() {
         }
     });
     
-    // Move menu up
+    // Move menu up (delegate event)
     $(document).on('click', '.btn-move-up', function(e) {
         e.stopPropagation();
         const menuId = parseInt($(this).data('id'));
@@ -72,7 +170,7 @@ $(document).ready(function() {
         moveMenuUp(menuId, isParent);
     });
     
-    // Move menu down
+    // Move menu down (delegate event)
     $(document).on('click', '.btn-move-down', function(e) {
         e.stopPropagation();
         const menuId = parseInt($(this).data('id'));
@@ -80,7 +178,7 @@ $(document).ready(function() {
         moveMenuDown(menuId, isParent);
     });
     
-    // Add Submenu from menu item
+    // Add Submenu from menu item (delegate event)
     $(document).on('click', '.btn-add-submenu', function(e) {
         e.stopPropagation();
         const parentId = parseInt($(this).data('id'));
@@ -93,34 +191,6 @@ $(document).ready(function() {
         }
         
         openMenuModal('add-submenu', null, parentId);
-    });
-    
-    // Auto generate slug
-    $('#menuName').on('input', function() {
-        const name = $(this).val();
-        const slug = slugify(name);
-        $('#menuSlug').val(slug);
-    });
-    
-    // Preview menu
-    $('#previewMenuBtn').click(function() {
-        previewMenu();
-    });
-    
-    // Reset menu
-    $('#resetMenuBtn').click(function() {
-        if (confirm('Bạn có chắc muốn reset tất cả menu về mặc định? Thao tác này sẽ xóa tất cả menu hiện tại và tạo lại menu mặc định!')) {
-            resetMenuToDefault();
-        }
-    });
-    
-    // Logout
-    $('#logoutBtn').click(function(e) {
-        e.preventDefault();
-        if (confirm('Bạn có chắc muốn đăng xuất?')) {
-            localStorage.removeItem('userInfo');
-            window.location.href = 'login.html';
-        }
     });
 });
 
@@ -157,12 +227,13 @@ async function loadUserInfo() {
 // Check and init default menu items
 async function checkAndInitDefaultMenus() {
     try {
-        const response = await fetch('/admin/api/menu-items');
+        const apiBase = getApiBase();
+        const response = await fetch(apiBase);
         const result = await response.json();
         
         if (result.success && result.data && result.data.length === 0) {
             // Bảng rỗng, tự động init default menu items
-            const initResponse = await fetch('/admin/api/menu-items/init-default', {
+            const initResponse = await fetch(`${apiBase}/init-default`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -203,7 +274,9 @@ function renderMenuWithChildren(menu, allMenus, level = 1) {
 // Load menu table with tree view
 async function loadMenuTable() {
     try {
-        const response = await fetch('/admin/api/menu-items');
+        const apiBase = getApiBase();
+        const treeListSelector = getSelector('treeList');
+        const response = await fetch(apiBase);
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -224,14 +297,14 @@ async function loadMenuTable() {
                 html = '<div class="text-center text-muted p-4">Chưa có menu nào. Nhấn "Thêm Menu" để tạo mới.</div>';
             }
             
-            $('#menuTreeList').html(html);
+            $(treeListSelector).html(html);
             
             // Initialize sortable after rendering
             initDragAndDrop();
         }
     } catch (error) {
         console.error('Lỗi tải menu:', error);
-        $('#menuTreeList').html('<div class="text-center text-danger p-4">Lỗi tải dữ liệu</div>');
+        $(getSelector('treeList')).html('<div class="text-center text-danger p-4">Lỗi tải dữ liệu</div>');
     }
 }
 
@@ -298,9 +371,10 @@ function renderMenuRow(menu, hasChildren, isParent, level = null) {
 // Initialize drag and drop
 function initDragAndDrop() {
     if (typeof $.ui !== 'undefined' && $.ui.sortable) {
+        const treeListSelector = getSelector('treeList');
         // Destroy existing sortable instances to avoid conflicts
-        if ($('#menuTreeList').hasClass('ui-sortable')) {
-            $('#menuTreeList').sortable('destroy');
+        if ($(treeListSelector).hasClass('ui-sortable')) {
+            $(treeListSelector).sortable('destroy');
         }
         $('.menu-children-container').each(function() {
             if ($(this).hasClass('ui-sortable')) {
@@ -309,7 +383,7 @@ function initDragAndDrop() {
         });
         
         // Make parent items sortable
-        $('#menuTreeList').sortable({
+        $(treeListSelector).sortable({
             handle: '.menu-item-handle',
             items: '.menu-item-row.parent-item',
             tolerance: 'pointer',
@@ -449,11 +523,12 @@ async function saveMenuOrder() {
     const items = [];
     
     // Collect all menu items recursively starting from root
-    const $rootContainer = $('#menuTreeList');
+    const $rootContainer = $(getSelector('treeList'));
     collectMenuItems($rootContainer, null, items);
     
     try {
-        const response = await fetch('/admin/api/menu-items/update-order', {
+        const apiBase = getApiBase();
+        const response = await fetch(`${apiBase}/update-order`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -635,7 +710,9 @@ function moveMenuDown(menuId, isParent) {
 // Load menu tree
 async function loadMenuTree() {
     try {
-        const response = await fetch('/admin/api/menu-items');
+        const apiBase = getApiBase();
+        const treeViewSelector = getSelector('treeView');
+        const response = await fetch(apiBase);
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -677,7 +754,7 @@ async function loadMenuTree() {
             });
             
             html += '</ul>';
-            $('#menuTreeView').html(html);
+            $(treeViewSelector).html(html);
         }
     } catch (error) {
         console.error('Lỗi tải menu tree:', error);
@@ -687,7 +764,9 @@ async function loadMenuTree() {
 // Load parent menu options
 async function loadParentMenuOptions() {
     try {
-        const response = await fetch('/admin/api/menu-items');
+        const apiBase = getApiBase();
+        const formParentSelector = getSelector('formParent');
+        const response = await fetch(apiBase);
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -716,7 +795,7 @@ async function loadParentMenuOptions() {
                 });
             });
             
-            $('#menuParent').html(html);
+            $(formParentSelector).html(html);
         }
     } catch (error) {
         console.error('Lỗi tải parent menu options:', error);
@@ -725,27 +804,40 @@ async function loadParentMenuOptions() {
 
 // Open menu modal
 async function openMenuModal(mode, menuId, parentId = null) {
-    $('#menuForm')[0].reset();
-    $('#menuId').val('');
+    const config = getMenuConfig();
+    const formSelector = getSelector('form');
+    const formIdSelector = getSelector('formId');
+    const modalTitleSelector = getSelector('modalTitle');
+    const formParentSelector = getSelector('formParent');
+    const formVisibleSelector = getSelector('formVisible');
+    const formNameSelector = getSelector('formName');
+    const formSlugSelector = getSelector('formSlug');
+    const formIconSelector = getSelector('formIcon');
+    const formOrderSelector = getSelector('formOrder');
+    const modalSelector = getSelector('modal');
+    
+    $(formSelector)[0].reset();
+    $(formIdSelector).val('');
     
     // Load parent menu options first
     await loadParentMenuOptions();
     
     if (mode === 'add') {
-        $('#menuModalTitle').text('Thêm Menu Mới');
-        $('#menuParent').val('').prop('disabled', false);
-        $('#menuVisible').prop('checked', true);
+        $(modalTitleSelector).text('Thêm Menu Mới');
+        $(formParentSelector).val('').prop('disabled', false);
+        $(formVisibleSelector).prop('checked', true);
     } else if (mode === 'add-submenu') {
-        $('#menuModalTitle').text('Thêm Submenu');
-        $('#menuVisible').prop('checked', true);
+        $(modalTitleSelector).text('Thêm Submenu');
+        $(formVisibleSelector).prop('checked', true);
         
         // Nếu có parentId, tự động set và disable select
         if (parentId) {
-            $('#menuParent').val(parentId).prop('disabled', true);
+            $(formParentSelector).val(parentId).prop('disabled', true);
             
             // Lấy thông tin parent để hiển thị
             try {
-                const response = await fetch('/admin/api/menu-items');
+                const apiBase = getApiBase();
+                const response = await fetch(apiBase);
                 const result = await response.json();
                 
                 if (result.success && result.data) {
@@ -756,7 +848,7 @@ async function openMenuModal(mode, menuId, parentId = null) {
                             showToast('Cảnh báo', 'Không thể tạo menu quá 4 cấp. Menu cha đã đạt cấp tối đa.', 'warning');
                             return;
                         }
-                        $('#menuModalTitle').text(`Thêm Submenu cho "${parentMenu.name}" (Cấp ${parentLevel + 1})`);
+                        $(modalTitleSelector).text(`Thêm Submenu cho "${parentMenu.name}" (Cấp ${parentLevel + 1})`);
                     }
                 }
             } catch (error) {
@@ -764,25 +856,26 @@ async function openMenuModal(mode, menuId, parentId = null) {
             }
         } else {
             // Nếu không có parentId, cho phép chọn parent
-            $('#menuParent').val('').prop('disabled', false);
+            $(formParentSelector).val('').prop('disabled', false);
         }
     } else if (mode === 'edit' && menuId) {
-        $('#menuModalTitle').text('Chỉnh sửa Menu');
-        $('#menuParent').prop('disabled', false);
+        $(modalTitleSelector).text('Chỉnh sửa Menu');
+        $(formParentSelector).prop('disabled', false);
         try {
-            const response = await fetch('/admin/api/menu-items');
+            const apiBase = getApiBase();
+            const response = await fetch(apiBase);
             const result = await response.json();
             
             if (result.success && result.data) {
                 const menu = result.data.find(m => m.id === menuId);
                 if (menu) {
-                    $('#menuId').val(menu.id);
-                    $('#menuName').val(menu.name);
-                    $('#menuSlug').val(menu.slug);
-                    $('#menuParent').val(menu.parent_id || '');
-                    $('#menuIcon').val(menu.icon || '');
-                    $('#menuOrder').val(menu.order);
-                    $('#menuVisible').prop('checked', menu.visible);
+                    $(formIdSelector).val(menu.id);
+                    $(formNameSelector).val(menu.name);
+                    $(formSlugSelector).val(menu.slug);
+                    $(formParentSelector).val(menu.parent_id || '');
+                    $(formIconSelector).val(menu.icon || '');
+                    $(formOrderSelector).val(menu.order);
+                    $(formVisibleSelector).prop('checked', menu.visible);
                 }
             }
         } catch (error) {
@@ -790,19 +883,30 @@ async function openMenuModal(mode, menuId, parentId = null) {
         }
     }
     
-    const modal = new bootstrap.Modal(document.getElementById('menuModal'));
+    const modalElement = document.querySelector(modalSelector);
+    const modal = new bootstrap.Modal(modalElement);
     modal.show();
 }
 
 // Save menu
 async function saveMenu() {
-    const menuId = $('#menuId').val();
-    const parentId = $('#menuParent').val() ? parseInt($('#menuParent').val()) : null;
+    const apiBase = getApiBase();
+    const formIdSelector = getSelector('formId');
+    const formParentSelector = getSelector('formParent');
+    const formNameSelector = getSelector('formName');
+    const formSlugSelector = getSelector('formSlug');
+    const formIconSelector = getSelector('formIcon');
+    const formOrderSelector = getSelector('formOrder');
+    const formVisibleSelector = getSelector('formVisible');
+    const modalSelector = getSelector('modal');
+    
+    const menuId = $(formIdSelector).val();
+    const parentId = $(formParentSelector).val() ? parseInt($(formParentSelector).val()) : null;
     
     // Kiểm tra level nếu có parent_id
     if (parentId) {
         try {
-            const response = await fetch('/admin/api/menu-items');
+            const response = await fetch(apiBase);
             const result = await response.json();
             
             if (result.success && result.data) {
@@ -821,12 +925,12 @@ async function saveMenu() {
     }
     
     const menuData = {
-        name: $('#menuName').val().trim(),
-        slug: $('#menuSlug').val().trim(),
+        name: $(formNameSelector).val().trim(),
+        slug: $(formSlugSelector).val().trim(),
         parent_id: parentId,
-        icon: $('#menuIcon').val().trim() || null,
-        order: parseInt($('#menuOrder').val()) || 1,
-        visible: $('#menuVisible').is(':checked')
+        icon: $(formIconSelector).val().trim() || null,
+        order: parseInt($(formOrderSelector).val()) || 1,
+        visible: $(formVisibleSelector).is(':checked')
     };
     
     if (!menuData.name) {
@@ -842,7 +946,7 @@ async function saveMenu() {
         let response;
         if (menuId) {
             // Update existing menu
-            response = await fetch(`/admin/api/menu-items/${menuId}`, {
+            response = await fetch(`${apiBase}/${menuId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json'
@@ -851,7 +955,7 @@ async function saveMenu() {
             });
         } else {
             // Add new menu
-            response = await fetch('/admin/api/menu-items', {
+            response = await fetch(apiBase, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -864,7 +968,8 @@ async function saveMenu() {
         
         if (result.success) {
             showToast('Thành công', result.message || (menuId ? 'Đã cập nhật menu' : 'Đã thêm menu mới'), 'success');
-            bootstrap.Modal.getInstance(document.getElementById('menuModal')).hide();
+            const modalElement = document.querySelector(modalSelector);
+            bootstrap.Modal.getInstance(modalElement).hide();
             loadMenuTable();
             loadMenuTree();
             loadParentMenuOptions();
@@ -900,7 +1005,8 @@ function slugify(text) {
 // Delete menu
 async function deleteMenu(menuId) {
     try {
-        const response = await fetch('/admin/api/menu-items');
+        const apiBase = getApiBase();
+        const response = await fetch(apiBase);
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -918,7 +1024,7 @@ async function deleteMenu(menuId) {
             }
             
             if (confirm(confirmMsg)) {
-                const deleteResponse = await fetch(`/admin/api/menu-items/${menuId}`, {
+                const deleteResponse = await fetch(`${apiBase}/${menuId}`, {
                     method: 'DELETE'
                 });
                 
@@ -943,7 +1049,10 @@ async function deleteMenu(menuId) {
 // Preview menu
 async function previewMenu() {
     try {
-        const response = await fetch('/admin/api/menu-items');
+        const apiBase = getApiBase();
+        const previewListSelector = getSelector('previewList');
+        const previewModalSelector = getSelector('previewModal');
+        const response = await fetch(apiBase);
         const result = await response.json();
         
         if (result.success && result.data) {
@@ -978,9 +1087,10 @@ async function previewMenu() {
             html += '</ul>';
             html += '</nav>';
             
-            $('#previewMenuList').html(html);
+            $(previewListSelector).html(html);
             
-            const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+            const previewModalElement = document.querySelector(previewModalSelector);
+            const modal = new bootstrap.Modal(previewModalElement);
             modal.show();
         }
     } catch (error) {
@@ -991,7 +1101,8 @@ async function previewMenu() {
 // Update menu visibility
 async function updateMenuVisibility(menuId, visible) {
     try {
-        const response = await fetch(`/admin/api/menu-items/${menuId}`, {
+        const apiBase = getApiBase();
+        const response = await fetch(`${apiBase}/${menuId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json'
@@ -1017,20 +1128,21 @@ async function updateMenuVisibility(menuId, visible) {
 // Reset menu to default
 async function resetMenuToDefault() {
     try {
+        const apiBase = getApiBase();
         // Xóa tất cả menu items
-        const response = await fetch('/admin/api/menu-items');
+        const response = await fetch(apiBase);
         const result = await response.json();
         
         if (result.success && result.data) {
             // Xóa từng menu item
             for (const menu of result.data) {
-                await fetch(`/admin/api/menu-items/${menu.id}`, {
+                await fetch(`${apiBase}/${menu.id}`, {
                     method: 'DELETE'
                 });
             }
             
             // Init default menu items
-            const initResponse = await fetch('/admin/api/menu-items/init-default', {
+            const initResponse = await fetch(`${apiBase}/init-default`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

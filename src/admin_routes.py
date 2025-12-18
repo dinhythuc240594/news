@@ -93,6 +93,20 @@ def api_news_list():
     return admin_controller.api_news_list()
 
 
+@admin_bp.route('/api/my-articles')
+@controller.editor_required
+def api_my_articles():
+    """API lấy danh sách bài viết của editor hiện tại"""
+    return admin_controller.api_my_articles()
+
+
+@admin_bp.route('/api/editor-notifications')
+@controller.editor_required
+def api_editor_notifications():
+    """API lấy các bài viết được duyệt/từ chối gần đây của editor"""
+    return admin_controller.api_editor_notifications()
+
+
 @admin_bp.route('/api/current-user')
 def api_current_user():
     """API lấy thông tin user hiện tại từ session"""
@@ -183,11 +197,58 @@ def api_article_detail(article_id: int):
     return admin_controller.api_article_detail(article_id)
 
 
+@admin_bp.route('/api/create-article', methods=['POST'])
+@controller.editor_required
+def api_create_article():
+    """API tạo bài viết mới từ editor form"""
+    return admin_controller.api_create_article()
+
+@admin_bp.route('/api/edit-article/<int:article_id>', methods=['POST'])
+@controller.editor_required
+def api_edit_article(article_id: int):
+    """API chỉnh sửa bài viết theo ID"""
+    return admin_controller.api_edit_article(article_id)
+
+@admin_bp.route('/api/upload-image', methods=['POST'])
+@controller.editor_required
+def api_upload_image():
+    """API upload ảnh cho bài viết"""
+    return admin_controller.api_upload_image()
+
+
 @admin_bp.route('/api/categories')
 @controller.admin_required
 def api_categories():
     """API lấy danh sách danh mục"""
     return admin_controller.api_categories()
+
+
+@admin_bp.route('/api/tags')
+@controller.editor_required
+def api_tags():
+    """API lấy danh sách tags để autocomplete"""
+    return admin_controller.api_tags()
+
+
+@admin_bp.route('/api/tags', methods=['POST'])
+@controller.admin_required
+def api_create_tag():
+    """API tạo hashtag mới"""
+    return admin_controller.api_create_tag()
+
+
+@admin_bp.route('/api/tags/<int:tag_id>', methods=['PUT'])
+@controller.admin_required
+def api_update_tag(tag_id: int):
+    """API cập nhật hashtag"""
+    return admin_controller.api_update_tag(tag_id)
+
+
+@admin_bp.route('/api/tags/<int:tag_id>', methods=['DELETE'])
+@controller.admin_required
+def api_delete_tag(tag_id: int):
+    """API xóa hashtag"""
+    return admin_controller.api_delete_tag(tag_id)
 
 
 @admin_bp.route('/api/international-categories')

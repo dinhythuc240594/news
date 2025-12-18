@@ -18,7 +18,15 @@ $(document).ready(function() {
             ['table', ['table']],
             ['insert', ['link', 'picture', 'video']],
             ['view', ['fullscreen', 'codeview', 'help']]
-        ]
+        ],
+        callbacks: {
+            onImageUpload: function(files) {
+                // Upload image when inserted into editor
+                for (let i = 0; i < files.length; i++) {
+                    uploadImageToEditor(files[i]);
+                }
+            }
+        }
     });
     
     // Initialize International Article editor
@@ -38,9 +46,16 @@ $(document).ready(function() {
     });
     
     // Load initial data
-    loadMyArticles();
-    loadStatistics();
+    loadMyArticles(); // Bài viết của tôi (tất cả trạng thái, trang 1)
     
+    // Load notifications khi mở dropdown
+    $('#notificationDropdown').on('click', function() {
+        loadNotifications(false); // Không hiển thị toast khi click vào dropdown
+    });
+    
+    // Khởi tạo thống kê editor & polling thông báo duyệt / từ chối
+    initEditorStats();
+
     // Menu navigation
     $('.sidebar-menu a[data-section]').click(function(e) {
         e.preventDefault();
@@ -56,6 +71,17 @@ $(document).ready(function() {
         
         // Update page title
         updatePageTitle(section);
+
+        // Lazy load dữ liệu cho các tab khi được mở
+        if (section === 'my-articles') {
+            loadMyArticles(1, $('#filterStatus').val(), $('#searchMyArticles').val().trim());
+        } else if (section === 'drafts') {
+            loadDrafts();
+        } else if (section === 'pending') {
+            loadPendingArticlesEditor();
+        } else if (section === 'published') {
+            loadPublishedArticles();
+        }
     });
     
     // Header create button
@@ -78,15 +104,32 @@ $(document).ready(function() {
         }
     });
     
-    // Image preview
+    // Image preview and upload
     $('#articleImage').change(function() {
         const file = this.files[0];
         if (file) {
+            // Show preview
             const reader = new FileReader();
             reader.onload = function(e) {
-                $('#imagePreview').html(`<img src="${e.target.result}" style="max-width: 100%; border-radius: 8px;">`);
+                $('#imagePreview').html(`
+                    <img src="${e.target.result}" style="max-width: 100%; border-radius: 8px; margin-bottom: 10px;">
+                    <div class="upload-progress" style="display: block;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%">Đang upload...</div>
+                        </div>
+                    </div>
+                `);
             };
             reader.readAsDataURL(file);
+            
+            // Upload image immediately
+            uploadArticleImage(file).then(function(url) {
+                if (url) {
+                    $('#imagePreview .upload-progress').html('<div class="alert alert-success mt-2"><i class="fas fa-check"></i> Upload thành công</div>');
+                } else {
+                    $('#imagePreview .upload-progress').html('<div class="alert alert-danger mt-2"><i class="fas fa-times"></i> Upload thất bại</div>');
+                }
+            });
         }
     });
     
@@ -115,10 +158,42 @@ $(document).ready(function() {
         previewInternationalArticle();
     });
     
-    // Filter articles
+    // Filter articles trong tab "Bài viết của tôi"
     $('#filterStatus').change(function() {
         const status = $(this).val();
-        filterArticles(status);
+        loadMyArticles(1, status, $('#searchMyArticles').val().trim());
+    });
+
+    // Tìm kiếm trong "Bài viết của tôi"
+    $('#searchMyArticles').on('keypress', function (e) {
+        if (e.which === 13) { // Enter
+            e.preventDefault();
+            loadMyArticles(1, $('#filterStatus').val(), $(this).val().trim());
+        }
+    });
+
+    // Tìm kiếm ở tab Bản nháp
+    $('#searchDrafts').on('keypress', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadDrafts(1);
+        }
+    });
+
+    // Tìm kiếm ở tab Chờ duyệt
+    $('#searchPending').on('keypress', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadPendingArticlesEditor(1);
+        }
+    });
+
+    // Tìm kiếm ở tab Đã xuất bản
+    $('#searchPublished').on('keypress', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadPublishedArticles(1);
+        }
     });
     
     // Edit article
@@ -146,7 +221,292 @@ $(document).ready(function() {
     $('#saveEditBtn').click(function() {
         saveEdit();
     });
+    // Submit draft for review from edit modal
+    $('#submitEditBtn').click(function() {
+        saveEdit('pending');
+    });
+    
+    // Edit article image upload handler
+    $('#editArticleImage').change(function() {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                $('#editArticleImagePreview').attr('src', e.target.result);
+            };
+            reader.readAsDataURL(file);
+            
+            // Upload image immediately
+            uploadArticleImage(file, $('#editArticleId').val()).then(function(url) {
+                if (url) {
+                    $('#editArticleImageUrl').val(url);
+                    $('#editArticleImagePreview').attr('src', url);
+                }
+            });
+        }
+    });
+    
+    // Initialize tag autocomplete for all tag inputs
+    initTagAutocomplete('#articleTags', '#tagSuggestions');
+    initTagAutocomplete('#editArticleTags', '#editTagSuggestions');
+    initTagAutocomplete('#intArticleTags', '#intTagSuggestions');
 });
+
+// ===== Editor statistics & notifications =====
+
+let editorStats = {
+    total: 0,
+    draft: 0,
+    pending: 0,
+    published: 0,
+    rejected: 0
+};
+
+// Lưu trữ danh sách ID bài viết đã thông báo
+let notifiedArticleIds = new Set();
+
+// Khởi tạo thống kê từ DOM và đồng bộ với API
+function initEditorStats() {
+    editorStats.total = parseInt($('#statTotal').text()) || 0;
+    editorStats.draft = parseInt($('#statDrafts').text()) || 0;
+    editorStats.pending = parseInt($('#statPending').text()) || 0;
+    editorStats.published = parseInt($('#statPublished').text()) || 0;
+
+    // Load danh sách ID đã thông báo từ localStorage
+    const savedIds = localStorage.getItem('editor_notified_ids');
+    if (savedIds) {
+        try {
+            notifiedArticleIds = new Set(JSON.parse(savedIds));
+        } catch (e) {
+            console.error('Lỗi load notified IDs:', e);
+            notifiedArticleIds = new Set();
+        }
+    }
+
+    // Đồng bộ lần đầu từ API (không cần thông báo)
+    refreshEditorStats(false);
+    loadNotifications(false);
+
+    // Polling mỗi 30s để phát hiện bài được duyệt / bị từ chối
+    setInterval(function () {
+        refreshEditorStats(true);
+        loadNotifications(true);
+    }, 30000);
+}
+
+// Lấy tổng bài theo trạng thái cho editor hiện tại (dựa trên pagination.total)
+async function fetchCountByStatus(status) {
+    try {
+        const params = new URLSearchParams();
+        params.append('page', 1);
+        params.append('per_page', 1);
+        if (status && status !== 'all') {
+            params.append('status', status);
+        }
+
+        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const result = await response.json();
+        if (!result.success || !result.pagination) {
+            return null;
+        }
+
+        return result.pagination.total || 0;
+    } catch (error) {
+        console.error('Lỗi tải thống kê bài viết editor:', error);
+        return null;
+    }
+}
+
+// Cập nhật lại thống kê & hiển thị toast khi có bài được duyệt / từ chối
+async function refreshEditorStats(showNotifications) {
+    try {
+        const [total, draft, pending, published, rejected] = await Promise.all([
+            fetchCountByStatus('all'),
+            fetchCountByStatus('draft'),
+            fetchCountByStatus('pending'),
+            fetchCountByStatus('published'),
+            fetchCountByStatus('rejected')
+        ]);
+
+        // Bỏ qua nếu API lỗi
+        if (total === null || draft === null || pending === null || published === null || rejected === null) {
+            return;
+        }
+
+        const prevStats = { ...editorStats };
+
+        editorStats.total = total;
+        editorStats.draft = draft;
+        editorStats.pending = pending;
+        editorStats.published = published;
+        editorStats.rejected = rejected;
+
+        // Cập nhật DOM dashboard
+        $('#statTotal').text(total);
+        $('#statDrafts').text(draft);
+        $('#statPending').text(pending);
+        $('#statPublished').text(published);
+
+        // Cập nhật badge menu trái
+        $('#draftCount').text(draft);
+        $('#pendingCount').text(pending);
+    } catch (error) {
+        console.error('Lỗi cập nhật thống kê editor:', error);
+    }
+}
+
+// Load notifications từ API và hiển thị
+async function loadNotifications(showToastNotifications) {
+    try {
+        const response = await fetch('/admin/api/editor-notifications?limit=20', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        const result = await response.json();
+        if (!result.success || !result.data) {
+            return;
+        }
+
+        const notifications = result.data || [];
+        const newNotifications = [];
+
+        // Phát hiện các bài viết mới được duyệt/từ chối
+        notifications.forEach(notif => {
+            const articleId = notif.id.toString();
+            if (!notifiedArticleIds.has(articleId)) {
+                newNotifications.push(notif);
+                notifiedArticleIds.add(articleId);
+            }
+        });
+
+        // Lưu danh sách ID đã thông báo vào localStorage
+        if (newNotifications.length > 0) {
+            localStorage.setItem('editor_notified_ids', JSON.stringify(Array.from(notifiedArticleIds)));
+        }
+
+        // Hiển thị toast cho các bài viết mới
+        if (showToastNotifications && newNotifications.length > 0) {
+            newNotifications.forEach(notif => {
+                if (notif.status === 'published') {
+                    showToast('Thông báo', `Bài viết "${notif.title}" đã được duyệt và xuất bản`, 'success');
+                } else if (notif.status === 'rejected') {
+                    showToast('Thông báo', `Bài viết "${notif.title}" đã bị từ chối`, 'warning');
+                }
+            });
+        }
+
+        // Hiển thị notifications trong dropdown
+        displayNotifications(notifications);
+    } catch (error) {
+        console.error('Lỗi tải notifications:', error);
+    }
+}
+
+// Hiển thị notifications trong dropdown
+function displayNotifications(notifications) {
+    const $notificationList = $('#notificationList');
+    const $notificationEmpty = $('#notificationEmpty');
+    const $notificationCount = $('#notificationCount');
+
+    if (!notifications || notifications.length === 0) {
+        $notificationList.html('');
+        $notificationEmpty.show().text('Chưa có thông báo mới.');
+        $notificationCount.text('0').hide();
+        return;
+    }
+
+    $notificationEmpty.hide();
+    
+    // Đếm số notification chưa đọc (các bài mới)
+    const unreadCount = notifications.filter(n => !notifiedArticleIds.has(n.id.toString())).length;
+    
+    if (unreadCount > 0) {
+        $notificationCount.text(unreadCount).show();
+    } else {
+        $notificationCount.hide();
+    }
+
+    let html = '';
+    notifications.slice(0, 10).forEach(notif => {
+        const isUnread = !notifiedArticleIds.has(notif.id.toString());
+        const dateStr = notif.published_at || notif.updated_at || '';
+        const date = dateStr ? new Date(dateStr + 'Z').toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : '';
+
+        const statusClass = notif.status === 'published' ? 'success' : 'danger';
+        const statusIcon = notif.status === 'published' ? 'fa-check-circle' : 'fa-times-circle';
+        const statusText = notif.status === 'published' ? 'Đã duyệt' : 'Bị từ chối';
+
+        html += `
+            <li>
+                <div class="dropdown-item ${isUnread ? 'notification-unread' : ''}" style="cursor: pointer;" data-article-id="${notif.id}">
+                    <div class="d-flex align-items-start">
+                        <div class="flex-shrink-0">
+                            <i class="fas ${statusIcon} text-${statusClass}"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-2">
+                            <div class="fw-bold">${escapeHtml(notif.title || 'Không có tiêu đề')}</div>
+                            <small class="text-muted">
+                                <span class="badge bg-${statusClass}">${statusText}</span>
+                                ${date ? ` - ${date}` : ''}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </li>
+        `;
+    });
+
+    $notificationList.html(html);
+    
+    // Xử lý click vào notification để mở edit modal và đánh dấu đã đọc
+    $notificationList.off('click', '.dropdown-item').on('click', '.dropdown-item', function() {
+        const articleId = $(this).data('article-id');
+        if (articleId) {
+            // Đánh dấu đã đọc
+            notifiedArticleIds.add(articleId.toString());
+            localStorage.setItem('editor_notified_ids', JSON.stringify(Array.from(notifiedArticleIds)));
+            
+            // Cập nhật lại hiển thị
+            displayNotifications(notifications);
+            
+            // Mở modal edit
+            editArticle(articleId);
+        }
+    });
+}
+
+// Helper function để escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.toString().replace(/[&<>"']/g, m => map[m]);
+}
 
 // Check authentication
 async function checkAuth() {
@@ -191,117 +551,182 @@ function updatePageTitle(section) {
     $('#pageTitle').text(titles[section] || 'Dashboard');
 }
 
-// Load statistics
-function loadStatistics() {
-    const stats = {
-        total: 24,
-        pending: 5,
-        published: 16,
-        drafts: 3
-    };
-    
-    $('#statTotal').text(stats.total);
-    $('#statPending').text(stats.pending);
-    $('#statPublished').text(stats.published);
-    $('#statDrafts').text(stats.drafts);
-    $('#pendingCount').text(stats.pending);
-    $('#draftCount').text(stats.drafts);
-}
+// Load my articles from API (database, joined with categories) với phân trang & lọc
+async function loadMyArticles(page = 1, status = null, search = null) {
+    try {
+        showSpinner();
 
-// Load my articles
-function loadMyArticles() {
-    const articles = [
-        {
-            id: 1,
-            title: 'Thủ tướng phát biểu tại hội nghị kinh tế quốc tế',
-            category: 'Thời sự',
-            status: 'pending',
-            visible: true,
-            date: '2024-12-13 14:30'
-        },
-        {
-            id: 2,
-            title: 'Giá vàng trong nước tăng cao kỷ lục',
-            category: 'Kinh doanh',
-            status: 'published',
-            visible: true,
-            date: '2024-12-12 10:15'
-        },
-        {
-            id: 3,
-            title: 'Top 10 địa điểm du lịch hấp dẫn nhất mùa đông',
-            category: 'Du lịch',
-            status: 'published',
-            visible: true,
-            date: '2024-12-11 16:45'
-        },
-        {
-            id: 4,
-            title: 'Công nghệ AI đang thay đổi cách chúng ta làm việc',
-            category: 'Công nghệ',
-            status: 'draft',
-            visible: false,
-            date: '2024-12-13 09:20'
-        },
-        {
-            id: 5,
-            title: '5 thói quen buổi sáng giúp tăng cường sức khỏe',
-            category: 'Sức khỏe',
-            status: 'published',
-            visible: false,
-            date: '2024-12-10 13:30'
-        },
-        {
-            id: 6,
-            title: 'Phim Việt gây sốt phòng vé dịp cuối năm',
-            category: 'Giải trí',
-            status: 'pending',
-            visible: true,
-            date: '2024-12-13 11:00'
+        const params = new URLSearchParams();
+        params.append('page', page);
+        params.append('per_page', 10);
+        if (status && status !== 'all') {
+            params.append('status', status);
         }
-    ];
-    
-    displayArticles(articles);
+        if (search) {
+            params.append('search', search);
+        }
+
+        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        const result = await response.json();
+        hideSpinner();
+
+        if (!result.success) {
+            showToast('Lỗi', result.error || 'Không thể tải danh sách bài viết', 'warning');
+            return;
+        }
+
+        // Chuẩn hóa dữ liệu trả về để phù hợp với displayArticles
+        const articles = (result.data || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            // Ưu tiên tên danh mục lấy từ bảng categories (category_name / category_title...),
+            // fallback về slug hoặc chuỗi rỗng nếu không có
+            category: item.category_name || item.category_title || item.category || '',
+            status: item.status, // ví dụ: 'draft' | 'pending' | 'published'
+            visible: item.visible !== undefined ? item.visible : true,
+            // Chuyển ngày về string hiển thị
+            date: item.created_at || item.published_at || ''
+        }));
+
+        const pagination = result.pagination || {};
+        displayArticles(articles, 'myArticlesTable');
+        updatePagination(
+            pagination,
+            'myArticlesPagination',
+            (newPage) => loadMyArticles(newPage, $('#filterStatus').val(), $('#searchMyArticles').val().trim())
+        );
+        updateInfoText(pagination, 'myArticlesInfo');
+    } catch (error) {
+        console.error('Lỗi tải bài viết:', error);
+        hideSpinner();
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải danh sách bài viết', 'warning');
+    }
 }
 
-// Display articles
-function displayArticles(articles) {
+// Load danh sách bản nháp
+function loadDrafts(page = 1) {
+    const search = $('#searchDrafts').val() ? $('#searchDrafts').val().trim() : null;
+    fetchMyArticlesForSection('draft', page, search, 'draftsTable', 'draftsPagination', 'draftsInfo');
+}
+
+// Load danh sách chờ duyệt
+function loadPendingArticlesEditor(page = 1) {
+    const search = $('#searchPending').val() ? $('#searchPending').val().trim() : null;
+    fetchMyArticlesForSection('pending', page, search, 'pendingTable', 'pendingPagination', 'pendingInfo');
+}
+
+// Load danh sách đã xuất bản
+function loadPublishedArticles(page = 1) {
+    const search = $('#searchPublished').val() ? $('#searchPublished').val().trim() : null;
+    fetchMyArticlesForSection('published', page, search, 'publishedTable', 'publishedPagination', 'publishedInfo');
+}
+
+// Hàm dùng chung để load bài viết cho từng section
+async function fetchMyArticlesForSection(status, page, search, tableId, paginationId, infoId) {
+    try {
+        showSpinner();
+
+        const params = new URLSearchParams();
+        params.append('page', page);
+        params.append('per_page', 10);
+        if (status) {
+            params.append('status', status);
+        }
+        if (search) {
+            params.append('search', search);
+        }
+
+        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+
+        const result = await response.json();
+        hideSpinner();
+
+        if (!result.success) {
+            showToast('Lỗi', result.error || 'Không thể tải danh sách bài viết', 'warning');
+            return;
+        }
+
+        const articles = (result.data || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            category: item.category_name || (item.category && item.category.name) || '',
+            status: item.status,
+            visible: item.visible !== undefined ? item.visible : true,
+            date: item.created_at || item.published_at || ''
+        }));
+
+        const pagination = result.pagination || {};
+        displayArticles(articles, tableId);
+        updatePagination(
+            pagination,
+            paginationId,
+            (newPage) => fetchMyArticlesForSection(status, newPage, search, tableId, paginationId, infoId)
+        );
+        updateInfoText(pagination, infoId);
+    } catch (error) {
+        console.error('Lỗi tải bài viết:', error);
+        hideSpinner();
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải danh sách bài viết', 'warning');
+    }
+}
+
+// Display articles vào bảng theo ID
+function displayArticles(articles, tableBodyId) {
     let html = '';
     articles.forEach((article, index) => {
         const statusBadge = getStatusBadge(article.status);
         const checked = article.visible ? 'checked' : '';
         
-        html += `
-            <tr>
-                <td>${index + 1}</td>
-                <td><strong>${article.title}</strong></td>
-                <td><span class="badge bg-primary">${article.category}</span></td>
-                <td>${statusBadge}</td>
-                <td>
-                    <label class="visibility-switch">
-                        <input type="checkbox" class="visibility-toggle" data-id="${article.id}" ${checked}>
-                        <span class="visibility-slider"></span>
-                    </label>
-                </td>
-                <td>${article.date}</td>
-                <td>
-                    <button class="btn btn-sm btn-info btn-action btn-edit" data-id="${article.id}" title="Chỉnh sửa">
-                        <i class="fas fa-edit"></i>
-                    </button>
-                    ${article.status === 'draft' ? `
-                        <button class="btn btn-sm btn-success btn-action btn-submit" data-id="${article.id}" title="Gửi duyệt">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    ` : ''}
-                    <button class="btn btn-sm btn-danger btn-action btn-delete" data-id="${article.id}" title="Xóa">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `;
+        const date = new Date(article.date + 'Z');
+
+        const dateVN = date.toLocaleString('sv-SE', {
+            timeZone: 'Asia/Ho_Chi_Minh', // Chuyển sang múi giờ VN
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false // Sử dụng định dạng 24h
+        });
+
+        html += '';
+        html += '<tr>';
+        // html += '<td>' + (index + 1) + '</td>';
+        html += '<td><strong>' + article.title + '</strong></td>';
+        html += '<td><span class="badge bg-primary">' + article.category + '</span></td>';
+        if (tableBodyId != 'draftsTable' && tableBodyId != 'publishedTable') {
+            html += '<td>' + statusBadge + '</td>';
+        } else {
+            html += '<td style="display: none;">'+ statusBadge +'</td>';
+        }
+        html += '<td style="display: none;">';
+        html += '<label class="visibility-switch">';
+        html += '<input type="checkbox" class="visibility-toggle" data-id="' + article.id + '" ' + checked + '>';
+        html += '<span class="visibility-slider"></span>';
+        html += '</label>';
+        html += '</td>';
+        html += '<td>' + (dateVN) + '</td>';
+        html += '<td>';
+        if (article.status === 'draft') {
+            html += '<button class="btn btn-sm btn-info btn-action btn-edit" data-id="' + article.id + '" title="Chỉnh sửa">';
+            html += '<i class="fas fa-edit"></i>';
+            html += '</button>';
+        }
+        html += '<button class="btn btn-sm btn-danger btn-action btn-delete" data-id="' + article.id + '" title="Xóa">';
+        html += '<i class="fas fa-trash"></i>';
+        html += '</button>';
+        html += '</td>';
+        html += '</tr>';
     });
     
-    $('#myArticlesTable').html(html);
+    $('#' + tableBodyId).html(html);
 }
 
 // Get status badge
@@ -315,118 +740,443 @@ function getStatusBadge(status) {
     return badges[status] || status;
 }
 
-// Filter articles
-function filterArticles(status) {
-    // In a real application, this would filter the articles
-    showToast('Thông báo', `Lọc bài viết: ${status}`, 'info');
+// Cập nhật thanh phân trang
+function updatePagination(pagination, containerId, onPageClick) {
+    const container = $('#' + containerId);
+    container.empty();
+
+    const page = pagination.page || 1;
+    const totalPages = pagination.pages || 1;
+
+    if (totalPages <= 1) {
+        return;
+    }
+
+    const createPageItem = (p, label = null, disabled = false, active = false) => {
+        const li = $('<li>').addClass('page-item');
+        if (disabled) li.addClass('disabled');
+        if (active) li.addClass('active');
+
+        const a = $('<a>')
+            .addClass('page-link')
+            .attr('href', '#')
+            .attr('data-page', p)
+            .text(label || p);
+
+        a.on('click', function (e) {
+            e.preventDefault();
+            if (!disabled && !active) {
+                onPageClick(p);
+            }
+        });
+
+        li.append(a);
+        container.append(li);
+    };
+
+    createPageItem(page - 1, '«', page <= 1, false);
+
+    for (let p = 1; p <= totalPages; p++) {
+        createPageItem(p, null, false, p === page);
+    }
+
+    createPageItem(page + 1, '»', page >= totalPages, false);
+}
+
+// Hiển thị thông tin phân trang
+function updateInfoText(pagination, infoElementId) {
+    const infoEl = $('#' + infoElementId);
+    const page = pagination.page || 1;
+    const perPage = pagination.per_page || 10;
+    const total = pagination.total || 0;
+
+    if (!total) {
+        infoEl.text('Không có bản ghi nào.');
+        return;
+    }
+
+    const start = (page - 1) * perPage + 1;
+    const end = Math.min(page * perPage, total);
+    infoEl.text(`Hiển thị ${start}-${end} trên tổng ${total} bài viết`);
+}
+
+// Upload article image
+async function uploadArticleImage(file, newsId = null) {
+    const formData = new FormData();
+    formData.append('image', file);
+    if (newsId) {
+        formData.append('news_id', newsId);
+    }
+    
+    try {
+        const response = await fetch('/admin/api/upload-image', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update thumbnail input with URL
+            $('#articleImageUrl').val(result.url);
+            showToast('Thành công', 'Upload ảnh thành công', 'success');
+            return result.url;
+        } else {
+            showToast('Lỗi', result.error || 'Upload ảnh thất bại', 'warning');
+            return null;
+        }
+    } catch (error) {
+        console.error('Lỗi upload ảnh:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi upload ảnh', 'warning');
+        return null;
+    }
+}
+
+// Upload image to editor (for Summernote)
+async function uploadImageToEditor(file) {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    try {
+        const response = await fetch('/admin/api/upload-image', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            // Insert image into editor
+            $('#articleContent').summernote('insertImage', result.url);
+        } else {
+            showToast('Lỗi', result.error || 'Upload ảnh thất bại', 'warning');
+        }
+    } catch (error) {
+        console.error('Lỗi upload ảnh:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi upload ảnh', 'warning');
+    }
 }
 
 // Save draft
-function saveDraft() {
-    const title = $('#articleTitle').val();
+async function saveDraft() {
+    const title = $('#articleTitle').val().trim();
     const content = $('#articleContent').summernote('code');
     const category = $('#articleCategory').val();
+    const description = $('#articleDescription').val().trim();
+    const thumbnail = $('#articleImageUrl').val() || '';
+    const tags = normalizeTagString($('#articleTags').val());
     
-    // if (!title) {
-    //     alert('Vui lòng nhập tiêu đề bài viết!');
-    //     return;
-    // }
+    if (!title) {
+        showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
+        return;
+    }
+    
+    if (!content || content.trim() === '' || content === '<p><br></p>') {
+        showToast('Cảnh báo', 'Vui lòng nhập nội dung bài viết!', 'warning');
+        return;
+    }
+    
+    if (!category) {
+        showToast('Cảnh báo', 'Vui lòng chọn danh mục!', 'warning');
+        return;
+    }
+    
+    // Validate tags - chỉ chấp nhận tags có sẵn
+    if (tags) {
+        const tagValidation = validateTags(tags);
+        if (!tagValidation.valid) {
+            showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
+            return;
+        }
+    }
     
     showSpinner();
     
-    // Simulate API call
-    setTimeout(function() {
+    try {
+        const response = await fetch('/admin/api/create-article', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                content: content,
+                category_id: parseInt(category),
+                summary: description,
+                thumbnail: thumbnail,
+                tags: tags,
+                status: 'draft'
+            })
+        });
+        
+        const result = await response.json();
+        
         hideSpinner();
-        showToast('Thành công', 'Bài viết đã được lưu vào bản nháp', 'success');
         
-        // Clear form
-        $('#articleForm')[0].reset();
-        $('#articleContent').summernote('code', '');
-        $('#imagePreview').html('');
-        
-        // Update stats
-        const drafts = parseInt($('#statDrafts').text()) + 1;
-        $('#statDrafts').text(drafts);
-        $('#draftCount').text(drafts);
-    }, 1000);
+        if (result.success) {
+            showToast('Thành công', 'Bài viết đã được lưu vào bản nháp', 'success');
+            
+            // Clear form
+            $('#articleForm')[0].reset();
+            $('#articleContent').summernote('code', '');
+            $('#imagePreview').html('');
+            $('#articleImageUrl').val('');
+            
+            // Đồng bộ lại thống kê từ API
+            refreshEditorStats(false);
+            
+            // Reload articles
+            loadMyArticles();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể lưu bài viết', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi lưu bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi lưu bài viết', 'warning');
+    }
+}
+
+function normalizeTagString(tagsString) {
+    return tagsString.trim().replace(/[,;]+/g, ',');
+}
+
+// Validate tags - chỉ chấp nhận tags có sẵn trong tagSuggestionsCache
+function validateTags(tagsString) {
+    if (!tagsString || !tagsString.trim()) {
+        return { valid: true, invalidTags: [] };
+    }
+    
+    // Đảm bảo cache đã được load
+    if (tagSuggestionsCache.length === 0) {
+        console.warn('Tag cache chưa được load, đang tải...');
+        // Không block user, nhưng sẽ validate ở backend
+        return { valid: true, invalidTags: [], warning: 'Cache chưa sẵn sàng, sẽ validate ở server' };
+    }
+    
+    // Parse tags từ string
+    const tagNames = tagsString
+        .split(/[,\s;]+/)
+        .map(tag => tag.trim().replace(/^#/, ''))
+        .filter(tag => tag.length > 0);
+    
+    const invalidTags = [];
+    
+    // Kiểm tra từng tag có trong cache không (case-insensitive)
+    tagNames.forEach(tagName => {
+        const tagLower = tagName.toLowerCase();
+        const found = tagSuggestionsCache.some(cachedTag => cachedTag.toLowerCase() === tagLower);
+        if (!found) {
+            invalidTags.push(tagName);
+        }
+    });
+    
+    return {
+        valid: invalidTags.length === 0,
+        invalidTags: invalidTags
+    };
 }
 
 // Submit article
-function submitArticle() {
-    const title = $('#articleTitle').val();
+async function submitArticle() {
+    const title = $('#articleTitle').val().trim();
     const content = $('#articleContent').summernote('code');
     const category = $('#articleCategory').val();
-    const description = $('#articleDescription').val();
-    const tags = $('#articleTags').val();
+    const description = $('#articleDescription').val().trim();
+    const thumbnail = $('#articleImageUrl').val() || '';
+    const tags = normalizeTagString($('#articleTags').val());
     
-    // if (!title || !content || !category) {
-    //     alert('Vui lòng điền đầy đủ thông tin bắt buộc!');
-    //     return;
-    // }
+    // Validation
+    if (!title) {
+        showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
+        return;
+    }
+    
+    if (!content || content.trim() === '' || content === '<p><br></p>') {
+        showToast('Cảnh báo', 'Vui lòng nhập nội dung bài viết!', 'warning');
+        return;
+    }
+    
+    if (!category) {
+        showToast('Cảnh báo', 'Vui lòng chọn danh mục!', 'warning');
+        return;
+    }
+    
+    // Validate tags - chỉ chấp nhận tags có sẵn
+    const tagValidation = validateTags(tags);
+    if (!tagValidation.valid) {
+        showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
+        return;
+    }
     
     showSpinner();
     
-    // Simulate API call
-    setTimeout(function() {
+    try {
+        const response = await fetch('/admin/api/create-article', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                content: content,
+                category_id: parseInt(category),
+                summary: description,
+                thumbnail: thumbnail,
+                tags: tags,
+                status: 'pending'
+            })
+        });
+        
+        const result = await response.json();
+        
         hideSpinner();
-        showToast('Thành công', 'Bài viết đã được gửi để duyệt', 'success');
         
-        // Clear form
-        $('#articleForm')[0].reset();
-        $('#articleContent').summernote('code', '');
-        $('#imagePreview').html('');
-        
-        // Update stats
-        const pending = parseInt($('#statPending').text()) + 1;
-        const total = parseInt($('#statTotal').text()) + 1;
-        $('#statPending').text(pending);
-        $('#statTotal').text(total);
-        $('#pendingCount').text(pending);
-        
-        // Reload articles
-        loadMyArticles();
-    }, 1500);
+        if (result.success) {
+            showToast('Thành công', 'Bài viết đã được gửi để duyệt', 'success');
+            
+            // Clear form
+            $('#articleForm')[0].reset();
+            $('#articleContent').summernote('code', '');
+            $('#imagePreview').html('');
+            $('#articleImageUrl').val('');
+            
+            // Đồng bộ lại thống kê từ API
+            refreshEditorStats(false);
+            
+            // Reload articles
+            loadMyArticles();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể gửi bài viết', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi gửi bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi gửi bài viết', 'warning');
+    }
 }
 
 // Edit article
-function editArticle(articleId) {
-    // Simulate loading article data
-    const article = {
-        id: articleId,
-        title: 'Thủ tướng phát biểu tại hội nghị kinh tế quốc tế',
-        content: '<p>Nội dung bài viết...</p>',
-        category: 'thoi-su'
-    };
-    
-    $('#editArticleId').val(article.id);
-    $('#editArticleTitle').val(article.title);
-    $('#editArticleContent').summernote('code', article.content);
-    $('#editArticleCategory').val(article.category);
-    
-    const modal = new bootstrap.Modal(document.getElementById('editModal'));
-    modal.show();
+async function editArticle(articleId) {
+    try {
+        const response = await fetch(`/admin/api/article/${articleId}`);
+        const result = await response.json();
+        if (result.success) {
+            const article = result.data;
+            
+            // Load categories if not already loaded
+            if ($('#editArticleCategory option').length <= 1) {
+                try {
+                    const catResponse = await fetch('/admin/api/categories');
+                    const catResult = await catResponse.json();
+                    if (catResult.success && catResult.data) {
+                        let categoryOptions = '<option value="">Chọn danh mục</option>';
+                        catResult.data.forEach(cat => {
+                            categoryOptions += `<option value="${cat.id}">${cat.name}</option>`;
+                        });
+                        $('#editArticleCategory').html(categoryOptions);
+                    }
+                } catch (error) {
+                    console.error('Lỗi tải danh mục:', error);
+                }
+            }
+            
+            $('#editArticleId').val(article.id);
+            $('#editArticleTitle').val(article.title);
+            $('#editArticleContent').summernote('code', article.content);
+            $('#editArticleCategory').val(article.category_id);
+            $('#editArticleDescription').val(article.summary);
+            $('#editArticleImageUrl').val(article.thumbnail || '');
+            $('#editArticleImagePreview').attr('src', article.thumbnail || '/static/images/default-image.jpg');
+            $('#editArticleTags').val(article.tags || '');
+            
+            const modal = new bootstrap.Modal(document.getElementById('editModal'));
+            modal.show();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể tải bài viết', 'warning');
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải bài viết', 'warning');
+    }
 }
 
-// Save edit
-function saveEdit() {
+// Save edit (có thể kèm theo thay đổi trạng thái, ví dụ: gửi duyệt)
+async function saveEdit(newStatus = null) {
     const articleId = $('#editArticleId').val();
     const title = $('#editArticleTitle').val();
     const content = $('#editArticleContent').summernote('code');
     const category = $('#editArticleCategory').val();
+    const description = $('#editArticleDescription').val();
+    const image = $('#editArticleImageUrl').val();
+    const tags = normalizeTagString($('#editArticleTags').val());
+    if (!title) {
+        showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
+        return;
+    }
     
-    showSpinner();
+    if (!content) {
+        showToast('Cảnh báo', 'Vui lòng nhập nội dung bài viết!', 'warning');
+        return;
+    }
+    if (!category) {
+        showToast('Cảnh báo', 'Vui lòng chọn danh mục!', 'warning');
+        return;
+    }
+    if (!description) {
+        showToast('Cảnh báo', 'Vui lòng nhập mô tả ngắn gọn về bài viết!', 'warning');
+        return;
+    }
+    if (!image) {
+        showToast('Cảnh báo', 'Vui lòng chọn ảnh đại diện!', 'warning');
+        return;
+    }
+    if (!tags) {
+        showToast('Cảnh báo', 'Vui lòng nhập tags!', 'warning');
+        return;
+    }
     
-    // Simulate API call
-    setTimeout(function() {
+    // Validate tags - chỉ chấp nhận tags có sẵn
+    const tagValidation = validateTags(tags);
+    if (!tagValidation.valid) {
+        showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
+        return;
+    }
+    
+    try {
+        const payload = {
+            id: articleId,
+            title: title,
+            content: content,
+            category_id: parseInt(category),
+            summary: description,
+            thumbnail: image,
+            tags: tags
+        };
+        if (newStatus) {
+            payload.status = newStatus;
+        }
+
+        const response = await fetch(`/admin/api/edit-article/${articleId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.success) {
+            showToast('Thành công', 'Bài viết đã được cập nhật', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+            loadMyArticles();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể cập nhật bài viết', 'warning');
+        }
+    } catch (error) {
         hideSpinner();
-        showToast('Thành công', 'Bài viết đã được cập nhật', 'success');
-        
-        // Close modal
-        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
-        
-        // Reload articles
-        loadMyArticles();
-    }, 1000);
+        console.error('Lỗi cập nhật bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi cập nhật bài viết', 'warning');
+    }
 }
 
 // Delete article
@@ -443,9 +1193,8 @@ function deleteArticle(articleId) {
             $(this).remove();
         });
         
-        // Update stats
-        const total = parseInt($('#statTotal').text()) - 1;
-        $('#statTotal').text(total);
+        // Đồng bộ lại thống kê từ API sau khi xóa
+        refreshEditorStats(false);
     }, 1000);
 }
 
@@ -766,3 +1515,159 @@ $(document).on('click', '.save-api-article', function() {
     console.log('Save API article:', article);
     alert('Chức năng lưu bài sẽ được hoàn thiện sau. Bài viết: ' + article.title);
 });
+
+// ===== Tag Autocomplete Functionality =====
+
+let tagSuggestionsCache = [];
+
+// Initialize tag autocomplete for an input
+function initTagAutocomplete(inputSelector, suggestionsSelector) {
+    const $input = $(inputSelector);
+    const $suggestions = $(suggestionsSelector);
+    
+    // Load all tags on first use
+    if (tagSuggestionsCache.length === 0) {
+        loadAllTags();
+    }
+    
+    $input.on('input', function() {
+        const value = $(this).val();
+        const cursorPos = this.selectionStart;
+        const textBeforeCursor = value.substring(0, cursorPos);
+        
+        // Check if user is typing after a #
+        const lastHashIndex = textBeforeCursor.lastIndexOf('#');
+        if (lastHashIndex !== -1) {
+            const textAfterHash = textBeforeCursor.substring(lastHashIndex + 1);
+            // Check if there's no space or comma after the #
+            if (!textAfterHash.match(/[\s,]/)) {
+                const searchTerm = textAfterHash.toLowerCase();
+                showTagSuggestions($input, $suggestions, searchTerm, lastHashIndex);
+                return;
+            }
+        }
+        
+        // Hide suggestions if not typing after #
+        hideTagSuggestions($suggestions);
+    });
+    
+    $input.on('keydown', function(e) {
+        const $activeSuggestion = $suggestions.find('.suggestion-item.active');
+        
+        if ($suggestions.is(':visible') && $activeSuggestion.length > 0) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const $next = $activeSuggestion.next('.suggestion-item');
+                if ($next.length) {
+                    $activeSuggestion.removeClass('active');
+                    $next.addClass('active');
+                } else {
+                    $suggestions.find('.suggestion-item').first().addClass('active');
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const $prev = $activeSuggestion.prev('.suggestion-item');
+                if ($prev.length) {
+                    $activeSuggestion.removeClass('active');
+                    $prev.addClass('active');
+                } else {
+                    $suggestions.find('.suggestion-item').last().addClass('active');
+                }
+            } else if (e.key === 'Enter' || e.key === 'Tab') {
+                e.preventDefault();
+                const tagName = $activeSuggestion.data('tag');
+                if (tagName) {
+                    insertTag($input, tagName);
+                    hideTagSuggestions($suggestions);
+                }
+            } else if (e.key === 'Escape') {
+                hideTagSuggestions($suggestions);
+            }
+        }
+    });
+    
+    // Hide suggestions when clicking outside
+    $(document).on('click', function(e) {
+        if (!$(e.target).closest(inputSelector).length && !$(e.target).closest(suggestionsSelector).length) {
+            hideTagSuggestions($suggestions);
+        }
+    });
+}
+
+// Load all tags from API
+async function loadAllTags() {
+    try {
+        const response = await fetch('/admin/api/tags');
+        const result = await response.json();
+        if (result.success) {
+            tagSuggestionsCache = result.data.map(tag => tag.name);
+        }
+    } catch (error) {
+        console.error('Lỗi tải tags:', error);
+    }
+}
+
+// Show tag suggestions
+function showTagSuggestions($input, $suggestions, searchTerm, hashIndex) {
+    if (!searchTerm) {
+        // Show all tags if no search term
+        const filteredTags = tagSuggestionsCache.slice(0, 10);
+        renderSuggestions($input, $suggestions, filteredTags, hashIndex);
+        return;
+    }
+    
+    // Filter tags by search term
+    const filteredTags = tagSuggestionsCache
+        .filter(tag => tag.toLowerCase().includes(searchTerm))
+        .slice(0, 10);
+    
+    renderSuggestions($input, $suggestions, filteredTags, hashIndex);
+}
+
+// Render suggestions
+function renderSuggestions($input, $suggestions, tags, hashIndex) {
+    if (tags.length === 0) {
+        hideTagSuggestions($suggestions);
+        return;
+    }
+    
+    let html = '<div class="suggestion-list">';
+    tags.forEach((tag, index) => {
+        html += `<div class="suggestion-item ${index === 0 ? 'active' : ''}" data-tag="${tag}">#${tag}</div>`;
+    });
+    html += '</div>';
+    
+    $suggestions.html(html).show();
+    
+    // Handle click on suggestion
+    $suggestions.off('click', '.suggestion-item').on('click', '.suggestion-item', function() {
+        const tagName = $(this).data('tag');
+        insertTag($input, tagName);
+        hideTagSuggestions($suggestions);
+    });
+}
+
+// Insert tag into input
+function insertTag($input, tagName) {
+    const value = $input.val();
+    const cursorPos = $input[0].selectionStart;
+    const textBeforeCursor = value.substring(0, cursorPos);
+    
+    const lastHashIndex = textBeforeCursor.lastIndexOf('#');
+    if (lastHashIndex !== -1) {
+        const beforeHash = value.substring(0, lastHashIndex);
+        const afterCursor = value.substring(cursorPos);
+        const newValue = beforeHash + '#' + tagName + ' ' + afterCursor;
+        $input.val(newValue);
+        
+        // Set cursor position after inserted tag
+        const newCursorPos = beforeHash.length + tagName.length + 2;
+        $input[0].setSelectionRange(newCursorPos, newCursorPos);
+        $input.focus();
+    }
+}
+
+// Hide tag suggestions
+function hideTagSuggestions($suggestions) {
+    $suggestions.hide();
+}
