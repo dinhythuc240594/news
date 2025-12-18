@@ -135,6 +135,36 @@ $(document).ready(function() {
             $('#previewArticleModal').modal('hide');
         }
     });
+
+    // Tag manager events
+    $('#tagSearchInput').on('input', function() {
+        const search = $(this).val().trim();
+        loadTags(search);
+    });
+
+    $('#tagForm').on('submit', function(e) {
+        e.preventDefault();
+        saveTag();
+    });
+
+    $('#tagResetBtn').on('click', function() {
+        resetTagForm();
+    });
+
+    $(document).on('click', '.btn-edit-tag', function() {
+        const tagId = $(this).data('id');
+        const tagName = $(this).data('name');
+        const tagSlug = $(this).data('slug');
+        fillTagForm(tagId, tagName, tagSlug);
+    });
+
+    $(document).on('click', '.btn-delete-tag', function() {
+        const tagId = $(this).data('id');
+        const tagName = $(this).data('name');
+        if (confirm(`Bạn có chắc muốn xóa hashtag "${tagName}"?`)) {
+            deleteTag(tagId);
+        }
+    });
 });
 
 // Check authentication
@@ -175,6 +205,7 @@ function updatePageTitle(section) {
         'approved': 'Bài viết đã duyệt',
         'rejected': 'Bài viết bị từ chối',
         'api': 'Bài viết từ API',
+        'tags-manager': 'Quản lý Hashtag',
         'international': 'Bài báo Quốc tế',
         'international-pending': 'Quốc tế chờ duyệt',
         'menu-manager': 'Quản lý Menu',
@@ -209,6 +240,9 @@ async function loadSectionData(section) {
         case 'dashboard':
             loadStatistics();
             loadHotArticles();
+            break;
+        case 'tags-manager':
+            loadTags();
             break;
     }
 }
@@ -395,14 +429,226 @@ async function loadStatistics() {
         const result = await response.json();
         
         if (result.success && result.data) {
-            $('#statPending').text(result.data.pending);
-            $('#statApproved').text(result.data.approved);
-            $('#statRejected').text(result.data.rejected);
-            $('#statAPI').text(result.data.api);
-            $('#pendingCount').text(result.data.pending);
+            const stats = result.data;
+            $('#statPending').text(stats.pending);
+            $('#statApproved').text(stats.approved);
+            $('#statRejected').text(stats.rejected);
+            $('#statAPI').text(stats.api);
+            $('#pendingCount').text(stats.pending);
+
+            // Update notification bell if elements exist
+            const $notifCount = $('#notificationCount');
+            const $notifList = $('#notificationList');
+            const $notifEmpty = $('#notificationEmpty');
+            if ($notifCount.length && $notifList.length && $notifEmpty.length) {
+                const totalAlerts = (stats.pending || 0) + (stats.rejected || 0);
+                $notifCount.text(totalAlerts);
+
+                let html = '';
+                if (stats.pending > 0) {
+                    html += `
+                        <div class="dropdown-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div><strong>${stats.pending}</strong> bài viết <span class="text-warning">chờ duyệt</span></div>
+                                <small class="text-muted">Kiểm tra trong mục "Bài chờ duyệt".</small>
+                            </div>
+                            <span class="badge bg-warning text-dark ms-2"><i class="fas fa-clock"></i></span>
+                        </div>
+                    `;
+                }
+                if (stats.rejected > 0) {
+                    html += `
+                        <div class="dropdown-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div><strong>${stats.rejected}</strong> bài viết <span class="text-danger">bị từ chối</span></div>
+                                <small class="text-muted">Xem chi tiết ở mục "Bài từ chối".</small>
+                            </div>
+                            <span class="badge bg-danger ms-2"><i class="fas fa-times"></i></span>
+                        </div>
+                    `;
+                }
+                if (stats.api > 0) {
+                    html += `
+                        <div class="dropdown-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <div><strong>${stats.api}</strong> bài viết mới từ <span class="text-info">API</span></div>
+                                <small class="text-muted">Kiểm tra tab "Bài viết từ API".</small>
+                            </div>
+                            <span class="badge bg-info ms-2"><i class="fas fa-cloud"></i></span>
+                        </div>
+                    `;
+                }
+
+                if (html) {
+                    $notifEmpty.hide();
+                    $notifList.html(html);
+                } else {
+                    $notifList.empty();
+                    $notifEmpty.show().text('Chưa có thông báo mới.');
+                }
+            }
         }
     } catch (error) {
         console.error('Lỗi tải thống kê:', error);
+    }
+}
+
+// =========================
+// Tag Manager
+// =========================
+
+let tagsCache = [];
+
+async function loadTags(search = '') {
+    try {
+        let url = '/admin/api/tags';
+        if (search) {
+            url += `?search=${encodeURIComponent(search)}`;
+        }
+
+        const response = await fetch(url);
+        const result = await response.json();
+
+        if (result.success && Array.isArray(result.data)) {
+            tagsCache = result.data;
+            renderTagsTable(tagsCache);
+        } else {
+            renderTagsTable([]);
+        }
+    } catch (error) {
+        console.error('Lỗi tải hashtag:', error);
+        renderTagsTable([]);
+    }
+}
+
+function renderTagsTable(tags) {
+    const $tbody = $('#tagsTableBody');
+    const $badge = $('#tagsTotalBadge');
+
+    if (!$tbody.length) {
+        return;
+    }
+
+    if (!tags || tags.length === 0) {
+        $tbody.html(`
+            <tr>
+                <td colspan="4" class="text-center text-muted">Chưa có hashtag nào.</td>
+            </tr>
+        `);
+        if ($badge.length) {
+            $badge.text('0 hashtag');
+        }
+        return;
+    }
+
+    let html = '';
+    tags.forEach((tag, index) => {
+        html += `
+            <tr>
+                <td>${index + 1}</td>
+                <td><code>#${tag.name}</code></td>
+                <td>${tag.slug}</td>
+                <td>
+                    <button class="btn btn-sm btn-warning btn-edit-tag" 
+                            data-id="${tag.id}" 
+                            data-name="${tag.name}" 
+                            data-slug="${tag.slug}">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-delete-tag ms-1" 
+                            data-id="${tag.id}" 
+                            data-name="${tag.name}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    $tbody.html(html);
+    if ($badge.length) {
+        $badge.text(`${tags.length} hashtag`);
+    }
+}
+
+function fillTagForm(id, name, slug) {
+    $('#tagId').val(id);
+    $('#tagName').val(name);
+    $('#tagSlug').val(slug || '');
+}
+
+function resetTagForm() {
+    $('#tagId').val('');
+    $('#tagName').val('');
+    $('#tagSlug').val('');
+}
+
+async function saveTag() {
+    const id = $('#tagId').val();
+    const nameRaw = $('#tagName').val().trim();
+    const slugRaw = $('#tagSlug').val().trim();
+
+    if (!nameRaw) {
+        alert('Vui lòng nhập tên hashtag');
+        return;
+    }
+
+    // Chuẩn hóa: bỏ dấu # nếu có ở đầu
+    const name = nameRaw.startsWith('#') ? nameRaw.substring(1) : nameRaw;
+    const payload = {
+        name: name,
+        slug: slugRaw || null
+    };
+
+    try {
+        let url = '/admin/api/tags';
+        let method = 'POST';
+
+        if (id) {
+            url = `/admin/api/tags/${id}`;
+            method = 'PUT';
+        }
+
+        const response = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast('Thành công', id ? 'Đã cập nhật hashtag' : 'Đã tạo hashtag mới', 'success');
+            resetTagForm();
+            loadTags($('#tagSearchInput').val().trim());
+        } else {
+            showToast('Lỗi', result.error || 'Không thể lưu hashtag', 'warning');
+        }
+    } catch (error) {
+        console.error('Lỗi lưu hashtag:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi lưu hashtag', 'warning');
+    }
+}
+
+async function deleteTag(id) {
+    try {
+        const response = await fetch(`/admin/api/tags/${id}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast('Thành công', 'Đã xóa hashtag', 'success');
+            loadTags($('#tagSearchInput').val().trim());
+        } else {
+            showToast('Lỗi', result.error || 'Không thể xóa hashtag', 'warning');
+        }
+    } catch (error) {
+        console.error('Lỗi xóa hashtag:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi xóa hashtag', 'warning');
     }
 }
 

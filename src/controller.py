@@ -1020,6 +1020,106 @@ class AdminController:
             } for tag in tags]
         })
 
+    def api_create_tag(self):
+        """API tạo hashtag mới"""
+        data = request.get_json(silent=True) or {}
+        name = (data.get('name') or '').strip()
+        slug = (data.get('slug') or '').strip() or None
+
+        if not name:
+            return jsonify({'success': False, 'error': 'Tên hashtag không được để trống'}), 400
+
+        # Chuẩn hóa: bỏ dấu # nếu có
+        if name.startswith('#'):
+            name = name[1:]
+
+        # Nếu không truyền slug, tự sinh từ name
+        if not slug:
+            slug = self._generate_slug(name)
+
+        try:
+            # Kiểm tra trùng slug
+            existing = self.db_session.query(Tag).filter(Tag.slug == slug).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'Hashtag đã tồn tại'}), 400
+
+            tag = Tag(name=name, slug=slug)
+            self.db_session.add(tag)
+            self.db_session.commit()
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'id': tag.id,
+                    'name': tag.name,
+                    'slug': tag.slug
+                }
+            })
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            current_app.logger.exception('Lỗi tạo hashtag: %s', e)
+            return jsonify({'success': False, 'error': 'Không thể tạo hashtag'}), 500
+
+    def api_update_tag(self, tag_id: int):
+        """API cập nhật hashtag"""
+        data = request.get_json(silent=True) or {}
+        name = (data.get('name') or '').strip()
+        slug = (data.get('slug') or '').strip() or None
+
+        if not name:
+            return jsonify({'success': False, 'error': 'Tên hashtag không được để trống'}), 400
+
+        if name.startswith('#'):
+            name = name[1:]
+
+        if not slug:
+            slug = self._generate_slug(name)
+
+        try:
+            tag = self.db_session.query(Tag).filter(Tag.id == tag_id).first()
+            if not tag:
+                return jsonify({'success': False, 'error': 'Không tìm thấy hashtag'}), 404
+
+            # Kiểm tra slug trùng với tag khác
+            existing = self.db_session.query(Tag).filter(Tag.slug == slug, Tag.id != tag_id).first()
+            if existing:
+                return jsonify({'success': False, 'error': 'Slug đã được dùng bởi hashtag khác'}), 400
+
+            tag.name = name
+            tag.slug = slug
+            self.db_session.commit()
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'id': tag.id,
+                    'name': tag.name,
+                    'slug': tag.slug
+                }
+            })
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            current_app.logger.exception('Lỗi cập nhật hashtag: %s', e)
+            return jsonify({'success': False, 'error': 'Không thể cập nhật hashtag'}), 500
+
+    def api_delete_tag(self, tag_id: int):
+        """API xóa hashtag"""
+        try:
+            tag = self.db_session.query(Tag).filter(Tag.id == tag_id).first()
+            if not tag:
+                return jsonify({'success': False, 'error': 'Không tìm thấy hashtag'}), 404
+
+            # Xóa liên kết NewsTag trước khi xóa tag
+            self.db_session.query(NewsTag).where(NewsTag.tag_id == tag_id).delete()
+            self.db_session.delete(tag)
+            self.db_session.commit()
+
+            return jsonify({'success': True})
+        except SQLAlchemyError as e:
+            self.db_session.rollback()
+            current_app.logger.exception('Lỗi xóa hashtag: %s', e)
+            return jsonify({'success': False, 'error': 'Không thể xóa hashtag'}), 500
+
     def api_international_categories(self):
         """API lấy danh sách danh mục tin quốc tế (categories_international)"""
         categories = self.int_category_model.get_all()

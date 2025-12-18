@@ -659,6 +659,16 @@ input:checked + .visibility-slider:before {
     z-index: 1000;
 }
 
+/* Notification dropdown */
+.notification-dropdown {
+    min-width: 320px;
+    max-width: 380px;
+}
+
+.notification-dropdown .dropdown-item {
+    white-space: normal;
+}
+
 .suggestion-list {
     list-style: none;
     padding: 0;

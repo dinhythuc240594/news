@@ -223,6 +223,27 @@ def api_tags():
     return admin_controller.api_tags()
 
 
+@admin_bp.route('/api/tags', methods=['POST'])
+@controller.admin_required
+def api_create_tag():
+    """API tạo hashtag mới"""
+    return admin_controller.api_create_tag()
+
+
+@admin_bp.route('/api/tags/<int:tag_id>', methods=['PUT'])
+@controller.admin_required
+def api_update_tag(tag_id: int):
+    """API cập nhật hashtag"""
+    return admin_controller.api_update_tag(tag_id)
+
+
+@admin_bp.route('/api/tags/<int:tag_id>', methods=['DELETE'])
+@controller.admin_required
+def api_delete_tag(tag_id: int):
+    """API xóa hashtag"""
+    return admin_controller.api_delete_tag(tag_id)
+
+
 @admin_bp.route('/api/international-categories')
 @controller.admin_required
 def api_international_categories():
