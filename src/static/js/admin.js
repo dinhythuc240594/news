@@ -1410,7 +1410,7 @@ function displayRssArticles(articles) {
                         ${article.thumbnail ? `<img src="${article.thumbnail}" class="img-fluid rounded mb-2" style="max-height: 150px; object-fit: cover; width: 100%;">` : ''}
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">${article.published_at || 'N/A'}</small>
-                            <button class="btn btn-sm btn-primary save-rss-article" data-index="${index}">
+                            <button class="btn btn-sm btn-primary save-rss-article" data-index="${index}" data-article-id="${article.id}">
                                 <i class="fas fa-save"></i> Lưu
                             </button>
                         </div>
@@ -1523,10 +1523,23 @@ $('#saveAPIArticleBtn').off('click').on('click', async function() {
             // Close modal
             bootstrap.Modal.getInstance(document.getElementById('saveAPIArticleModal')).hide();
             
-            // Remove article card from list
-            $(`.save-api-article, .save-rss-article`).closest('.col-md-6').fadeOut(function() {
-                $(this).remove();
-            });
+            // Chỉ xóa card của bài viết vừa lưu (tìm bằng article ID)
+            const articleId = result.article_id || articleData.id;
+            if (articleId) {
+                // Tìm và xóa card chứa bài viết với ID này
+                $(`.save-api-article[data-article-id="${articleId}"], .save-rss-article[data-article-id="${articleId}"]`)
+                    .closest('.col-md-6').fadeOut(function() {
+                        $(this).remove();
+                        
+                        // Cập nhật số lượng bài còn lại
+                        const remainingCount = $('.save-api-article, .save-rss-article').length;
+                        if (remainingCount === 0) {
+                            $('#apiArticlesList, #rssArticlesList').html(
+                                '<p class="text-muted text-center">Không còn bài viết nào. Hãy tải thêm bài mới.</p>'
+                            );
+                        }
+                    });
+            }
             
             // Reload statistics
             loadStatistics();
@@ -1704,7 +1717,7 @@ function displayApiArticles(articles) {
                                 <i class="fas fa-globe"></i> ${article.source || 'N/A'}<br>
                                 <i class="fas fa-calendar"></i> ${article.published_at || 'N/A'}
                             </small>
-                            <button class="btn btn-sm btn-primary save-api-article" data-index="${index}">
+                            <button class="btn btn-sm btn-primary save-api-article" data-index="${index}" data-article-id="${article.id}">
                                 <i class="fas fa-save"></i> Lưu
                             </button>
                         </div>

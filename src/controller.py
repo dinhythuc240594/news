@@ -810,13 +810,46 @@ class AdminController:
                             
                             # Format articles theo cấu trúc mới
                             for api_article in api_articles[:limit]:
-                                # Join description array thành string
-                                description_text = ' '.join(api_article.get('description', []))
+                                # Parse description array - bao gồm cả text và image theo đúng thứ tự
+                                description_items = api_article.get('description', [])
+                                description_html_parts = []
+                                description_texts = []
+                                
+                                for item in description_items:
+                                    if isinstance(item, dict):
+                                        if item.get('type') == 'text':
+                                            text_content = item.get('text', '').strip()
+                                            if text_content:
+                                                description_texts.append(text_content)
+                                                description_html_parts.append(f'<p>{text_content}</p>')
+                                        elif item.get('type') == 'image':
+                                            img_src = item.get('src', '')
+                                            img_alt = item.get('alt', '')
+                                            if img_src:
+                                                description_html_parts.append(f'<img src="{img_src}" alt="{img_alt}" />')
+                                
+                                # Join text cho summary/description ngắn
+                                description_text = ' '.join(description_texts)
+                                # Join HTML cho content đầy đủ với cả hình ảnh
+                                description_html = '\n'.join(description_html_parts)
                                 
                                 # Lấy main image hoặc first image
                                 main_image = api_article.get('mainImage', '')
                                 if not main_image and api_article.get('images'):
-                                    main_image = api_article['images'][0]
+                                    first_img = api_article['images'][0]
+                                    # Handle new image structure {src, alt}
+                                    main_image = first_img.get('src', '') if isinstance(first_img, dict) else first_img
+                                
+                                # Parse images array - extract src từ objects
+                                images_data = api_article.get('images', [])
+                                image_urls = []
+                                for img in images_data:
+                                    if isinstance(img, dict):
+                                        img_src = img.get('src', '')
+                                        if img_src:
+                                            image_urls.append(img_src)
+                                    elif isinstance(img, str):
+                                        image_urls.append(img)
                                 
                                 articles.append({
                                     'title': api_article.get('title', 'No title'),
@@ -826,8 +859,8 @@ class AdminController:
                                     'source': {'name': 'Custom API'},
                                     'author': api_article.get('author', 'Unknown'),
                                     'publishedAt': api_article.get('pubDate', datetime.utcnow().isoformat()),
-                                    'content': description_text,
-                                    'images': api_article.get('images', [])
+                                    'content': description_html,  # Sử dụng HTML với cả text và images
+                                    'images': image_urls
                                 })
                         else:
                             return jsonify({
@@ -956,10 +989,22 @@ class AdminController:
                 except:
                     published_at = datetime.utcnow()
             
+            # Tạo slug từ title
+            title = article_data.get('title', 'Untitled')
+            base_slug = self._generate_slug(title)
+            
+            # Kiểm tra xem bài viết với slug này đã tồn tại chưa
+            existing_news = db_session.query(News).filter(News.slug == base_slug).first()
+            if existing_news:
+                return jsonify({
+                    'success': False,
+                    'error': 'Bài viết đã được lưu trước đó'
+                }), 400
+            
             # Tạo bài viết mới từ API article
             news = News(
-                title=article_data.get('title', ''),
-                slug=self._generate_slug(article_data.get('title', 'Untitled')),
+                title=title,
+                slug=base_slug,
                 summary=article_data.get('summary', ''),
                 content=article_data.get('content', article_data.get('summary', '')),
                 thumbnail=article_data.get('thumbnail'),
@@ -968,7 +1013,8 @@ class AdminController:
                 approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
                 status=news_status,
                 is_api=True,  # Đánh dấu bài từ API
-                published_at=published_at if news_status == NewsStatus.PUBLISHED else None
+                published_at=published_at if news_status == NewsStatus.PUBLISHED else None,
+                author=article_data.get('author'),
             )
             
             db_session.add(news)
@@ -976,17 +1022,40 @@ class AdminController:
             
             news_id = news.id
             
+            # Xóa bài viết vừa lưu khỏi cache session
+            api_articles_cache = session.get('api_articles_cache', [])
+            article_id = article_data.get('id')
+            if article_id:
+                # Lọc bỏ bài viết vừa lưu
+                api_articles_cache = [a for a in api_articles_cache if a.get('id') != article_id]
+                session['api_articles_cache'] = api_articles_cache
+            
             return jsonify({
                 'success': True,
                 'message': f'Đã lưu bài viết với trạng thái {news_status.value}',
-                'news_id': news_id
+                'news_id': news_id,
+                'article_id': article_id
             })
             
+        except IntegrityError as e:
+            db_session.rollback()
+            # Lỗi trùng lặp dữ liệu (duplicate key)
+            error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+            if 'duplicate key' in error_msg.lower() or 'unique constraint' in error_msg.lower():
+                return jsonify({
+                    'success': False,
+                    'error': 'Bài viết đã được lưu trước đó'
+                }), 400
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Lỗi khi lưu bài viết'
+                }), 500
         except Exception as e:
             db_session.rollback()
             return jsonify({
                 'success': False,
-                'error': f'Lỗi khi lưu bài viết: {str(e)}'
+                'error': 'Không thể lưu bài viết'
             }), 500
         finally:
             db_session.close()
