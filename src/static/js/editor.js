@@ -1108,7 +1108,7 @@ async function editArticle(articleId) {
             $('#editArticleCategory').val(article.category_id);
             $('#editArticleDescription').val(article.summary);
             $('#editArticleImageUrl').val(article.thumbnail || '');
-            $('#editArticleImagePreview').attr('src', article.thumbnail || '/static/images/default-image.jpg');
+            $('#editArticleImagePreview').attr('src', article.thumbnail || '/static/images/default-image.png');
             $('#editArticleTags').val(article.tags || '');
             
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
