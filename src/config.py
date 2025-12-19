@@ -10,7 +10,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
     # Database configuration
-    DATABASE_URL = os.environ.get('DATABASE_URL') or 'postgresql://postgres:123456789@localhost:5432/newsdb'
+    DATABASE_URL = os.environ.get('DATABASE_URL') or 'postgresql://postgres:1@localhost:5432/newsdb'
     
     # Session configuration
     PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
