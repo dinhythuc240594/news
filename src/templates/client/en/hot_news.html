@@ -1,7 +1,7 @@
 <script>
     // Load hot news for sidebar
     $(document).ready(function() {
-        $.get('{{ url_for("client.api_hot_news") }}?limit=5', function(data) {
+        $.get('{{ url_for("client.en_api_hot_news") }}?limit=5', function(data) {
             if (data.success && data.data.length > 0) {
                 let html = '';
                 data.data.forEach(function(news, index) {

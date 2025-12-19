@@ -22,10 +22,13 @@
             <div class="col-md-3">
                 <h4>Categories</h4>
                 <ul class="footer-links">
-                    <li><a href="#">News</a></li>
-                    <li><a href="#">Economy</a></li>
-                    <li><a href="#">Entertainment</a></li>
-                    <li><a href="#">Sports</a></li>
+                    {% for category in categories %}
+                    {% if category.parent_id is none%}
+                        {% if category.visible %}
+                            <li><a href="{{ url_for('client.en_category', category_slug=category.slug) }}">{{ category.name }}</a></li>
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
                 </ul>
             </div>
             <div class="col-md-3">

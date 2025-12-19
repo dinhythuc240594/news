@@ -2338,8 +2338,14 @@ class ClientController:
     """Quản lý các route của client"""
     
     def __init__(self):
-        # Don't store session - create fresh one per request
-        pass
+        """Khởi tạo controller"""
+        self.db_session = get_session()
+        self.news_model = NewsModel(self.db_session)
+        self.category_model = CategoryModel(self.db_session)
+        self.user_model = UserModel(self.db_session)
+        # Model cho tin tức quốc tế
+        self.int_news_model = InternationalNewsModel(self.db_session)
+        self.int_category_model = InternationalCategoryModel(self.db_session)
     
     def index(self):
         """
@@ -2677,7 +2683,7 @@ class ClientController:
                 session['role'] = user.role.value
                 
                 flash('Đăng nhập thành công', 'success')
-                return redirect(url_for('client.vn.index'))
+                return redirect(url_for('client.index'))
             else:
                 flash('Tên đăng nhập hoặc mật khẩu không đúng', 'error')
         
@@ -2758,7 +2764,8 @@ class ClientController:
         """Đăng xuất user"""
         session.clear()
         flash('Đã đăng xuất', 'success')
-        return redirect(url_for('client.vn.index'))
+        site = request.path.split('/')[1]
+        return redirect(url_for(f'client.{site}_index'))
     
     def profile(self):
         """

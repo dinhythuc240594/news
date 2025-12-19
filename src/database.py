@@ -457,11 +457,11 @@ def get_database_url():
     """Lấy URL kết nối database từ config"""
     from flask import current_app
     try:
-        return current_app.config.get('DATABASE_URL', 'postgresql://postgres:1@localhost:5432/newsdb')
+        return current_app.config.get('DATABASE_URL', 'postgresql://postgres:123456789@localhost:5432/newsdb')
     except RuntimeError:
         # Nếu không có Flask app context, dùng giá trị mặc định
         import os
-        return os.environ.get('DATABASE_URL', 'postgresql://postgres:1@localhost:5432/newsdb')
+        return os.environ.get('DATABASE_URL', 'postgresql://postgres:123456789@localhost:5432/newsdb')
 
 
 def create_engine_instance():

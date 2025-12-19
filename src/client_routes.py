@@ -137,3 +137,13 @@ def en_api_latest_news():
 def en_api_featured_news():
     """API lấy tin nổi bật"""
     return client_controller.en_api_featured_news()
+
+@client_bp.route('/en/api/hot-news')
+def en_api_hot_news():
+    """API lấy tin nóng"""
+    return client_controller.en_api_hot_news()
+
+@client_bp.route('/en/api/categories')
+def en_api_categories():
+    """API lấy danh sách danh mục"""
+    return client_controller.en_api_categories()
