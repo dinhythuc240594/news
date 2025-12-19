@@ -145,7 +145,7 @@ class AdminController:
         # Bài viết mới nhất
         latest_news = self.news_model.get_all(limit=10)
         
-        return render_template('admin/dashboard.html',
+        return render_template('admin/admin.html',
                              total_news=total_news,
                              published_news=published_news,
                              pending_news=pending_news,
@@ -169,7 +169,7 @@ class AdminController:
         published_news = [n for n in my_news if n.status == NewsStatus.PUBLISHED]
         categories = self.category_model.get_all()
         
-        return render_template('editor/editor-dashboard.html',
+        return render_template('editor/editor.html',
                              draft_news=draft_news,
                              pending_news=pending_news,
                              published_news=published_news,
