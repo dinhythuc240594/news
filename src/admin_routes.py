@@ -390,3 +390,8 @@ def api_init_default_international_menu_items():
 def api_update_international_menu_order():
     """API cập nhật thứ tự international menu items (drag & drop)"""
     return admin_controller.api_update_international_menu_order()
+
+@admin_bp.route('/profile')
+def profile():
+    """Trang thông tin cá nhân của user"""
+    return admin_controller.profile()
