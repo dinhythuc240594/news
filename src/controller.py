@@ -3222,3 +3222,77 @@ class ClientController:
                 'is_hot': article.is_hot,
             },
         })
+
+
+class ClientControllerCommon:
+
+    """Quản lý các route chung của client"""
+    def __init__(self): 
+        """Khởi tạo controller"""
+
+    def _init_models(self, site: str):
+        self.db_session = get_session()
+        if site == 'en':
+            self.news_model = InternationalNewsModel(self.db_session)
+            self.category_model = InternationalCategoryModel(self.db_session)
+        else:
+            self.news_model = NewsModel(self.db_session)
+            self.category_model = CategoryModel(self.db_session)
+
+    def getDictCommon(self):
+        """Lấy dictionary chung"""
+        return {
+            'categories': self.category_model.get_all(),
+            'featured_news': self.news_model.get_featured(limit=5),
+            'latest_news': self.news_model.get_published(limit=10),
+            'hot_news': self.news_model.get_hot(limit=5),
+        }
+
+    def _get_site(self):
+        """Lấy site từ đường dẫn"""
+        return request.path.split('/')[1]
+
+    def contact(self):
+        """Trang liên hệ"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/contact.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/contact.html', **self.getDictCommon())
+    
+    def guide(self):
+        """Trang hướng dẫn"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/guide.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/guide.html', **self.getDictCommon())
+    
+    def introducing(self):
+        """Trang giới thiệu"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/introducing.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/introducing.html', **self.getDictCommon())
+    
+    def security(self):
+        """Trang chính sách bảo mật"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/security.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/security.html', **self.getDictCommon())
+    
+    def term_of_service(self):
+        """Trang điều khoản sử dụng"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/term_of_service.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/term_of_service.html', **self.getDictCommon())

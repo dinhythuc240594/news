@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, jsonify, abort
 # from database import get_session, NewsStatus
 # from models import NewsModel, CategoryModel
 
-from controller import ClientController
+from controller import ClientController, ClientControllerCommon
 
 # Tạo Blueprint cho client để chỉ đường dẫn file tĩnh trong dự án
 client_bp = Blueprint('client', __name__, 
@@ -14,6 +14,7 @@ client_bp = Blueprint('client', __name__,
 
 # Khởi tạo client controller
 client_controller = ClientController()
+client_controller_common = ClientControllerCommon()
 
 # Trang chủ viết bằng tiếng Việt
 @client_bp.route('/')
@@ -106,6 +107,31 @@ def submit_comment(news_id: int):
     """API gửi bình luận"""
     return client_controller.submit_comment(news_id)
 
+@client_bp.route('/contact')
+def contact():
+    """Trang liên hệ"""
+    return client_controller_common.contact()
+
+@client_bp.route('/guide')
+def guide():
+    """Trang hướng dẫn"""
+    return client_controller_common.guide()
+
+@client_bp.route('/introducing')
+def introducing():
+    """Trang giới thiệu"""
+    return client_controller_common.introducing()
+
+@client_bp.route('/security')
+def security():
+    """Trang chính sách bảo mật"""
+    return client_controller_common.security()
+
+@client_bp.route('/term_of_service')
+def term_of_service():
+    """Trang điều khoản sử dụng"""
+    return client_controller_common.term_of_service()
+
 # Trang chủ viết bằng tiếng Anh
 @client_bp.route('/en')
 def en_index():
@@ -147,3 +173,28 @@ def en_api_hot_news():
 def en_api_categories():
     """API lấy danh sách danh mục"""
     return client_controller.en_api_categories()
+
+@client_bp.route('/en/contact')
+def en_contact():
+    """Trang liên hệ"""
+    return client_controller_common.contact()
+
+@client_bp.route('/en/guide')
+def en_guide():
+    """Trang hướng dẫn"""
+    return client_controller_common.guide()
+
+@client_bp.route('/en/introducing')
+def en_introducing():
+    """Trang giới thiệu"""
+    return client_controller_common.introducing()
+
+@client_bp.route('/en/security')
+def en_security():
+    """Trang chính sách bảo mật"""
+    return client_controller_common.security()
+
+@client_bp.route('/en/term_of_service')
+def en_term_of_service():
+    """Trang điều khoản sử dụng"""
+    return client_controller_common.term_of_service()

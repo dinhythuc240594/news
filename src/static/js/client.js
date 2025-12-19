@@ -14,7 +14,13 @@ $(document).ready(function() {
             hour: '2-digit',
             minute: '2-digit'
         };
-        const dateTimeString = now.toLocaleDateString('vi-VN', options);
+        const site = window.location.pathname.split('/')[1];
+        if (site == 'en') {
+            options.locale = 'en-US';
+        } else {
+            options.locale = 'vi-VN';
+        }
+        const dateTimeString = now.toLocaleDateString(options.locale, options);
         $('#currentDateTime').text(dateTimeString);
     }
     
