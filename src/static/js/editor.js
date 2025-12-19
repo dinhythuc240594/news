@@ -600,6 +600,9 @@ async function loadMyArticles(page = 1, status = null, search = null) {
             (newPage) => loadMyArticles(newPage, $('#filterStatus').val(), $('#searchMyArticles').val().trim())
         );
         updateInfoText(pagination, 'myArticlesInfo');
+        // getApprovedNewsTitle(articles);
+        // getUpdateNewsTitle(articles);
+        // getCreateNewsTitle(articles);
     } catch (error) {
         console.error('Lỗi tải bài viết:', error);
         hideSpinner();
@@ -675,6 +678,24 @@ async function fetchMyArticlesForSection(status, page, search, tableId, paginati
         hideSpinner();
         showToast('Lỗi', 'Có lỗi xảy ra khi tải danh sách bài viết', 'warning');
     }
+}
+
+// Get approved news title
+function getApprovedNewsTitle(articles) {
+    const approvedNewsTitle = articles.find(article => article.status === 'published');
+    $('#approvedNewsTitle').text(approvedNewsTitle.title);
+}
+
+// Get update news title
+function getUpdateNewsTitle(articles) {
+    const updateNewsTitle = articles.find(article => article.updated_at !== article.created_at);
+    $('#updateNewsTitle').text(updateNewsTitle.title);
+}
+
+// Get create news title
+function getCreateNewsTitle(articles) {
+    const createNewsTitle = articles.find(article => article.created_at !== article.updated_at);
+    $('#createNewsTitle').text(createNewsTitle.title);
 }
 
 // Display articles vào bảng theo ID
