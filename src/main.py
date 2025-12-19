@@ -1,7 +1,7 @@
 """
 Main application file - Khởi tạo Flask app và đăng ký routes
 """
-from flask import Flask
+from flask import Flask, request
 from admin_routes import admin_bp
 from client_routes import client_bp
 from database import init_db, get_session
@@ -30,6 +30,21 @@ def create_app(config_class=Config):
     # Đăng ký Blueprints
     app.register_blueprint(client_bp)
     app.register_blueprint(admin_bp)
+    
+    # Debug: Log mọi request
+    @app.before_request
+    def log_request():
+        print(f"\n>>> INCOMING REQUEST: {request.method} {request.path}")
+        print(f">>> Endpoint: {request.endpoint}")
+        print(f">>> View args: {request.view_args}\n")
+    
+    # Debug: In ra tất cả routes
+    print("\n" + "="*50)
+    print("REGISTERED ROUTES:")
+    print("="*50)
+    for rule in app.url_map.iter_rules():
+        print(f"{rule.rule} -> {rule.endpoint} [{', '.join(rule.methods)}]")
+    print("="*50 + "\n")
     
     # Đăng ký Jinja2 filters
     @app.template_filter('timeago')

@@ -258,6 +258,55 @@ def api_international_categories():
     return admin_controller.api_international_categories()
 
 
+@admin_bp.route('/api/external-categories')
+@controller.admin_required
+def api_external_categories():
+    """Proxy API lấy danh sách danh mục từ external API (tránh CORS)"""
+    import requests
+    
+    # Lấy source từ query params
+    source = request.args.get('source', '')
+    # Lấy token từ query params hoặc header
+    api_token = request.args.get('token', '') or request.headers.get('X-API-Token', '')
+    
+    if not api_token:
+        return jsonify({
+            'success': False,
+            'error': 'API token is required'
+        }), 400
+    
+    try:
+        # Call external API với Bearer token
+        api_url = 'https://news-api.techreview.pro/categories'
+        if source:
+            api_url += f'?source={source}'
+        
+        headers = {
+            'Authorization': f'Bearer {api_token}'
+        }
+        
+        response = requests.get(api_url, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            return jsonify(response.json())
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'API error: {response.status_code}'
+            }), response.status_code
+            
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            'success': False,
+            'error': f'Connection error: {str(e)}'
+        }), 500
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @admin_bp.route('/api/menu-items')
 @controller.admin_required
 def api_menu_items():

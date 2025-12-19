@@ -294,6 +294,9 @@ $(document).ready(function() {
     // Weather Widget - Load weather data
     loadWeatherData();
 
+    // Check for visible elements on page load
+    checkVisibleElements();
+
     // Console log for debugging
     console.log('VnNews website loaded successfully!');
     console.log('jQuery version:', $.fn.jquery);
@@ -509,13 +512,18 @@ function isInViewport(element) {
     );
 }
 
-// Animate elements on scroll
-$(window).scroll(function() {
+// Function to check and animate visible elements
+function checkVisibleElements() {
     $('.news-card').each(function() {
         if (isInViewport(this)) {
             $(this).addClass('animated');
         }
     });
+}
+
+// Animate elements on scroll
+$(window).scroll(function() {
+    checkVisibleElements();
 });
 
 // Add CSS for animation
