@@ -531,7 +531,8 @@ async function loadUserInfo() {
         const result = await response.json();
         
         if (result.success && result.data) {
-            $('#userName').text(result.data.name);
+            var html = `<a href="${url_for('admin.profile')}">${result.data.name}</a>`;
+            $('#userName').html(html);
         }
     } catch (error) {
         console.error('Lỗi tải thông tin user:', error);
@@ -600,6 +601,9 @@ async function loadMyArticles(page = 1, status = null, search = null) {
             (newPage) => loadMyArticles(newPage, $('#filterStatus').val(), $('#searchMyArticles').val().trim())
         );
         updateInfoText(pagination, 'myArticlesInfo');
+        // getApprovedNewsTitle(articles);
+        // getUpdateNewsTitle(articles);
+        // getCreateNewsTitle(articles);
     } catch (error) {
         console.error('Lỗi tải bài viết:', error);
         hideSpinner();
@@ -675,6 +679,24 @@ async function fetchMyArticlesForSection(status, page, search, tableId, paginati
         hideSpinner();
         showToast('Lỗi', 'Có lỗi xảy ra khi tải danh sách bài viết', 'warning');
     }
+}
+
+// Get approved news title
+function getApprovedNewsTitle(articles) {
+    const approvedNewsTitle = articles.find(article => article.status === 'published');
+    $('#approvedNewsTitle').text(approvedNewsTitle.title);
+}
+
+// Get update news title
+function getUpdateNewsTitle(articles) {
+    const updateNewsTitle = articles.find(article => article.updated_at !== article.created_at);
+    $('#updateNewsTitle').text(updateNewsTitle.title);
+}
+
+// Get create news title
+function getCreateNewsTitle(articles) {
+    const createNewsTitle = articles.find(article => article.created_at !== article.updated_at);
+    $('#createNewsTitle').text(createNewsTitle.title);
 }
 
 // Display articles vào bảng theo ID
@@ -1087,7 +1109,7 @@ async function editArticle(articleId) {
             $('#editArticleCategory').val(article.category_id);
             $('#editArticleDescription').val(article.summary);
             $('#editArticleImageUrl').val(article.thumbnail || '');
-            $('#editArticleImagePreview').attr('src', article.thumbnail || '/static/images/default-image.jpg');
+            $('#editArticleImagePreview').attr('src', article.thumbnail || '/static/images/default-image.png');
             $('#editArticleTags').val(article.tags || '');
             
             const modal = new bootstrap.Modal(document.getElementById('editModal'));

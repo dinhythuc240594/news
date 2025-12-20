@@ -1,5 +1,5 @@
 {% extends 'client/en/base.html' %}
-{% block title %}VnNews International - Latest World News{% endblock %}
+{% block title %}VnNews International - The Latest News{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_client.css') }}">
 {% endblock %}
@@ -12,143 +12,104 @@
                 <div class="col-lg-9">
                     <!-- Featured News -->
                     <section class="featured-news mb-4">
+                        {% if featured_news %}
                         <div class="row">
+                            {% if featured_news|length > 0 %}
                             <div class="col-md-8">
+                                {% set main_featured = featured_news[0] %}
                                 <article class="news-card featured-card">
-                                    <img src="https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800" alt="Featured news">
+                                    <div class="news-image">
+                                        <img src="{{ main_featured.thumbnail|default_image }}" alt="{{ main_featured.title }}">
+                                        <span class="badge-category">{{ main_featured.category.name }}</span>
+                                    </div>
                                     <div class="news-content">
-                                        <span class="news-category">World News</span>
                                         <h2 class="news-title">
-                                            <a href="#">Global Leaders Meet to Discuss Climate Action at International Summit</a>
+                                            <a href="{{ url_for('client.news_detail', news_slug=main_featured.slug) }}">{{ main_featured.title }}</a>
                                         </h2>
                                         <p class="news-description">
-                                            World leaders gathered today in Geneva for a crucial summit on climate change, with key discussions focusing on carbon reduction targets and renewable energy investments.
+                                            {{ main_featured.summary or main_featured.content[:200] + '...' }}
                                         </p>
                                         <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> 2 hours ago</span>
-                                            <span><i class="far fa-eye"></i> 15,234 views</span>
+                                            <span><i class="far fa-clock"></i> {{ (main_featured.published_at or main_featured.created_at)|timeago }}</span>
+                                            <span><i class="far fa-eye"></i> {{ main_featured.view_count|format_view }}</span>
                                         </div>
                                     </div>
                                 </article>
                             </div>
+                            {% endif %}
+                            {% if featured_news|length > 1 %}
                             <div class="col-md-4">
-                                <article class="news-card">
-                                    <img src="https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=400" alt="Business news">
-                                    <div class="news-content">
-                                        <span class="news-category">Business</span>
+                                <div class="sub-featured">
+                                    {% for news in featured_news[1:3] %}
+                                    <article class="news-card small-card">
+                                        <div class="news-image">
+                                            <img src="{{ news.thumbnail|default_image }}" alt="{{ news.title }}">
+                                            <span class="badge-category">{{ news.category.name }}</span>
+                                        </div>
                                         <h3 class="news-title">
-                                            <a href="#">Tech Giants Report Record Earnings Despite Market Volatility</a>
+                                            <a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
                                         </h3>
                                         <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> 3 hours ago</span>
+                                            <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>
                                         </div>
-                                    </div>
-                                </article>
-                                <article class="news-card mt-3">
-                                    <img src="https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400" alt="Technology">
-                                    <div class="news-content">
-                                        <span class="news-category">Technology</span>
-                                        <h3 class="news-title">
-                                            <a href="#">AI Revolution: New Breakthrough in Natural Language Processing</a>
-                                        </h3>
-                                        <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> 4 hours ago</span>
-                                        </div>
-                                    </div>
-                                </article>
+                                    </article>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div class="row">
+                            <div class="col-12">
+                                <p class="text-center text-muted">No featured news</p>
                             </div>
                         </div>
+                        {% endif %}
                     </section>
 
-                    <!-- Latest News Grid -->
-                    <section class="news-grid mb-4">
-                        <h2 class="section-title">Latest News</h2>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <article class="news-card">
-                                    <img src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=400" alt="News">
-                                    <div class="news-content">
-                                        <span class="news-category">Politics</span>
-                                        <h3 class="news-title">
-                                            <a href="#">Election Results Show Shift in Political Landscape</a>
-                                        </h3>
-                                        <p class="news-description">
-                                            Recent elections across Europe indicate significant changes in voter preferences and political alignments.
-                                        </p>
-                                        <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> 5 hours ago</span>
-                                            <span><i class="far fa-eye"></i> 8,521 views</span>
+                    <!-- Latest News -->
+                    <section class="latest-news">
+                        <h2 class="section-title">
+                            <span>Latest</span>
+                        </h2>
+                        
+                        <div class="news-list">
+                            {% if latest_news %}
+                                {% for news in latest_news %}
+                                <article class="news-card horizontal-card">
+                                    <div class="row g-0">
+                                        <div class="col-md-4">
+                                            <div class="news-image">
+                                                <img src="{{ news.thumbnail|default_image }}" alt="{{ news.title }}">
+                                                <span class="badge-category">{{ news.category.name }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-8">
+                                            <div class="news-content">
+                                                <h3 class="news-title">
+                                                    <a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
+                                                </h3>
+                                                <p class="news-description">
+                                                    {{ news.summary or news.content[:200] + '...' }}
+                                                </p>
+                                                <div class="news-meta">
+                                                    <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>
+                                                    <span><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </article>
-                            </div>
-                            <div class="col-md-6">
-                                <article class="news-card">
-                                    <img src="https://images.unsplash.com/photo-1587825140708-dfaf72ae4b04?w=400" alt="Sports">
-                                    <div class="news-content">
-                                        <span class="news-category">Sports</span>
-                                        <h3 class="news-title">
-                                            <a href="#">Champions League: Underdogs Shock Favorites in Quarterfinals</a>
-                                        </h3>
-                                        <p class="news-description">
-                                            In a stunning upset, the underdog team defeated the tournament favorites 3-1 in an electrifying match.
-                                        </p>
-                                        <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> 6 hours ago</span>
-                                            <span><i class="far fa-eye"></i> 12,450 views</span>
-                                        </div>
-                                    </div>
-                                </article>
-                            </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-center text-muted">No latest news</p>
+                            {% endif %}
                         </div>
-                    </section>
 
-                    <!-- World News Section -->
-                    <section class="category-section mb-4">
-                        <h2 class="section-title">World News</h2>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <article class="news-card">
-                                    <img src="https://images.unsplash.com/photo-1523995462485-3d171b5c8fa9?w=400" alt="Asia">
-                                    <div class="news-content">
-                                        <span class="news-category">Asia</span>
-                                        <h4 class="news-title">
-                                            <a href="#">Economic Growth Continues in Southeast Asian Markets</a>
-                                        </h4>
-                                        <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> 7 hours ago</span>
-                                        </div>
-                                    </div>
-                                </article>
-                            </div>
-                            <div class="col-md-4">
-                                <article class="news-card">
-                                    <img src="https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400" alt="Europe">
-                                    <div class="news-content">
-                                        <span class="news-category">Europe</span>
-                                        <h4 class="news-title">
-                                            <a href="#">European Union Announces New Trade Agreement</a>
-                                        </h4>
-                                        <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> 8 hours ago</span>
-                                        </div>
-                                    </div>
-                                </article>
-                            </div>
-                            <div class="col-md-4">
-                                <article class="news-card">
-                                    <img src="https://images.unsplash.com/photo-1485230895905-ec40ba36b9bc?w=400" alt="Americas">
-                                    <div class="news-content">
-                                        <span class="news-category">Americas</span>
-                                        <h4 class="news-title">
-                                            <a href="#">Innovation Hub Opens in Silicon Valley</a>
-                                        </h4>
-                                        <div class="news-meta">
-                                            <span><i class="far fa-clock"></i> 9 hours ago</span>
-                                        </div>
-                                    </div>
-                                </article>
-                            </div>
+                        <div class="text-center mt-4">
+                            <button class="btn-load-more">
+                                <i class="fas fa-sync-alt"></i> View more
+                            </button>
                         </div>
                     </section>
                 </div>
@@ -156,67 +117,53 @@
                 <!-- Right Sidebar -->
                 <div class="col-lg-3">
                     <!-- Most Read -->
-                    <aside class="sidebar-widget mb-4">
-                        <h3 class="widget-title">Most Read</h3>
+                    <aside class="sidebar-widget">
+                        <h3 class="widget-title">
+                            <i class="fas fa-fire"></i> View more
+                        </h3>
                         <div class="most-read-list">
-                            <div class="most-read-item">
-                                <span class="item-number">1</span>
-                                <div class="item-content">
-                                    <h4><a href="#">Breaking: Major Breakthrough in Cancer Research</a></h4>
-                                    <span class="item-meta">25,432 views</span>
-                                </div>
-                            </div>
-                            <div class="most-read-item">
-                                <span class="item-number">2</span>
-                                <div class="item-content">
-                                    <h4><a href="#">Stock Market Hits All-Time High</a></h4>
-                                    <span class="item-meta">18,765 views</span>
-                                </div>
-                            </div>
-                            <div class="most-read-item">
-                                <span class="item-number">3</span>
-                                <div class="item-content">
-                                    <h4><a href="#">Space Tourism: First Commercial Flight Success</a></h4>
-                                    <span class="item-meta">16,234 views</span>
-                                </div>
-                            </div>
-                            <div class="most-read-item">
-                                <span class="item-number">4</span>
-                                <div class="item-content">
-                                    <h4><a href="#">Olympics 2024: Record-Breaking Performances</a></h4>
-                                    <span class="item-meta">14,987 views</span>
-                                </div>
-                            </div>
-                            <div class="most-read-item">
-                                <span class="item-number">5</span>
-                                <div class="item-content">
-                                    <h4><a href="#">New Smartphone Launches with Revolutionary Features</a></h4>
-                                    <span class="item-meta">13,456 views</span>
-                                </div>
-                            </div>
+                            {% if hot_news %}
+                                {% for news in hot_news %}
+                                <article class="most-read-item">
+                                    <span class="rank">{{ loop.index }}</span>
+                                    <div class="content">
+                                        <h4><a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a></h4>
+                                        <span class="meta"><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
+                                    </div>
+                                </article>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted text-center">No hot news</p>
+                            {% endif %}
                         </div>
                     </aside>
 
-                    <!-- Video Widget -->
-                    <aside class="sidebar-widget mb-4">
-                        <h3 class="widget-title">Featured Video</h3>
+                    <!-- Video -->
+                    <!-- <aside class="sidebar-widget">
+                        <h3 class="widget-title">
+                            <i class="fas fa-video"></i> Video
+                        </h3>
                         <div class="video-widget">
-                            <img src="https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=400" alt="Video">
-                            <div class="video-overlay">
-                                <i class="fas fa-play-circle"></i>
+                            <div class="video-thumbnail">
+                                <img src="https://images.unsplash.com/photo-1492619375914-88005aa9e8fb?w=400" alt="Video">
+                                <div class="play-icon">
+                                    <i class="fas fa-play"></i>
+                                </div>
                             </div>
-                            <p class="video-title">Climate Change: What You Need to Know</p>
+                            <h4 class="video-title">Cảnh đẹp Việt Nam từ trên cao</h4>
                         </div>
-                    </aside>
+                    </aside> -->
 
-                    <!-- Newsletter -->
-                    <aside class="sidebar-widget newsletter-widget">
-                        <h3 class="widget-title">Newsletter</h3>
-                        <p>Subscribe to receive daily news updates</p>
-                        <form class="newsletter-form">
-                            <input type="email" class="form-control mb-2" placeholder="Your email address">
-                            <button type="submit" class="btn btn-primary w-100">Subscribe</button>
-                        </form>
+                    <!-- Weather -->
+                    <aside class="sidebar-widget weather-widget">
+                        <h3 class="widget-title">
+                            <i class="fas fa-cloud-sun"></i> Weather
+                        </h3>
+                        <div class="weather-content" id="weatherWidget">
+                            <div class="weather-loading">
+                                <i class="fas fa-spinner fa-spin"></i> Loading...
+                            </div>
+                        </div>
                     </aside>
                 </div>
             </div>

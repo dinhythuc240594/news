@@ -16,11 +16,14 @@
                 <i class="fas fa-user-edit"></i>
             </div>
             <div class="user-details">
-                <strong id="userName">Biên tập viên</strong>
-                <span class="badge bg-primary">Editor</span>
+                <strong id="userName"><a href="{{ url_for('admin.profile') }}">{{ user.full_name }}</a></strong>
+                <span class="badge bg-danger">{{ user.role }}</span>
             </div>
         </div>
         <ul class="sidebar-menu">
+            <li class="nav-divider">
+                <span>QUẢN LÝ BÀI VIẾT</span>
+            </li>
             <li class="active">
                 <a href="#" data-section="dashboard">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
@@ -65,6 +68,9 @@
                 <a href="#" data-section="create-international">
                     <i class="fas fa-plus-circle"></i> Tạo bài Quốc tế
                 </a>
+            </li>
+            <li class="nav-divider">
+                <span>KHÁC</span>
             </li>
             <li>
                 <a href="#" id="logoutBtn">
@@ -163,21 +169,21 @@
                                 <i class="fas fa-check-circle text-success"></i>
                                 <div>
                                     <strong>Bài viết được duyệt</strong>
-                                    <p>"Thủ tướng phát biểu tại hội nghị" - 2 giờ trước</p>
+                                    <p id="approvedNewsTitle"></p>
                                 </div>
                             </div>
                             <div class="activity-item">
                                 <i class="fas fa-edit text-primary"></i>
                                 <div>
                                     <strong>Cập nhật bài viết</strong>
-                                    <p>"Giá vàng hôm nay tăng cao" - 5 giờ trước</p>
+                                    <p id="updateNewsTitle"></p>
                                 </div>
                             </div>
                             <div class="activity-item">
                                 <i class="fas fa-plus-circle text-info"></i>
                                 <div>
                                     <strong>Tạo bài viết mới</strong>
-                                    <p>"Top 10 địa điểm du lịch" - Hôm qua</p>
+                                    <p id="createNewsTitle"></p>
                                 </div>
                             </div>
                         </div>

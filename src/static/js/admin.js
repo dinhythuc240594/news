@@ -185,7 +185,8 @@ async function loadUserInfo() {
         const result = await response.json();
         
         if (result.success && result.data) {
-            $('#userName').text(result.data.name);
+            var html = `<a href="${url_for('admin.profile')}">${result.data.name}</a>`;
+            $('#userName').html(html);
         }
     } catch (error) {
         console.error('Lỗi tải thông tin user:', error);

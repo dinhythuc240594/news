@@ -14,7 +14,13 @@ $(document).ready(function() {
             hour: '2-digit',
             minute: '2-digit'
         };
-        const dateTimeString = now.toLocaleDateString('vi-VN', options);
+        const site = window.location.pathname.split('/')[1];
+        if (site == 'en') {
+            options.locale = 'en-US';
+        } else {
+            options.locale = 'vi-VN';
+        }
+        const dateTimeString = now.toLocaleDateString(options.locale, options);
         $('#currentDateTime').text(dateTimeString);
     }
     
@@ -351,16 +357,17 @@ function loadWeatherData() {
     const weatherWidget = $('#weatherWidget');
     if (!weatherWidget.length) return;
 
-    var city = 'Saigon';
 
-    fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&language=vi&format=json`)
+    const site = window.location.pathname.split('/')[1];
+    const lang = site == 'en' ? 'en' : 'vi';
+    fetch(`https://geocoding-api.open-meteo.com/v1/search?name=Saigon&count=1&language=${lang}&format=json`)
         .then(response => response.json())
         .then(data => {
             if (data.results && data.results.length > 0) {
                 const location = data.results[0];
                 const latitude = location.latitude;
                 const longitude = location.longitude;
-                const cityName = "TP. Hồ Chí Minh";
+                const cityName = site == 'en' ? 'Ho Chi Minh City' : 'TP. Hồ Chí Minh';
                 
                 // Get current weather
                 return fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&timezone=Asia/Ho_Chi_Minh`)
@@ -413,29 +420,46 @@ function loadWeatherFallback(city) {
 
 // Display weather data
 function displayWeather(cityName, weatherData) {
+    const site = window.location.pathname.split('/')[1];
     const weatherWidget = $('#weatherWidget');
     const current = weatherData.current;
     
     // Get weather icon and description
     const weatherInfo = getWeatherInfo(current.weather_code);
+    const time = new Date(current.time);
+    const hours = time.getHours();
+    const minutes = time.getMinutes();
+    const seconds = time.getSeconds();
+    const timeString = `${hours}:${minutes}:${seconds}`;
+
+    if((hours > 6 && hours < 18) && (weatherInfo.icon == 'fas fa-sun' || weatherInfo.icon == 'fas fa-cloud-sun')) {
+        weatherInfo.icon = 'fas fa-sun';
+        weatherInfo.description = site == 'en' ? 'Sunny' : 'Trời nắng';
+    } else {
+        if((hours > 18 && hours < 24) || (hours > 0 && hours < 6)) {
+            weatherInfo.icon = 'fas fa-moon';
+            weatherInfo.description = site == 'en' ? 'Night' : 'Đêm';
+        }
+    }
+    
     const temperature = Math.round(current.temperature_2m);
     const humidity = Math.round(current.relative_humidity_2m);
     const windSpeed = Math.round(current.wind_speed_10m * 3.6); // Convert m/s to km/h
     
     const weatherHTML = `
         <div class="city-name">${cityName}</div>
-        <div class="temperature">${temperature}°C</div>
+        <div class="temperature">${temperature}${site == 'en' ? '°F' : '°C'}</div>
         <div class="weather-desc">
             <i class="${weatherInfo.icon}"></i> ${weatherInfo.description}
         </div>
         <div class="weather-details">
             <div class="detail-item">
                 <i class="fas fa-tint"></i>
-                <span>Độ ẩm: ${humidity}%</span>
+                <span>${site == 'en' ? 'Humidity' : 'Độ ẩm'}: ${humidity}%</span>
             </div>
             <div class="detail-item">
                 <i class="fas fa-wind"></i>
-                <span>Gió: ${windSpeed} km/h</span>
+                <span>${site == 'en' ? 'Wind' : 'Gió'}: ${windSpeed} km/h</span>
             </div>
         </div>
     `;
@@ -467,38 +491,40 @@ function getWeatherCode(description) {
 
 // Get weather icon and description from weather code (WMO Weather interpretation codes)
 function getWeatherInfo(code) {
+    const site = window.location.pathname.split('/')[1];
+    const lang = site == 'en' ? 'en' : 'vi';
     const weatherMap = {
-        0: { icon: 'fas fa-sun', description: 'Trời nắng' },
-        1: { icon: 'fas fa-sun', description: 'Trời quang' },
-        2: { icon: 'fas fa-cloud-sun', description: 'Ít mây' },
-        3: { icon: 'fas fa-cloud', description: 'Nhiều mây' },
-        45: { icon: 'fas fa-smog', description: 'Sương mù' },
-        48: { icon: 'fas fa-smog', description: 'Sương mù' },
-        51: { icon: 'fas fa-cloud-rain', description: 'Mưa nhẹ' },
-        53: { icon: 'fas fa-cloud-rain', description: 'Mưa vừa' },
-        55: { icon: 'fas fa-cloud-rain', description: 'Mưa nặng' },
-        56: { icon: 'fas fa-cloud-rain', description: 'Mưa đá nhẹ' },
-        57: { icon: 'fas fa-cloud-rain', description: 'Mưa đá nặng' },
-        61: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa nhẹ' },
-        63: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa vừa' },
-        65: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa nặng' },
-        66: { icon: 'fas fa-cloud-rain', description: 'Mưa đá nhẹ' },
-        67: { icon: 'fas fa-cloud-rain', description: 'Mưa đá nặng' },
-        71: { icon: 'fas fa-snowflake', description: 'Tuyết nhẹ' },
-        73: { icon: 'fas fa-snowflake', description: 'Tuyết vừa' },
-        75: { icon: 'fas fa-snowflake', description: 'Tuyết nặng' },
-        77: { icon: 'fas fa-snowflake', description: 'Hạt tuyết' },
-        80: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa rào nhẹ' },
-        81: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa rào vừa' },
-        82: { icon: 'fas fa-cloud-showers-heavy', description: 'Mưa rào nặng' },
-        85: { icon: 'fas fa-snowflake', description: 'Mưa tuyết nhẹ' },
-        86: { icon: 'fas fa-snowflake', description: 'Mưa tuyết nặng' },
-        95: { icon: 'fas fa-bolt', description: 'Dông' },
-        96: { icon: 'fas fa-bolt', description: 'Dông có mưa đá' },
-        99: { icon: 'fas fa-bolt', description: 'Dông có mưa đá nặng' }
+        0: { icon: 'fas fa-sun', description: site == 'en' ? 'Sunny' : 'Trời nắng' },
+        1: { icon: 'fas fa-sun', description: site == 'en' ? 'Sunny' : 'Trời quang' },
+        2: { icon: 'fas fa-cloud-sun', description: site == 'en' ? 'Cloudy' : 'Ít mây' },
+        3: { icon: 'fas fa-cloud', description: site == 'en' ? 'Cloudy' : 'Nhiều mây' },
+        45: { icon: 'fas fa-smog', description: site == 'en' ? 'Fog' : 'Sương mù' },
+        48: { icon: 'fas fa-smog', description: site == 'en' ? 'Fog' : 'Sương mù' },
+        51: { icon: 'fas fa-cloud-rain', description: site == 'en' ? 'Rain' : 'Mưa nhẹ' },
+        53: { icon: 'fas fa-cloud-rain', description: site == 'en' ? 'Rain' : 'Mưa vừa' },
+        55: { icon: 'fas fa-cloud-rain', description: site == 'en' ? 'Rain' : 'Mưa nặng' },
+        56: { icon: 'fas fa-cloud-rain', description: site == 'en' ? 'Rain' : 'Mưa đá nhẹ' },
+        57: { icon: 'fas fa-cloud-rain', description: site == 'en' ? 'Rain' : 'Mưa đá nặng' },
+        61: { icon: 'fas fa-cloud-showers-heavy', description: site == 'en' ? 'Rain' : 'Mưa nhẹ' },
+        63: { icon: 'fas fa-cloud-showers-heavy', description: site == 'en' ? 'Rain' : 'Mưa vừa' },
+        65: { icon: 'fas fa-cloud-showers-heavy', description: site == 'en' ? 'Rain' : 'Mưa nặng' },
+        66: { icon: 'fas fa-cloud-rain', description: site == 'en' ? 'Rain' : 'Mưa đá nhẹ' },
+        67: { icon: 'fas fa-cloud-rain', description: site == 'en' ? 'Rain' : 'Mưa đá nặng' },
+        71: { icon: 'fas fa-snowflake', description: site == 'en' ? 'Snow' : 'Tuyết nhẹ' },
+        73: { icon: 'fas fa-snowflake', description: site == 'en' ? 'Snow' : 'Tuyết vừa' },
+        75: { icon: 'fas fa-snowflake', description: site == 'en' ? 'Snow' : 'Tuyết nặng' },
+        77: { icon: 'fas fa-snowflake', description: site == 'en' ? 'Snow' : 'Hạt tuyết' },
+        80: { icon: 'fas fa-cloud-showers-heavy', description: site == 'en' ? 'Rain' : 'Mưa rào nhẹ' },
+        81: { icon: 'fas fa-cloud-showers-heavy', description: site == 'en' ? 'Rain' : 'Mưa rào vừa' },
+        82: { icon: 'fas fa-cloud-showers-heavy', description: site == 'en' ? 'Rain' : 'Mưa rào nặng' },
+        85: { icon: 'fas fa-snowflake', description: site == 'en' ? 'Snow' : 'Mưa tuyết nhẹ' },
+        86: { icon: 'fas fa-snowflake', description: site == 'en' ? 'Snow' : 'Mưa tuyết nặng' },
+        95: { icon: 'fas fa-bolt', description: site == 'en' ? 'Thunder' : 'Dông' },
+        96: { icon: 'fas fa-bolt', description: site == 'en' ? 'Thunder' : 'Dông có mưa đá' },
+        99: { icon: 'fas fa-bolt', description: site == 'en' ? 'Thunder' : 'Dông có mưa đá nặng' },
     };
     
-    return weatherMap[code] || { icon: 'fas fa-cloud', description: 'Nhiều mây' };
+    return weatherMap[code] || { icon: 'fas fa-cloud', description: site == 'en' ? 'Cloudy' : 'Nhiều mây' };
 }
 
 // Add animation on scroll

@@ -145,13 +145,16 @@ class AdminController:
         # Bài viết mới nhất
         latest_news = self.news_model.get_all(limit=10)
         
-        return render_template('admin/dashboard.html',
+        user = self.user_model.get_by_id(session['user_id'])
+
+        return render_template('admin/admin.html',
                              total_news=total_news,
                              published_news=published_news,
                              pending_news=pending_news,
                              draft_news=draft_news,
                              pending_list=pending_list,
-                             latest_news=latest_news)
+                             latest_news=latest_news,
+                             user=user)
     
     def editor_dashboard(self):
         """
@@ -169,7 +172,9 @@ class AdminController:
         published_news = [n for n in my_news if n.status == NewsStatus.PUBLISHED]
         categories = self.category_model.get_all()
         
-        return render_template('editor/editor-dashboard.html',
+        user = self.user_model.get_by_id(user_id)
+
+        return render_template('editor/editor.html',
                              draft_news=draft_news,
                              pending_news=pending_news,
                              published_news=published_news,
@@ -177,7 +182,8 @@ class AdminController:
                              stat_total=len(my_news),
                              stat_draft=len(draft_news),
                              stat_pending=len(pending_news),
-                             stat_published=len(published_news))
+                             stat_published=len(published_news),
+                             user=user)
     
     def news_list(self):
         """
@@ -2435,6 +2441,72 @@ class AdminController:
         return '.' in filename and \
                filename.rsplit('.', 1)[1].lower() in current_app.config.get('ALLOWED_EXTENSIONS', {'png', 'jpg', 'jpeg', 'gif', 'webp'})
 
+    def profile(self):
+        """
+        Trang thông tin cá nhân của user
+        Route: GET /profile
+        """
+        print(f"=== DEBUG profile ===")
+        print(f"Session: {session}")
+        if 'user_id' not in session:
+            flash('Vui lòng đăng nhập để xem thông tin cá nhân', 'error')
+            return redirect(url_for('admin.login'))
+        
+        user = self.user_model.get_by_id(session['user_id'])
+        if not user:
+            flash('Không tìm thấy thông tin người dùng', 'error')
+            session.clear()
+            return redirect(url_for('admin.login'))
+        
+        # Lấy tin đã lưu
+        saved_news = self.db_session.query(SavedNews).filter(
+            SavedNews.user_id == user.id,
+            (SavedNews.site == 'vn') | (SavedNews.site.is_(None))
+        ).order_by(SavedNews.created_at.desc()).limit(20).all()
+        
+        # Lấy tin đã xem
+        viewed_news = self.db_session.query(ViewedNews).filter(
+            ViewedNews.user_id == user.id,
+            (ViewedNews.site == 'vn') | (ViewedNews.site.is_(None))
+        ).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
+        
+        # Lấy bình luận
+        comments = self.db_session.query(Comment).filter(
+            Comment.user_id == user.id,
+            (Comment.site == 'vn') | (Comment.site.is_(None))
+        ).order_by(Comment.created_at.desc()).limit(20).all()
+        
+        # Tính số bình luận cho mỗi bài viết
+        comment_counts = {}
+        if comments:
+            news_ids = list(set([comment.news_id for comment in comments]))
+            from sqlalchemy import func
+            counts = self.db_session.query(
+                Comment.news_id,
+                func.count(Comment.id).label('count')
+            ).filter(
+                Comment.news_id.in_(news_ids),
+                Comment.is_active == True
+            ).group_by(Comment.news_id).all()
+            
+            comment_counts = {news_id: count for news_id, count in counts}
+        
+        # Tính tổng số bình luận của cá nhân
+        total_comments = self.db_session.query(Comment).filter(
+            Comment.user_id == user.id,
+            Comment.is_active == True
+        ).count()
+
+        categories = self.category_model.get_all()
+        return render_template('admin/profile.html', 
+                             user=user, 
+                             categories=categories,
+                             saved_news=saved_news,
+                             viewed_news=viewed_news,
+                             comments=comments,
+                             comment_counts=comment_counts,
+                             total_comments=total_comments)
+
 class ClientController:
     """Quản lý các route của client"""
     
@@ -3399,3 +3471,77 @@ class ClientController:
                 'is_hot': article.is_hot,
             },
         })
+
+
+class ClientControllerCommon:
+
+    """Quản lý các route chung của client"""
+    def __init__(self): 
+        """Khởi tạo controller"""
+
+    def _init_models(self, site: str):
+        self.db_session = get_session()
+        if site == 'en':
+            self.news_model = InternationalNewsModel(self.db_session)
+            self.category_model = InternationalCategoryModel(self.db_session)
+        else:
+            self.news_model = NewsModel(self.db_session)
+            self.category_model = CategoryModel(self.db_session)
+
+    def getDictCommon(self):
+        """Lấy dictionary chung"""
+        return {
+            'categories': self.category_model.get_all(),
+            'featured_news': self.news_model.get_featured(limit=5),
+            'latest_news': self.news_model.get_published(limit=10),
+            'hot_news': self.news_model.get_hot(limit=5),
+        }
+
+    def _get_site(self):
+        """Lấy site từ đường dẫn"""
+        return request.path.split('/')[1]
+
+    def contact(self):
+        """Trang liên hệ"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/contact.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/contact.html', **self.getDictCommon())
+    
+    def guide(self):
+        """Trang hướng dẫn"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/guide.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/guide.html', **self.getDictCommon())
+    
+    def introducing(self):
+        """Trang giới thiệu"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/introducing.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/introducing.html', **self.getDictCommon())
+    
+    def security(self):
+        """Trang chính sách bảo mật"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/security.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/security.html', **self.getDictCommon())
+    
+    def term_of_service(self):
+        """Trang điều khoản sử dụng"""
+        site = self._get_site()
+        self._init_models(site)
+        if site == 'en':
+            return render_template('client/en/term_of_service.html', **self.getDictCommon())
+        else:
+            return render_template('client/vn/term_of_service.html', **self.getDictCommon())

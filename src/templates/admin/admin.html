@@ -1,0 +1,247 @@
+{% extends 'base_admin.html' %}
+{% block title %}Dashboard - VnNews Admin{% endblock %}
+{% block head %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">
+{% endblock %}
+{% block template %}
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h4><i class="fas fa-newspaper"></i> VnNews Admin</h4>
+        </div>
+        <div class="user-info">
+            <div class="user-avatar">
+                <i class="fas fa-user-shield"></i>
+            </div>
+            <div class="user-details">
+                <strong id="userName"><a href="{{ url_for('admin.profile') }}">{{ user.full_name }}</a></strong>
+                <span class="badge bg-danger">{{ user.role }}</span>
+            </div>
+        </div>
+        <ul class="sidebar-menu">
+            <li class="nav-divider">
+                <span>QUẢN LÝ HỆ THỐNG</span>
+            </li>
+            <li>
+                <a href="#" data-section="users">
+                    <i class="fas fa-users"></i> Quản lý người dùng
+                </a>
+            </li>
+            <li class="nav-divider">
+                <span>QUẢN LÝ BÀI VIẾT</span>
+            </li>
+            <li class="active">
+                <a href="#" data-section="dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                </a>
+            </li>    
+            <li>
+                <a href="#" data-section="pending">
+                    <i class="fas fa-clock"></i> Bài chờ duyệt
+                    <span class="badge bg-warning" id="pendingCount">{{ stat_pending }}</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" data-section="approved">
+                    <i class="fas fa-check-circle"></i> Bài đã duyệt
+                </a>
+            </li>
+            <li>
+                <a href="#" data-section="rejected">
+                    <i class="fas fa-times-circle"></i> Bài từ chối
+                </a>
+            </li>
+            <!-- <li>
+                <a href="#" data-section="api">
+                    <i class="fas fa-cloud-download-alt"></i> Bài từ API
+                </a>
+            </li> -->
+            <li>
+                <a href="#" data-section="tags-manager">
+                    <i class="fas fa-hashtag"></i> Quản lý Hashtag
+                </a>
+            </li>
+            <li>
+                <a href="#" data-section="menu-manager">
+                    <i class="fas fa-bars"></i> Quản lý Menu
+                </a>
+            </li>
+            <li class="nav-divider">
+                <span>NGUỒN BÊN NGOÀI</span>
+            </li>
+            <!-- <li>
+                <a href="#" data-section="rss-feeds">
+                    <i class="fas fa-rss"></i> RSS Feeds
+                </a>
+            </li> -->
+            <li>
+                <a href="#" data-section="api-news">
+                    <i class="fas fa-cloud"></i> API News
+                </a>
+            </li>
+            <li class="nav-divider">
+                <span>QUỐC TẾ</span>
+            </li>
+            <li>
+                <a href="#" data-section="international">
+                    <i class="fas fa-globe"></i> Bài báo Quốc tế
+                    <span class="badge bg-info" id="internationalCount">0</span>
+                </a>
+            </li>
+            <li>
+                <a href="#" data-section="international-pending">
+                    <i class="fas fa-clock"></i> Quốc tế chờ duyệt
+                </a>
+            </li>
+            <li>
+                <a href="#" data-section="en-menu-manager">
+                    <i class="fas fa-bars"></i> Quản lý Menu Quốc tế
+                </a>
+            </li>
+            <!-- <li>
+                <a href="#" data-section="statistics">
+                    <i class="fas fa-chart-bar"></i> Thống kê
+                </a>
+            </li> -->
+            <li class="nav-divider">
+                <span>KHÁC</span>
+            </li>
+            <li>
+                <a href="#" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i> Đăng xuất
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Header -->
+        <div class="content-header">
+            <h2 id="pageTitle">Dashboard</h2>
+            <div class="header-actions">
+                <div class="dropdown me-2">
+                    <button class="btn btn-outline-secondary position-relative" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="fas fa-bell"></i>
+                        <span class="badge bg-danger position-absolute top-0 start-100 translate-middle" id="notificationCount">0</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end notification-dropdown" aria-labelledby="notificationDropdown">
+                        <li class="dropdown-header">
+                            <strong>Thông báo</strong>
+                        </li>
+                        <li>
+                            <div class="px-3 py-2 small text-muted" id="notificationEmpty">
+                                Chưa có thông báo mới.
+                            </div>
+                            <div id="notificationList"></div>
+                        </li>
+                    </ul>
+                </div>
+                <!-- <button class="btn btn-outline-secondary">
+                    <i class="fas fa-cog"></i>
+                </button> -->
+            </div>
+        </div>
+
+        {% include 'admin/dashboard-section.html' %}
+
+        {% include 'admin/pednding-section.html' %}
+
+        {% include 'admin/approved-section.html' %}
+
+        {% include 'admin/rejected-section.html' %}
+
+
+        {% include 'admin/tags-manager.html' %}
+
+        {% include 'admin/menu-manager.html' %}
+
+        <!-- Source Section -->
+
+        {% include 'admin/api-section.html' %}
+
+
+        <!-- International Section -->
+        {% include 'admin/international-section.html' %}
+
+        {% include 'admin/int-pending-section.html' %}
+
+        {% include 'admin/int-menu-manager.html' %}
+
+        <!-- Article Preview Modal -->
+        <div class="modal fade" id="previewArticleModal" tabindex="-1" aria-labelledby="previewArticleModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="previewArticleModalLabel">
+                            <i class="fas fa-eye me-2"></i>Xem trước bài viết
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="modal-body" id="previewContent">
+                        <!-- Preview content will be loaded here -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>Đóng
+                        </button>
+                        <button type="button" class="btn btn-danger" id="rejectBtn" style="display: none;">
+                            <i class="fas fa-times me-1"></i>Từ chối
+                        </button>
+                        <button type="button" class="btn btn-success" id="approveBtn" style="display: none;">
+                            <i class="fas fa-check me-1"></i>Duyệt bài
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save API Article Modal -->
+        <div class="modal fade" id="saveAPIArticleModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Lưu bài viết từ API</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="saveAPIArticleData">
+                        <div class="mb-3">
+                            <label class="form-label">Tiêu đề</label>
+                            <input type="text" class="form-control" id="saveAPITitle" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Tóm tắt</label>
+                            <textarea class="form-control" id="saveAPISummary" rows="3" readonly></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Danh mục <span class="text-danger">*</span></label>
+                            <select class="form-select" id="saveAPICategory" required>
+                                <option value="">-- Chọn danh mục --</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Trạng thái</label>
+                            <select class="form-select" id="saveAPIStatus">
+                                <option value="draft">Bản nháp</option>
+                                <option value="pending">Chờ duyệt</option>
+                                <option value="published">Đã xuất bản</option>
+                            </select>
+                            <small class="text-muted">Bài viết sẽ được lưu với trạng thái đã chọn và đánh dấu là từ API</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="button" class="btn btn-primary" id="saveAPIArticleBtn">
+                            <i class="fas fa-save"></i> Lưu bài viết
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+{% endblock %}
+{% block scripts_url %}
+{% endblock %}
