@@ -418,8 +418,8 @@ class NewsInternational(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    is_deleted = Column(Boolean, default=False)
-    tags_string = Column(Text, nullable=True)
+    # is_deleted = Column(Boolean, default=False)
+    # tags_string = Column(Text, nullable=True)
 
     # Relationships
     # Liên kết tới CategoryInternational (danh mục tin quốc tế)

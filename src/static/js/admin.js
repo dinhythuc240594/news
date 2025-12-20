@@ -1434,9 +1434,17 @@ $(document).on('click', '.save-rss-article', function() {
 
 // Open modal for saving external articles (RSS/API)
 async function openSaveExternalArticleModal(articleData) {
-    // Load categories first
+    // Load categories - check region để load đúng loại danh mục
+    const region = window.currentApiRegion || 'domestic';
+    const isInternational = region === 'international';
+    
     try {
-        const response = await fetch('/admin/api/categories');
+        // Load categories từ API tương ứng với region
+        const categoryEndpoint = isInternational 
+            ? '/admin/api/international-categories' 
+            : '/admin/api/categories';
+            
+        const response = await fetch(categoryEndpoint);
         const result = await response.json();
         
         let categoryOptions = '<option value="">-- Chọn danh mục --</option>';
@@ -1459,6 +1467,10 @@ async function openSaveExternalArticleModal(articleData) {
         }
         
         $('#saveAPICategory').html(categoryOptions);
+        
+        // Lưu region info vào data attribute để biết save vào bảng nào
+        $('#saveAPIArticleData').data('region', region);
+        
     } catch (error) {
         console.error('Lỗi tải danh mục:', error);
         showToast('Lỗi', 'Không thể tải danh mục: ' + error.message, 'warning');
@@ -1471,6 +1483,10 @@ async function openSaveExternalArticleModal(articleData) {
     $('#saveAPISummary').val(articleData.summary || articleData.description || '');
     $('#saveAPIStatus').val('pending'); // Default to pending
     
+    // Update modal title để rõ đang lưu loại báo nào
+    const modalTitle = isInternational ? 'Lưu bài viết Quốc tế từ API' : 'Lưu bài viết từ API';
+    $('#saveAPIArticleModal .modal-title').text(modalTitle);
+    
     const modal = new bootstrap.Modal(document.getElementById('saveAPIArticleModal'));
     modal.show();
 }
@@ -1480,11 +1496,13 @@ $('#saveAPIArticleBtn').off('click').on('click', async function() {
     const articleData = JSON.parse($('#saveAPIArticleData').val());
     const categoryId = $('#saveAPICategory').val();
     const status = $('#saveAPIStatus').val();
+    const region = $('#saveAPIArticleData').data('region') || 'domestic'; // Lấy region từ data attribute
     
     console.log('Saving article with data:', {
         article: articleData,
         category_id: categoryId,
-        status: status
+        status: status,
+        region: region
     });
     
     if (!categoryId) {
@@ -1499,7 +1517,8 @@ $('#saveAPIArticleBtn').off('click').on('click', async function() {
         const requestData = {
             article: articleData,
             category_id: parseInt(categoryId),
-            status: status
+            status: status,
+            region: region  // Gửi region để backend biết lưu vào bảng nào
         };
         
         console.log('Request payload:', requestData);
@@ -1644,6 +1663,9 @@ $('#fetchApiBtn').click(function() {
         requestData.region = region;
         requestData.category_id = categoryId;
         
+        // Lưu region để dùng khi save article
+        window.currentApiRegion = region;
+        
     } else if (activeTab === 'urls-tab') {
         // Mode: Theo danh sách URL
         const apiUrlsText = $('#apiUrls').val().trim();
@@ -1665,6 +1687,9 @@ $('#fetchApiBtn').click(function() {
         
         requestData.mode = 'urls';
         requestData.urls = urls;
+        
+        // URLs mode mặc định là domestic, có thể lấy từ một select khác nếu cần
+        window.currentApiRegion = 'domestic';
     }
     
     const btn = $(this);
