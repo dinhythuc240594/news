@@ -1411,7 +1411,7 @@ function displayRssArticles(articles) {
                         ${article.thumbnail ? `<img src="${article.thumbnail}" class="img-fluid rounded mb-2" style="max-height: 150px; object-fit: cover; width: 100%;">` : ''}
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">${article.published_at || 'N/A'}</small>
-                            <button class="btn btn-sm btn-primary save-rss-article" data-index="${index}">
+                            <button class="btn btn-sm btn-primary save-rss-article" data-index="${index}" data-article-id="${article.id}">
                                 <i class="fas fa-save"></i> Lưu
                             </button>
                         </div>
@@ -1435,9 +1435,17 @@ $(document).on('click', '.save-rss-article', function() {
 
 // Open modal for saving external articles (RSS/API)
 async function openSaveExternalArticleModal(articleData) {
-    // Load categories first
+    // Load categories - check region để load đúng loại danh mục
+    const region = window.currentApiRegion || 'domestic';
+    const isInternational = region === 'international';
+    
     try {
-        const response = await fetch('/admin/api/categories');
+        // Load categories từ API tương ứng với region
+        const categoryEndpoint = isInternational 
+            ? '/admin/api/international-categories' 
+            : '/admin/api/categories';
+            
+        const response = await fetch(categoryEndpoint);
         const result = await response.json();
         
         let categoryOptions = '<option value="">-- Chọn danh mục --</option>';
@@ -1460,6 +1468,10 @@ async function openSaveExternalArticleModal(articleData) {
         }
         
         $('#saveAPICategory').html(categoryOptions);
+        
+        // Lưu region info vào data attribute để biết save vào bảng nào
+        $('#saveAPIArticleData').data('region', region);
+        
     } catch (error) {
         console.error('Lỗi tải danh mục:', error);
         showToast('Lỗi', 'Không thể tải danh mục: ' + error.message, 'warning');
@@ -1472,6 +1484,10 @@ async function openSaveExternalArticleModal(articleData) {
     $('#saveAPISummary').val(articleData.summary || articleData.description || '');
     $('#saveAPIStatus').val('pending'); // Default to pending
     
+    // Update modal title để rõ đang lưu loại báo nào
+    const modalTitle = isInternational ? 'Lưu bài viết Quốc tế từ API' : 'Lưu bài viết từ API';
+    $('#saveAPIArticleModal .modal-title').text(modalTitle);
+    
     const modal = new bootstrap.Modal(document.getElementById('saveAPIArticleModal'));
     modal.show();
 }
@@ -1481,11 +1497,13 @@ $('#saveAPIArticleBtn').off('click').on('click', async function() {
     const articleData = JSON.parse($('#saveAPIArticleData').val());
     const categoryId = $('#saveAPICategory').val();
     const status = $('#saveAPIStatus').val();
+    const region = $('#saveAPIArticleData').data('region') || 'domestic'; // Lấy region từ data attribute
     
     console.log('Saving article with data:', {
         article: articleData,
         category_id: categoryId,
-        status: status
+        status: status,
+        region: region
     });
     
     if (!categoryId) {
@@ -1500,7 +1518,8 @@ $('#saveAPIArticleBtn').off('click').on('click', async function() {
         const requestData = {
             article: articleData,
             category_id: parseInt(categoryId),
-            status: status
+            status: status,
+            region: region  // Gửi region để backend biết lưu vào bảng nào
         };
         
         console.log('Request payload:', requestData);
@@ -1524,10 +1543,23 @@ $('#saveAPIArticleBtn').off('click').on('click', async function() {
             // Close modal
             bootstrap.Modal.getInstance(document.getElementById('saveAPIArticleModal')).hide();
             
-            // Remove article card from list
-            $(`.save-api-article, .save-rss-article`).closest('.col-md-6').fadeOut(function() {
-                $(this).remove();
-            });
+            // Chỉ xóa card của bài viết vừa lưu (tìm bằng article ID)
+            const articleId = result.article_id || articleData.id;
+            if (articleId) {
+                // Tìm và xóa card chứa bài viết với ID này
+                $(`.save-api-article[data-article-id="${articleId}"], .save-rss-article[data-article-id="${articleId}"]`)
+                    .closest('.col-md-6').fadeOut(function() {
+                        $(this).remove();
+                        
+                        // Cập nhật số lượng bài còn lại
+                        const remainingCount = $('.save-api-article, .save-rss-article').length;
+                        if (remainingCount === 0) {
+                            $('#apiArticlesList, #rssArticlesList').html(
+                                '<p class="text-muted text-center">Không còn bài viết nào. Hãy tải thêm bài mới.</p>'
+                            );
+                        }
+                    });
+            }
             
             // Reload statistics
             loadStatistics();
@@ -1632,6 +1664,9 @@ $('#fetchApiBtn').click(function() {
         requestData.region = region;
         requestData.category_id = categoryId;
         
+        // Lưu region để dùng khi save article
+        window.currentApiRegion = region;
+        
     } else if (activeTab === 'urls-tab') {
         // Mode: Theo danh sách URL
         const apiUrlsText = $('#apiUrls').val().trim();
@@ -1653,6 +1688,9 @@ $('#fetchApiBtn').click(function() {
         
         requestData.mode = 'urls';
         requestData.urls = urls;
+        
+        // URLs mode mặc định là domestic, có thể lấy từ một select khác nếu cần
+        window.currentApiRegion = 'domestic';
     }
     
     const btn = $(this);
@@ -1705,7 +1743,7 @@ function displayApiArticles(articles) {
                                 <i class="fas fa-globe"></i> ${article.source || 'N/A'}<br>
                                 <i class="fas fa-calendar"></i> ${article.published_at || 'N/A'}
                             </small>
-                            <button class="btn btn-sm btn-primary save-api-article" data-index="${index}">
+                            <button class="btn btn-sm btn-primary save-api-article" data-index="${index}" data-article-id="${article.id}">
                                 <i class="fas fa-save"></i> Lưu
                             </button>
                         </div>

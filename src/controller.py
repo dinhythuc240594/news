@@ -816,13 +816,46 @@ class AdminController:
                             
                             # Format articles theo cấu trúc mới
                             for api_article in api_articles[:limit]:
-                                # Join description array thành string
-                                description_text = ' '.join(api_article.get('description', []))
+                                # Parse description array - bao gồm cả text và image theo đúng thứ tự
+                                description_items = api_article.get('description', [])
+                                description_html_parts = []
+                                description_texts = []
+                                
+                                for item in description_items:
+                                    if isinstance(item, dict):
+                                        if item.get('type') == 'text':
+                                            text_content = item.get('text', '').strip()
+                                            if text_content:
+                                                description_texts.append(text_content)
+                                                description_html_parts.append(f'<p>{text_content}</p>')
+                                        elif item.get('type') == 'image':
+                                            img_src = item.get('src', '')
+                                            img_alt = item.get('alt', '')
+                                            if img_src:
+                                                description_html_parts.append(f'<img src="{img_src}" alt="{img_alt}" />')
+                                
+                                # Join text cho summary/description ngắn
+                                description_text = ' '.join(description_texts)
+                                # Join HTML cho content đầy đủ với cả hình ảnh
+                                description_html = '\n'.join(description_html_parts)
                                 
                                 # Lấy main image hoặc first image
                                 main_image = api_article.get('mainImage', '')
                                 if not main_image and api_article.get('images'):
-                                    main_image = api_article['images'][0]
+                                    first_img = api_article['images'][0]
+                                    # Handle new image structure {src, alt}
+                                    main_image = first_img.get('src', '') if isinstance(first_img, dict) else first_img
+                                
+                                # Parse images array - extract src từ objects
+                                images_data = api_article.get('images', [])
+                                image_urls = []
+                                for img in images_data:
+                                    if isinstance(img, dict):
+                                        img_src = img.get('src', '')
+                                        if img_src:
+                                            image_urls.append(img_src)
+                                    elif isinstance(img, str):
+                                        image_urls.append(img)
                                 
                                 articles.append({
                                     'title': api_article.get('title', 'No title'),
@@ -832,8 +865,8 @@ class AdminController:
                                     'source': {'name': 'Custom API'},
                                     'author': api_article.get('author', 'Unknown'),
                                     'publishedAt': api_article.get('pubDate', datetime.utcnow().isoformat()),
-                                    'content': description_text,
-                                    'images': api_article.get('images', [])
+                                    'content': description_html,  # Sử dụng HTML với cả text và images
+                                    'images': image_urls
                                 })
                         else:
                             return jsonify({
@@ -917,7 +950,7 @@ class AdminController:
             }), 500
     
     def api_save_api_article(self):
-        """API lưu bài viết từ API vào bảng news với trạng thái được chọn"""
+        """API lưu bài viết từ API vào bảng news hoặc news_international tùy theo region"""
         # Tạo session mới để tránh lỗi "transaction closed"
         db_session = get_session()
         
@@ -939,6 +972,7 @@ class AdminController:
                 category_id = int(category_id)
             
             status = data.get('status', NewsStatus.DRAFT.value)
+            region = data.get('region', 'domestic')  # domestic hoặc international
             
             if not category_id:
                 return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
@@ -948,10 +982,15 @@ class AdminController:
             except ValueError:
                 news_status = NewsStatus.DRAFT
             
-            # Kiểm tra category tồn tại
-            category = db_session.query(Category).filter(Category.id == category_id).first()
-            if not category:
-                return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+            # Kiểm tra category tồn tại theo region
+            if region == 'international':
+                category = db_session.query(CategoryInternational).filter(CategoryInternational.id == category_id).first()
+                if not category:
+                    return jsonify({'success': False, 'error': 'Danh mục quốc tế không tồn tại'}), 400
+            else:
+                category = db_session.query(Category).filter(Category.id == category_id).first()
+                if not category:
+                    return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
             
             # Parse published_at nếu có
             published_at = None
@@ -962,37 +1001,99 @@ class AdminController:
                 except:
                     published_at = datetime.utcnow()
             
-            # Tạo bài viết mới từ API article
-            news = News(
-                title=article_data.get('title', ''),
-                slug=self._generate_slug(article_data.get('title', 'Untitled')),
-                summary=article_data.get('summary', ''),
-                content=article_data.get('content', article_data.get('summary', '')),
-                thumbnail=article_data.get('thumbnail'),
-                category_id=category_id,
-                created_by=user_id,
-                approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
-                status=news_status,
-                is_api=True,  # Đánh dấu bài từ API
-                published_at=published_at if news_status == NewsStatus.PUBLISHED else None
-            )
+            # Tạo slug từ title
+            title = article_data.get('title', 'Untitled')
+            base_slug = self._generate_slug(title)
+            
+            # Kiểm tra xem bài viết với slug này đã tồn tại chưa (theo region)
+            if region == 'international':
+                existing_news = db_session.query(NewsInternational).filter(NewsInternational.slug == base_slug).first()
+                if existing_news:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Bài viết quốc tế đã được lưu trước đó'
+                    }), 400
+                
+                # Tạo bài viết quốc tế mới
+                news = NewsInternational(
+                    title=title,
+                    slug=base_slug,
+                    summary=article_data.get('summary', ''),
+                    content=article_data.get('content', article_data.get('summary', '')),
+                    thumbnail=article_data.get('thumbnail'),
+                    category_id=category_id,
+                    created_by=user_id,
+                    approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
+                    status=news_status,
+                    is_api=True,  # Đánh dấu bài từ API
+                    published_at=published_at if news_status == NewsStatus.PUBLISHED else None,
+                )
+            else:
+                existing_news = db_session.query(News).filter(News.slug == base_slug).first()
+                if existing_news:
+                    return jsonify({
+                        'success': False,
+                        'error': 'Bài viết đã được lưu trước đó'
+                    }), 400
+                
+                # Tạo bài viết trong nước mới
+                news = News(
+                    title=title,
+                    slug=base_slug,
+                    summary=article_data.get('summary', ''),
+                    content=article_data.get('content', article_data.get('summary', '')),
+                    thumbnail=article_data.get('thumbnail'),
+                    category_id=category_id,
+                    created_by=user_id,
+                    approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
+                    status=news_status,
+                    is_api=True,  # Đánh dấu bài từ API
+                    published_at=published_at if news_status == NewsStatus.PUBLISHED else None,
+                    author=article_data.get('author'),
+                )
             
             db_session.add(news)
             db_session.commit()
             
             news_id = news.id
             
+            # Xóa bài viết vừa lưu khỏi cache session
+            api_articles_cache = session.get('api_articles_cache', [])
+            article_id = article_data.get('id')
+            if article_id:
+                # Lọc bỏ bài viết vừa lưu
+                api_articles_cache = [a for a in api_articles_cache if a.get('id') != article_id]
+                session['api_articles_cache'] = api_articles_cache
+            
+            message = f'Đã lưu bài viết {"quốc tế" if region == "international" else ""} với trạng thái {news_status.value}'
+            
             return jsonify({
                 'success': True,
-                'message': f'Đã lưu bài viết với trạng thái {news_status.value}',
-                'news_id': news_id
+                'message': message,
+                'news_id': news_id,
+                'article_id': article_id,
+                'region': region
             })
             
+        except IntegrityError as e:
+            db_session.rollback()
+            # Lỗi trùng lặp dữ liệu (duplicate key)
+            error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+            if 'duplicate key' in error_msg.lower() or 'unique constraint' in error_msg.lower():
+                return jsonify({
+                    'success': False,
+                    'error': 'Bài viết đã được lưu trước đó'
+                }), 400
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Lỗi khi lưu bài viết'
+                }), 500
         except Exception as e:
             db_session.rollback()
             return jsonify({
                 'success': False,
-                'error': f'Lỗi khi lưu bài viết: {str(e)}'
+                'error': 'Không thể lưu bài viết'
             }), 500
         finally:
             db_session.close()
@@ -3112,155 +3213,231 @@ class ClientController:
 
     def en_index(self):
         """Trang chủ quốc tế viết bằng tiếng Anh - sử dụng bảng NewsInternational"""
-        featured_news = self.int_news_model.get_featured(limit=5)
-        latest_news = self.int_news_model.get_published(limit=10)
-        hot_news = self.int_news_model.get_hot(limit=5)
-        categories = self.int_category_model.get_all()
+        db_session = get_session()
+        try:
+            int_news_model = InternationalNewsModel(db_session)
+            int_category_model = InternationalCategoryModel(db_session)
+            
+            featured_news = int_news_model.get_featured(limit=5)
+            latest_news = int_news_model.get_published(limit=10)
+            hot_news = int_news_model.get_hot(limit=5)
+            categories = int_category_model.get_all()
 
-        return render_template(
-            'client/en/index.html',
-            featured_news=featured_news,
-            latest_news=latest_news,
-            hot_news=hot_news,
-            categories=categories,
-        )
+            return render_template(
+                'client/en/index.html',
+                featured_news=featured_news,
+                latest_news=latest_news,
+                hot_news=hot_news,
+                categories=categories,
+            )
+        except Exception as e:
+            db_session.rollback()
+            print(f"Error in en_index: {e}")
+            raise
+        finally:
+            db_session.close()
 
     def en_category(self, category_slug: str):
         """Trang danh mục quốc tế viết bằng tiếng Anh"""
-        category = self.int_category_model.get_by_slug(category_slug)
-        if not category:
-            abort(404)
+        db_session = get_session()
+        try:
+            int_news_model = InternationalNewsModel(db_session)
+            int_category_model = InternationalCategoryModel(db_session)
+            
+            category = int_category_model.get_by_slug(category_slug)
+            if not category:
+                abort(404)
 
-        page = request.args.get('page', 1, type=int)
-        per_page = 20
-        offset = (page - 1) * per_page
+            page = request.args.get('page', 1, type=int)
+            per_page = 20
+            offset = (page - 1) * per_page
 
-        news_list = self.int_news_model.get_by_category(
-            category_id=category.id,
-            limit=per_page,
-            offset=offset,
-        )
+            news_list = int_news_model.get_by_category(
+                category_id=category.id,
+                limit=per_page,
+                offset=offset,
+            )
 
-        categories = self.int_category_model.get_all()
+            categories = int_category_model.get_all()
 
-        return render_template(
-            'client/en/category.html',
-            category=category,
-            news_list=news_list,
-            page=page,
-            categories=categories,
-        )
+            return render_template(
+                'client/en/category.html',
+                category=category,
+                news_list=news_list,
+                page=page,
+                categories=categories,
+            )
+        except Exception as e:
+            db_session.rollback()
+            print(f"Error in en_category: {e}")
+            raise
+        finally:
+            db_session.close()
 
     def en_news_detail(self, news_slug: str):
         """Trang chi tiết bài viết quốc tế (tiếng Anh)"""
-        news = self.int_news_model.get_by_slug(news_slug)
-        if not news or news.status != NewsStatus.PUBLISHED:
-            abort(404)
+        db_session = get_session()
+        try:
+            int_news_model = InternationalNewsModel(db_session)
+            int_category_model = InternationalCategoryModel(db_session)
+            
+            news = int_news_model.get_by_slug(news_slug)
+            if not news or news.status != NewsStatus.PUBLISHED:
+                abort(404)
 
-        category = self.int_category_model.get_by_id(news.category_id)
+            category = int_category_model.get_by_id(news.category_id)
 
-        # Tăng lượt xem
-        news.view_count += 1
-        self.db_session.commit()
+            # Tăng lượt xem
+            news.view_count += 1
+            db_session.commit()
 
-        # Bài viết liên quan trong cùng danh mục
-        related_news = self.int_news_model.get_by_category(
-            category_id=news.category_id,
-            limit=5,
-        )
-        related_news = [n for n in related_news if n.id != news.id][:5]
+            # Bài viết liên quan trong cùng danh mục
+            related_news = int_news_model.get_by_category(
+                category_id=news.category_id,
+                limit=5,
+            )
+            related_news = [n for n in related_news if n.id != news.id][:5]
 
-        categories = self.int_category_model.get_all()
+            categories = int_category_model.get_all()
 
-        return render_template(
-            'client/en/news_detail.html',
-            news=news,
-            category=category,
-            related_news=related_news,
-            categories=categories,
-        )
+            return render_template(
+                'client/en/news_detail.html',
+                news=news,
+                category=category,
+                related_news=related_news,
+                categories=categories,
+            )
+        except Exception as e:
+            db_session.rollback()
+            print(f"Error in en_news_detail: {e}")
+            raise
+        finally:
+            db_session.close()
 
     def en_search(self):
         """Tìm kiếm tin tức quốc tế (tiếng Anh)"""
-        keyword = request.args.get('q', '').strip()
-        page = request.args.get('page', 1, type=int)
-        categories = self.int_category_model.get_all()
+        db_session = get_session()
+        try:
+            int_news_model = InternationalNewsModel(db_session)
+            int_category_model = InternationalCategoryModel(db_session)
+            
+            keyword = request.args.get('q', '').strip()
+            page = request.args.get('page', 1, type=int)
+            categories = int_category_model.get_all()
 
-        if not keyword:
+            if not keyword:
+                return render_template(
+                    'client/en/search.html',
+                    keyword='',
+                    news_list=[],
+                    page=1,
+                    categories=categories,
+                )
+
+            per_page = 20
+            offset = (page - 1) * per_page
+
+            # Tìm kiếm đơn giản theo title/summary/content
+            from sqlalchemy import or_
+
+            query = db_session.query(NewsInternational).filter(
+                NewsInternational.status == NewsStatus.PUBLISHED,
+                or_(
+                    NewsInternational.title.ilike(f'%{keyword}%'),
+                    NewsInternational.summary.ilike(f'%{keyword}%'),
+                    NewsInternational.content.ilike(f'%{keyword}%'),
+                ),
+            ).order_by(NewsInternational.created_at.desc())
+
+            news_list = query.limit(per_page + offset).all()
+            news_list = news_list[offset:offset + per_page]
+
             return render_template(
                 'client/en/search.html',
-                keyword='',
-                news_list=[],
-                page=1,
+                keyword=keyword,
+                news_list=news_list,
+                page=page,
                 categories=categories,
             )
-
-        per_page = 20
-        offset = (page - 1) * per_page
-
-        # Tìm kiếm đơn giản theo title/summary/content
-        from sqlalchemy import or_
-
-        query = self.db_session.query(NewsInternational).filter(
-            NewsInternational.status == NewsStatus.PUBLISHED,
-            or_(
-                NewsInternational.title.ilike(f'%{keyword}%'),
-                NewsInternational.summary.ilike(f'%{keyword}%'),
-                NewsInternational.content.ilike(f'%{keyword}%'),
-            ),
-        ).order_by(NewsInternational.created_at.desc())
-
-        news_list = query.limit(per_page + offset).all()
-        news_list = news_list[offset:offset + per_page]
-
-        return render_template(
-            'client/en/search.html',
-            keyword=keyword,
-            news_list=news_list,
-            page=page,
-            categories=categories,
-        )
+        except Exception as e:
+            db_session.rollback()
+            print(f"Error in en_search: {e}")
+            raise
+        finally:
+            db_session.close()
 
     def en_api_latest_news(self):
         """API lấy tin tức quốc tế mới nhất (tiếng Anh)"""
-        limit = request.args.get('limit', 10, type=int)
-        offset = request.args.get('offset', 0, type=int)
+        db_session = get_session()
+        try:
+            int_news_model = InternationalNewsModel(db_session)
+            limit = request.args.get('limit', 10, type=int)
+            offset = request.args.get('offset', 0, type=int)
 
-        news_list = self.int_news_model.get_published(limit=limit, offset=offset)
+            news_list = int_news_model.get_published(limit=limit, offset=offset)
 
-        return jsonify({
-            'success': True,
-            'data': [self._news_to_dict(news) for news in news_list],
-        })
+            return jsonify({
+                'success': True,
+                'data': [self._news_to_dict(news) for news in news_list],
+            })
+        except Exception as e:
+            db_session.rollback()
+            return jsonify({'success': False, 'message': str(e)}), 500
+        finally:
+            db_session.close()
 
     def en_api_featured_news(self):
         """API lấy tin quốc tế nổi bật (tiếng Anh)"""
-        limit = request.args.get('limit', 5, type=int)
-        news_list = self.int_news_model.get_featured(limit=limit)
+        db_session = get_session()
+        try:
+            int_news_model = InternationalNewsModel(db_session)
+            limit = request.args.get('limit', 5, type=int)
+            news_list = int_news_model.get_featured(limit=limit)
 
-        return jsonify({
-            'success': True,
-            'data': [self._news_to_dict(news) for news in news_list],
-        })
+            return jsonify({
+                'success': True,
+                'data': [self._news_to_dict(news) for news in news_list],
+            })
+        except Exception as e:
+            db_session.rollback()
+            return jsonify({'success': False, 'message': str(e)}), 500
+        finally:
+            db_session.close()
 
     def en_api_hot_news(self):
         """API lấy tin quốc tế nóng (tiếng Anh)"""
-        limit = request.args.get('limit', 5, type=int)
-        news_list = self.int_news_model.get_hot(limit=limit)
+        db_session = get_session()
+        try:
+            int_news_model = InternationalNewsModel(db_session)
+            limit = request.args.get('limit', 5, type=int)
+            news_list = int_news_model.get_hot(limit=limit)
 
-        return jsonify({
-            'success': True,
-            'data': [self._news_to_dict(news) for news in news_list],
-        })
+            return jsonify({
+                'success': True,
+                'data': [self._news_to_dict(news) for news in news_list],
+            })
+        except Exception as e:
+            db_session.rollback()
+            return jsonify({'success': False, 'message': str(e)}), 500
+        finally:
+            db_session.close()
 
     def en_api_categories(self):
         """API lấy danh sách danh mục quốc tế (tiếng Anh)"""
-        categories = self.int_category_model.get_all()
+        db_session = get_session()
+        try:
+            int_category_model = InternationalCategoryModel(db_session)
+            categories = int_category_model.get_all()
 
-        return jsonify({
-            'success': True,
-            'data': [self._category_to_dict(cat) for cat in categories],
-        })
+            return jsonify({
+                'success': True,
+                'data': [self._category_to_dict(cat) for cat in categories],
+            })
+        except Exception as e:
+            db_session.rollback()
+            return jsonify({'success': False, 'message': str(e)}), 500
+        finally:
+            db_session.close()
 
     def en_api_article_detail(self, article_id: int):
         """API lấy chi tiết bài viết quốc tế (tiếng Anh)"""

@@ -293,6 +293,9 @@ class News(Base):
     created_by = Column(Integer, ForeignKey('users.id'), nullable=False)
     approved_by = Column(Integer, ForeignKey('users.id'), nullable=True)
     
+    # Author info (for API articles)
+    author = Column(String(255), nullable=True)  # Tên tác giả gốc từ nguồn bên ngoài
+    
     # Status and visibility
     status = Column(NewsStatusType(), default=NewsStatus.DRAFT)
     is_featured = Column(Boolean, default=False)
@@ -415,8 +418,8 @@ class NewsInternational(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    is_deleted = Column(Boolean, default=False)
-    tags_string = Column(Text, nullable=True)
+    # is_deleted = Column(Boolean, default=False)
+    # tags_string = Column(Text, nullable=True)
 
     # Relationships
     # Liên kết tới CategoryInternational (danh mục tin quốc tế)
