@@ -83,7 +83,25 @@ $(document).ready(function() {
     $(document).on('mouseleave', '.nav-menu > li.has-submenu', function() {
         $(this).find('.submenu').hide();
     });
+   
+    var split_path = window.location.pathname.split('/')[1];
+    var site = split_path == 'en' ? 'en' : 'vi';
+    var currentActiveCategory = null;
+    if (site == 'en') {
+        currentActiveCategory = window.location.pathname.split('/')[3];
+    } else {
+        currentActiveCategory = window.location.pathname.split('/')[2];
+    }
     
+    if (currentActiveCategory) {
+        $('.nav-menu > li').each(function() {
+            if ($(this).data('slug') == currentActiveCategory) {
+                $('.nav-menu > li').removeClass('active');
+                $(this).addClass('active');
+            }
+        });
+    }
+
     // Navigation active state
     $(document).on('click', '.nav-menu > li', function(e) {
         // Only if clicking on parent, not submenu
@@ -91,7 +109,7 @@ $(document).ready(function() {
             $('.nav-menu > li').removeClass('active');
             $(this).addClass('active');
         }
-    });
+    })
     
     // Submenu active state
     $(document).on('click', '.submenu li', function(e) {

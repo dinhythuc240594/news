@@ -198,3 +198,19 @@ def en_security():
 def en_term_of_service():
     """Trang điều khoản sử dụng"""
     return client_controller_common.term_of_service()
+
+@client_bp.route('/en/login', methods=['GET', 'POST'])
+def en_user_login():
+    """Trang đăng nhập cho user"""
+    return client_controller.user_login(site='en')
+
+
+@client_bp.route('/en/register', methods=['GET', 'POST'])
+def en_register():
+    """Trang đăng ký cho user"""
+    return client_controller.register(site='en')
+
+@client_bp.route('/en/profile')
+def en_profile():
+    """Trang thông tin cá nhân của user"""
+    return client_controller.profile(site='en')

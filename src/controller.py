@@ -2835,7 +2835,7 @@ class ClientController:
             'parent_id': category.parent_id
         }
     
-    def user_login(self):
+    def user_login(self, site='vn'):
         """
         Trang đăng nhập cho user
         Route: GET /login
@@ -2860,9 +2860,9 @@ class ClientController:
             else:
                 flash('Tên đăng nhập hoặc mật khẩu không đúng', 'error')
         
-        return render_template('client/login.html', categories=categories)
+        return render_template(f'client/{site}/login.html', categories=categories)
     
-    def register(self):
+    def register(self, site='vn'):
         """
         Trang đăng ký cho user
         Route: GET /register
@@ -2931,7 +2931,7 @@ class ClientController:
                 except Exception as e:
                     flash('Có lỗi xảy ra khi đăng ký. Vui lòng thử lại', 'error')
         
-        return render_template('client/register.html', categories=categories)
+        return render_template(f'client/{site}/register.html', categories=categories)
     
     def user_logout(self):
         """Đăng xuất user"""
@@ -2940,7 +2940,7 @@ class ClientController:
         site = request.path.split('/')[1]
         return redirect(url_for(f'client.{site}_index'))
     
-    def profile(self):
+    def profile(self, site='vn'):
         """
         Trang thông tin cá nhân của user
         Route: GET /profile
@@ -2995,7 +2995,7 @@ class ClientController:
         ).count()
 
         categories = self.category_model.get_all()
-        return render_template('client/profile.html', 
+        return render_template(f'client/{site}/profile.html', 
                              user=user, 
                              categories=categories,
                              saved_news=saved_news,
