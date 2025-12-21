@@ -10,15 +10,6 @@ import secrets
 import os
 from flask import url_for, current_app
 
-MAIL_SERVER="smtp.gmail.com"
-MAIL_PORT=587
-MAIL_USE_TLS=True
-MAIL_USE_SSL=False
-MAIL_USERNAME="dinhythuc10a9@gmail.com"
-MAIL_PASSWORD="nqso ngid ijmz dtap"
-MAIL_DEFAULT_SENDER="dinhythuc10a9@gmail.com"
-MAIL_SUBJECT_PREFIX="[VnNews] "
-
 
 def generate_token(length=32):
     """
