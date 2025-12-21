@@ -3439,7 +3439,11 @@ class ClientController:
             NewsletterSubscription.email == user.email
         ).first()
 
-        categories = self.category_model.get_all()
+        if site == 'en':
+            categories = self.int_category_model.get_all()
+        else:
+            categories = self.category_model.get_all()
+
         return render_template(f'client/{site}/profile.html', 
                              user=user, 
                              categories=categories,
