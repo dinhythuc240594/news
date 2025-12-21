@@ -4,7 +4,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_profile.css') }}">
 {% endblock %}
-{% block content %}
+{% block template %}
     <div class="container py-5">
         <div class="row justify-content-center">
             <div class="col-md-10 col-lg-9">
@@ -277,8 +277,8 @@
                     </div>
 
                     <div class="profile-actions mt-4 text-center">
-                        <a href="{{ url_for('client.index') }}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left me-2"></i> Quay lại trang chủ
+                        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i> Quay lại Quản lý hệ thống
                         </a>
                     </div>
                 </div>

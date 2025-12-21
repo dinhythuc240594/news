@@ -482,6 +482,19 @@ class PasswordResetToken(Base):
     user = relationship("User", foreign_keys=[user_id])
 
 
+class Setting(Base):
+    """Bảng cài đặt hệ thống"""
+    __tablename__ = 'settings'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String(100), nullable=False, unique=True)
+    value = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
+    category = Column(String(50), nullable=True)  # 'api', 'smtp', 'general', etc.
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 # Database connection
 _engine = None
 _SessionLocal = None

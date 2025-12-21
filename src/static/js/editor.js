@@ -531,11 +531,11 @@ async function loadUserInfo() {
         const result = await response.json();
         
         if (result.success && result.data) {
-            var html = `<a href="${url_for('admin.profile')}">${result.data.name}</a>`;
+            var html = `<a href="/admin/profile">${result.data.name}</a>`;
             $('#userName').html(html);
         }
     } catch (error) {
-        console.error('Lỗi tải thông tin user:', error);
+        console.error('Error loading user info:', error);
     }
 }
 

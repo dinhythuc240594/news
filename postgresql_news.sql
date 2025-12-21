@@ -217,3 +217,18 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE INDEX IF NOT EXISTS idx_reset_token ON password_reset_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_reset_user ON password_reset_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_reset_expires ON password_reset_tokens(expires_at);
+
+-- Table: settings
+CREATE TABLE IF NOT EXISTS settings (
+    id SERIAL PRIMARY KEY,
+    key VARCHAR(100) NOT NULL UNIQUE,
+    value TEXT,
+    description TEXT,
+    category VARCHAR(50),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create index on key for faster lookups
+CREATE INDEX IF NOT EXISTS idx_settings_key ON settings(key);
+CREATE INDEX IF NOT EXISTS idx_settings_category ON settings(category);

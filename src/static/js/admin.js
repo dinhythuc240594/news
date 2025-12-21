@@ -185,19 +185,19 @@ async function loadUserInfo() {
         const result = await response.json();
         
         if (result.success && result.data) {
-            var html = `<a href="${url_for('admin.profile')}">${result.data.name}</a>`;
+            var html = `<a href="/admin/profile">${result.data.name}</a>`;
             $('#userName').html(html);
         }
     } catch (error) {
-        console.error('Lỗi tải thông tin user:', error);
+        console.error('Error loading user info:', error);
     }
 }
 
-// Update page title
+// Update page title based on section
 function updatePageTitle(section) {
     const titles = {
         'dashboard': 'Dashboard',
-        'pending': 'Bài viết chờ duyệt',
+        'pending': 'Pending Articles',
         'approved': 'Bài viết đã duyệt',
         'rejected': 'Bài viết bị từ chối',
         'api': 'Bài viết từ API',
@@ -239,6 +239,12 @@ async function loadSectionData(section) {
             break;
         case 'tags-manager':
             loadTags();
+            break;
+        case 'settings':
+            // Settings will be loaded by its own script in setting-section.html
+            if (typeof loadSettings === 'function') {
+                loadSettings();
+            }
             break;
     }
 }

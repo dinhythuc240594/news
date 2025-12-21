@@ -392,6 +392,53 @@ def api_update_international_menu_order():
     return admin_controller.api_update_international_menu_order()
 
 @admin_bp.route('/profile')
+@controller.editor_required
 def profile():
-    """Trang thông tin cá nhân của user"""
+    print("=== DEBUG profile ===")
+    print(f"Session: {session}")
+    """Trang thông tin cá nhân của admin/editor"""
     return admin_controller.profile()
+
+# User Management Routes
+@admin_bp.route('/api/users')
+@controller.admin_required
+def api_users_list():
+    """API lấy danh sách users"""
+    return admin_controller.api_users_list()
+
+@admin_bp.route('/api/users', methods=['POST'])
+@controller.admin_required
+def api_create_user():
+    """API tạo user mới"""
+    return admin_controller.api_create_user()
+
+@admin_bp.route('/api/users/<int:user_id>', methods=['GET', 'PUT'])
+@controller.admin_required
+def api_update_user(user_id: int):
+    """API lấy thông tin hoặc cập nhật user"""
+    return admin_controller.api_update_user(user_id)
+
+@admin_bp.route('/api/users/<int:user_id>/toggle-status', methods=['POST'])
+@controller.admin_required
+def api_toggle_user_status(user_id: int):
+    """API khóa/mở khóa user"""
+    return admin_controller.api_toggle_user_status(user_id)
+
+# Settings Routes
+@admin_bp.route('/api/settings')
+@controller.admin_required
+def api_get_settings():
+    """API lấy settings"""
+    return admin_controller.api_get_settings()
+
+@admin_bp.route('/api/settings', methods=['POST'])
+@controller.admin_required
+def api_update_settings():
+    """API cập nhật settings"""
+    return admin_controller.api_update_settings()
+
+@admin_bp.route('/api/test-email', methods=['POST'])
+@controller.admin_required
+def api_test_email():
+    """API test gửi email"""
+    return admin_controller.api_test_email()

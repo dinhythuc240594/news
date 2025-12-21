@@ -23,7 +23,7 @@
                 <span>QUẢN LÝ HỆ THỐNG</span>
             </li>
             <li>
-                <a href="#" data-section="users">
+                <a href="#" data-section="users-manager">
                     <i class="fas fa-users"></i> Quản lý người dùng
                 </a>
             </li>
@@ -107,10 +107,15 @@
                 <span>KHÁC</span>
             </li>
             <li>
+                <a href="#" data-section="settings">
+                    <i class="fas fa-cog"></i> Cài đặt
+                </a>
+            </li>
+            <li>
                 <a href="#" id="logoutBtn">
                     <i class="fas fa-sign-out-alt"></i> Đăng xuất
                 </a>
-            </li>
+            </li>  
         </ul>
     </div>
 
@@ -142,6 +147,10 @@
                 </button> -->
             </div>
         </div>
+
+        {% include 'admin/users-manager.html' %}
+
+        {% include 'admin/setting-section.html' %}
 
         {% include 'admin/dashboard-section.html' %}
 

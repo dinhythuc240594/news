@@ -26,34 +26,53 @@ def generate_token(length=32):
 
 def get_smtp_config():
     """
-    Lấy cấu hình SMTP từ config
+    Lấy cấu hình SMTP từ database settings hoặc fallback về hardcoded values
     
     Returns:
         Dictionary chứa cấu hình SMTP
     """
     try:
-        return {
-            'server': MAIL_SERVER,
-            'port': MAIL_PORT,
-            'use_tls': MAIL_USE_TLS,
-            'use_ssl': MAIL_USE_SSL,
-            'username': MAIL_USERNAME,
-            'password': MAIL_PASSWORD,
-            'sender': MAIL_DEFAULT_SENDER,
-            'prefix': MAIL_SUBJECT_PREFIX
-        }
-    except RuntimeError:
-        # Nếu không có Flask app context, dùng environment variables
-        return {
-            'server': MAIL_SERVER,
-            'port': MAIL_PORT,
-            'use_tls': MAIL_USE_TLS,
-            'use_ssl': MAIL_USE_SSL,
-            'username': MAIL_USERNAME,
-            'password': MAIL_PASSWORD,
-            'sender': MAIL_DEFAULT_SENDER,
-            'prefix': MAIL_SUBJECT_PREFIX
-        }
+        # Thử lấy từ database settings
+        from database import get_session, Setting
+        db_session = get_session()
+        try:
+            smtp_settings = db_session.query(Setting).filter(
+                Setting.category == 'smtp'
+            ).all()
+            
+            if smtp_settings:
+                settings_dict = {s.key: s.value for s in smtp_settings}
+                
+                # Nếu có đủ settings từ database, sử dụng chúng
+                if settings_dict.get('smtp_server') and settings_dict.get('smtp_username') and settings_dict.get('smtp_password'):
+                    return {
+                        'server': settings_dict.get('smtp_server', 'smtp.gmail.com'),
+                        'port': int(settings_dict.get('smtp_port', '587')),
+                        'use_tls': settings_dict.get('smtp_use_tls', 'true').lower() == 'true',
+                        'use_ssl': not (settings_dict.get('smtp_use_tls', 'true').lower() == 'true'),
+                        'username': settings_dict.get('smtp_username', ''),
+                        'password': settings_dict.get('smtp_password', ''),
+                        'sender': settings_dict.get('smtp_from_email') or settings_dict.get('smtp_username', ''),
+                        'prefix': '[VnNews] '
+                    }
+        except Exception as e:
+            print(f"Error reading SMTP settings from database: {str(e)}")
+        finally:
+            db_session.close()
+    except Exception as e:
+        print(f"Error getting SMTP config: {str(e)}")
+    
+    # Fallback về hardcoded values
+    return {
+        'server': 'smtp.gmail.com',
+        'port': 587,
+        'use_tls': True,
+        'use_ssl': False,
+        'username': '',
+        'password': '',
+        'sender': '',
+        'prefix': '[VnNews] '
+    }
 
 
 def send_email(to_email, subject, body_html, body_text=None):

@@ -21,6 +21,8 @@ from database import (
     NewsTag,
     NewsletterSubscription,
     PasswordResetToken,
+    Setting,
+    User,
 )
 from models import (
     NewsModel,
@@ -2500,6 +2502,8 @@ class AdminController:
         ).count()
 
         categories = self.category_model.get_all()
+        print(f"=== DEBUG profile ===")
+        print(f"Categories: {user}")
         return render_template('admin/profile.html', 
                              user=user, 
                              categories=categories,
@@ -2507,7 +2511,379 @@ class AdminController:
                              viewed_news=viewed_news,
                              comments=comments,
                              comment_counts=comment_counts,
-                             total_comments=total_comments)
+                             total_comments=total_comments,
+                             )
+    
+    # User Management Methods
+    def api_users_list(self):
+        """API lấy danh sách users"""
+        try:
+            search = request.args.get('search', '').strip()
+            role_filter = request.args.get('role', '')
+            status_filter = request.args.get('status', '')
+            page = request.args.get('page', 1, type=int)
+            per_page = request.args.get('per_page', 20, type=int)
+            
+            query = self.db_session.query(User)
+            
+            # Filter by search
+            if search:
+                query = query.filter(
+                    or_(
+                        User.username.ilike(f'%{search}%'),
+                        User.email.ilike(f'%{search}%'),
+                        User.full_name.ilike(f'%{search}%')
+                    )
+                )
+            
+            # Filter by role
+            if role_filter:
+                query = query.filter(User.role == role_filter)
+            
+            # Filter by status
+            if status_filter == 'active':
+                query = query.filter(User.is_active == True)
+            elif status_filter == 'inactive':
+                query = query.filter(User.is_active == False)
+            
+            # Count total
+            total = query.count()
+            
+            # Pagination
+            offset = (page - 1) * per_page
+            users = query.order_by(User.created_at.desc()).limit(per_page).offset(offset).all()
+            
+            users_data = []
+            for user in users:
+                users_data.append({
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'full_name': user.full_name,
+                    'phone': user.phone,
+                    'role': user.role.value if user.role else 'user',
+                    'is_active': user.is_active,
+                    'created_at': user.created_at.strftime('%d/%m/%Y %H:%M') if user.created_at else '',
+                    'avatar': user.avatar
+                })
+            
+            return jsonify({
+                'success': True,
+                'users': users_data,
+                'total': total,
+                'page': page,
+                'per_page': per_page,
+                'total_pages': (total + per_page - 1) // per_page
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    def api_create_user(self):
+        """API tạo user mới"""
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        
+        current_user = self.user_model.get_by_id(session['user_id'])
+        if not current_user or current_user.role != UserRole.ADMIN:
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+        
+        try:
+            data = request.json if request.is_json else request.form
+            username = data.get('username', '').strip()
+            email = data.get('email', '').strip().lower()
+            password = data.get('password', '')
+            full_name = data.get('full_name', '').strip()
+            phone = data.get('phone', '').strip()
+            role_str = data.get('role', 'user')
+            
+            from auth_utils import validate_email, validate_password
+            
+            # Validation
+            if not username:
+                return jsonify({'success': False, 'error': 'Tên đăng nhập không được để trống'}), 400
+            
+            if self.user_model.get_by_username(username):
+                return jsonify({'success': False, 'error': 'Tên đăng nhập đã tồn tại'}), 400
+            
+            if not validate_email(email):
+                return jsonify({'success': False, 'error': 'Email không đúng định dạng'}), 400
+            
+            if self.user_model.get_by_email(email):
+                return jsonify({'success': False, 'error': 'Email đã được sử dụng'}), 400
+            
+            password_valid, password_error = validate_password(password)
+            if not password_valid:
+                return jsonify({'success': False, 'error': password_error}), 400
+            
+            # Convert role string to enum
+            role_map = {'admin': UserRole.ADMIN, 'editor': UserRole.EDITOR, 'user': UserRole.USER}
+            role = role_map.get(role_str.lower(), UserRole.USER)
+            
+            # Create user
+            user = self.user_model.create(
+                username=username,
+                email=email,
+                password=password,
+                full_name=full_name if full_name else None,
+                phone=phone if phone else None,
+                role=role
+            )
+            
+            return jsonify({
+                'success': True,
+                'message': 'Tạo tài khoản thành công',
+                'user': {
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'role': user.role.value
+                }
+            })
+        except Exception as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    def api_update_user(self, user_id: int):
+        """API cập nhật user hoặc lấy thông tin user"""
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        
+        current_user = self.user_model.get_by_id(session['user_id'])
+        if not current_user or current_user.role != UserRole.ADMIN:
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+        
+        try:
+            user = self.user_model.get_by_id(user_id)
+            if not user:
+                return jsonify({'success': False, 'error': 'Không tìm thấy người dùng'}), 404
+            
+            # GET request - return user info
+            if request.method == 'GET':
+                return jsonify({
+                    'success': True,
+                    'user': {
+                        'id': user.id,
+                        'username': user.username,
+                        'email': user.email,
+                        'full_name': user.full_name,
+                        'phone': user.phone,
+                        'role': user.role.value if user.role else 'user',
+                        'is_active': user.is_active
+                    }
+                })
+            
+            # PUT request - update user
+            data = request.json if request.is_json else request.form
+            full_name = data.get('full_name', '').strip()
+            email = data.get('email', '').strip().lower()
+            phone = data.get('phone', '').strip()
+            role_str = data.get('role', '')
+            
+            # Update fields
+            if full_name is not None:
+                user.full_name = full_name if full_name else None
+            if email and email != user.email:
+                from auth_utils import validate_email
+                if not validate_email(email):
+                    return jsonify({'success': False, 'error': 'Email không đúng định dạng'}), 400
+                if self.user_model.get_by_email(email):
+                    return jsonify({'success': False, 'error': 'Email đã được sử dụng'}), 400
+                user.email = email
+            if phone is not None:
+                user.phone = phone if phone else None
+            if role_str:
+                role_map = {'admin': UserRole.ADMIN, 'editor': UserRole.EDITOR, 'user': UserRole.USER}
+                if role_str.lower() in role_map:
+                    user.role = role_map[role_str.lower()]
+            
+            user.updated_at = datetime.utcnow()
+            self.db_session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Cập nhật thông tin thành công'
+            })
+        except Exception as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    def api_toggle_user_status(self, user_id: int):
+        """API khóa/mở khóa user"""
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        
+        current_user = self.user_model.get_by_id(session['user_id'])
+        if not current_user or current_user.role != UserRole.ADMIN:
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+        
+        try:
+            user = self.user_model.get_by_id(user_id)
+            if not user:
+                return jsonify({'success': False, 'error': 'Không tìm thấy người dùng'}), 404
+            
+            # Không cho phép khóa chính mình
+            if user.id == current_user.id:
+                return jsonify({'success': False, 'error': 'Không thể khóa tài khoản của chính bạn'}), 400
+            
+            # Toggle status
+            user.is_active = not user.is_active
+            user.updated_at = datetime.utcnow()
+            self.db_session.commit()
+            
+            status_text = 'mở khóa' if user.is_active else 'khóa'
+            return jsonify({
+                'success': True,
+                'message': f'Đã {status_text} tài khoản thành công',
+                'is_active': user.is_active
+            })
+        except Exception as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    # Settings Management Methods
+    def api_get_settings(self):
+        """API lấy settings"""
+        try:
+            category = request.args.get('category', '')
+            query = self.db_session.query(Setting)
+            
+            if category:
+                query = query.filter(Setting.category == category)
+            
+            settings = query.all()
+            settings_data = {s.key: {'value': s.value, 'description': s.description, 'category': s.category} for s in settings}
+            
+            return jsonify({
+                'success': True,
+                'settings': settings_data
+            })
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    def api_update_settings(self):
+        """API cập nhật settings"""
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        
+        current_user = self.user_model.get_by_id(session['user_id'])
+        if not current_user or current_user.role != UserRole.ADMIN:
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+        
+        try:
+            data = request.json if request.is_json else request.form
+            
+            for key, value in data.items():
+                setting = self.db_session.query(Setting).filter(Setting.key == key).first()
+                if setting:
+                    setting.value = value if value else None
+                    setting.updated_at = datetime.utcnow()
+                else:
+                    # Tạo setting mới nếu chưa tồn tại
+                    category = 'general'
+                    if 'api' in key.lower() or 'token' in key.lower():
+                        category = 'api'
+                    elif 'mail' in key.lower() or 'smtp' in key.lower():
+                        category = 'smtp'
+                    
+                    setting = Setting(
+                        key=key,
+                        value=value if value else None,
+                        category=category
+                    )
+                    self.db_session.add(setting)
+            
+            self.db_session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': 'Cập nhật cài đặt thành công'
+            })
+        except Exception as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    def api_test_email(self):
+        """API test gửi email"""
+        if 'user_id' not in session:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        
+        current_user = self.user_model.get_by_id(session['user_id'])
+        if not current_user or current_user.role != UserRole.ADMIN:
+            return jsonify({'success': False, 'error': 'Permission denied'}), 403
+        
+        try:
+            data = request.json if request.is_json else request.form
+            test_email = data.get('email', '').strip()
+            
+            if not test_email:
+                return jsonify({'success': False, 'error': 'Email không được để trống'}), 400
+            
+            from auth_utils import validate_email
+            if not validate_email(test_email):
+                return jsonify({'success': False, 'error': 'Email không đúng định dạng'}), 400
+            
+            # Lấy SMTP settings từ database
+            smtp_settings = {}
+            settings = self.db_session.query(Setting).filter(
+                Setting.category == 'smtp'
+            ).all()
+            
+            for s in settings:
+                smtp_settings[s.key] = s.value
+            
+            # Kiểm tra settings có đủ không
+            required_fields = ['smtp_server', 'smtp_port', 'smtp_username', 'smtp_password']
+            missing_fields = [f for f in required_fields if not smtp_settings.get(f)]
+            
+            if missing_fields:
+                return jsonify({
+                    'success': False,
+                    'error': f'Thiếu cài đặt: {", ".join(missing_fields)}'
+                }), 400
+            
+            # Gửi email test
+            from email_utils import send_email
+            
+            subject = "Test Email - VnNews"
+            body_html = """
+            <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #2c3e50;">Email Test thành công!</h2>
+                    <p>Đây là email test từ hệ thống VnNews.</p>
+                    <p>Nếu bạn nhận được email này, có nghĩa là cài đặt SMTP của bạn đã hoạt động đúng.</p>
+                    <p style="color: #7f8c8d; font-size: 12px; margin-top: 30px;">
+                        Đây là email tự động. Vui lòng không trả lời email này.
+                    </p>
+                </div>
+            </body>
+            </html>
+            """
+            body_text = """Email Test thành công!
+
+Đây là email test từ hệ thống VnNews.
+
+Nếu bạn nhận được email này, có nghĩa là cài đặt SMTP của bạn đã hoạt động đúng.
+"""
+            
+            # Tạm thời cập nhật email_utils với settings từ database
+            # (Trong thực tế, nên refactor email_utils để đọc từ database)
+            success = send_email(test_email, subject, body_html, body_text)
+            
+            if success:
+                return jsonify({
+                    'success': True,
+                    'message': 'Email test đã được gửi thành công! Vui lòng kiểm tra hộp thư của bạn.'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Không thể gửi email. Vui lòng kiểm tra lại cài đặt SMTP.'
+                }), 500
+                
+        except Exception as e:
+            print(f"Error in api_test_email: {str(e)}")
+            return jsonify({'success': False, 'error': str(e)}), 500
 
 class ClientController:
     """Quản lý các route của client"""
