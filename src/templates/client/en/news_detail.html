@@ -112,7 +112,7 @@
                                             <div class="comment-header mb-2">
                                                 <strong>{{ comment.user.full_name or comment.user.username }}</strong>
                                                 <span class="text-muted ms-2 small">
-                                                    <i class="far fa-clock"></i> {{ comment.created_at.strftime('%d/%m/%Y %H:%M') if comment.created_at else '' }}
+                                                    <i class="far fa-clock"></i> {{ format_time(comment.created_at) if comment.created_at else '' }}
                                                 </span>
                                             </div>
                                             <div class="comment-text">

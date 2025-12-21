@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from typing import Optional
 from functools import wraps
+import pytz
 import os
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
@@ -3086,6 +3087,11 @@ class ClientController:
                 Comment.parent_id == None  # Chỉ lấy comment gốc, không lấy reply
             ).order_by(Comment.created_at.desc()).all()
             
+            time_format = '%d-%m-%Y %H:%M'
+            time_zone = 'Asia/Ho_Chi_Minh'
+            
+            format_time = lambda x: x.astimezone(pytz.timezone(time_zone)).strftime(time_format)
+
             # Lấy bài viết liên quan
             related_news = news_model.get_by_category(
                 category_id=news.category_id,
@@ -3102,7 +3108,8 @@ class ClientController:
                                  categories=categories,
                                  is_saved=is_saved,
                                  comments=comments,
-                                 user_id=user_id)
+                                 user_id=user_id,
+                                 format_time=format_time)
         except Exception as e:
             # Rollback nếu có lỗi database
             db_session.rollback()
@@ -4004,6 +4011,56 @@ class ClientController:
             )
             related_news = [n for n in related_news if n.id != news.id][:5]
 
+            # Xử lý cho user đã đăng nhập
+            is_saved = False
+            user_id = None
+            if 'user_id' in session:
+                user_id = session['user_id']
+                # Lưu vào tin đã xem
+                existing_viewed = db_session.query(ViewedNews).filter(
+                    ViewedNews.user_id == user_id,
+                    ViewedNews.news_id == news.id
+                ).first()
+                
+                if not existing_viewed:
+                    viewed_news = ViewedNews(
+                        user_id=user_id,
+                        news_id=news.id,
+                        site='vn'
+                    )
+                    db_session.add(viewed_news)
+                    db_session.commit()
+                else:
+                    # Cập nhật thời gian xem
+                    existing_viewed.viewed_at = datetime.utcnow()
+                    db_session.commit()
+                
+                # Kiểm tra xem tin đã được lưu chưa
+                saved_news = db_session.query(SavedNews).filter(
+                    SavedNews.user_id == user_id,
+                    SavedNews.news_id == news.id
+                ).first()
+                is_saved = saved_news is not None
+            
+            # Lấy bình luận
+            from sqlalchemy.orm import joinedload
+            comments = db_session.query(Comment).options(
+                joinedload(Comment.user)
+            ).filter(
+                Comment.news_id == news.id,
+                Comment.is_active == True,
+                Comment.parent_id == None,
+                Comment.site == 'en'  # Chỉ lấy comment gốc, không lấy reply
+            ).order_by(Comment.created_at.desc()).all()
+
+            time_format = '%d-%m-%Y %H:%M'
+            time_zone = 'UTC'
+            
+            time_format = '%d-%m-%Y %H:%M'
+            time_zone = 'UTC'
+            
+            format_time = lambda x: x.astimezone(pytz.timezone(time_zone)).strftime(time_format)
+
             categories = int_category_model.get_all()
 
             return render_template(
@@ -4012,6 +4069,8 @@ class ClientController:
                 category=category,
                 related_news=related_news,
                 categories=categories,
+                format_time=format_time,
+                comments=comments,
             )
         except Exception as e:
             db_session.rollback()
