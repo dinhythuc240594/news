@@ -73,6 +73,11 @@
                                         <i class="fas fa-comments me-2"></i>Ý kiến của bạn ({{ total_comments }})
                                     </button>
                                 </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="newsletter-tab" data-bs-toggle="tab" data-bs-target="#newsletter" type="button" role="tab">
+                                        <i class="fas fa-envelope me-2"></i>Newsletter
+                                    </button>
+                                </li>
                             </ul>
                         </div>
 
@@ -273,6 +278,52 @@
                                 </div>
                             {% endif %}
                         </div>
+
+                        <!-- Tab 7: Newsletter -->
+                        <div class="tab-pane fade" id="newsletter" role="tabpanel">
+                            <div class="newsletter-management">
+                                <h4 class="mb-4"><i class="fas fa-envelope me-2"></i>Quản lý Newsletter</h4>
+                                
+                                {% if newsletter_subscription %}
+                                    {% if newsletter_subscription.is_active %}
+                                        <div class="alert alert-success">
+                                            <i class="fas fa-check-circle me-2"></i>
+                                            <strong>Bạn đang đăng ký nhận bản tin</strong>
+                                            <p class="mb-0 mt-2">
+                                                Email: <strong>{{ newsletter_subscription.email }}</strong><br>
+                                                Đăng ký ngày: {{ newsletter_subscription.subscribed_at.strftime('%d/%m/%Y %H:%M') if newsletter_subscription.subscribed_at else 'N/A' }}
+                                            </p>
+                                        </div>
+                                        <div class="newsletter-actions mt-4">
+                                            <button type="button" class="btn btn-danger" id="unsubscribeBtnVn">
+                                                <i class="fas fa-times-circle me-2"></i>Hủy đăng ký nhận bản tin
+                                            </button>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <strong>Bạn đã hủy đăng ký nhận bản tin</strong>
+                                            <p class="mb-0 mt-2">
+                                                Email: <strong>{{ newsletter_subscription.email }}</strong><br>
+                                                Hủy đăng ký ngày: {{ newsletter_subscription.unsubscribed_at.strftime('%d/%m/%Y %H:%M') if newsletter_subscription.unsubscribed_at else 'N/A' }}
+                                            </p>
+                                        </div>
+                                        <div class="newsletter-actions mt-4">
+                                            <p class="text-muted">Bạn có thể đăng ký lại bằng cách nhập email vào form đăng ký ở footer.</p>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>Bạn chưa đăng ký nhận bản tin</strong>
+                                        <p class="mb-0 mt-2">Đăng ký ngay để nhận những tin tức và cập nhật mới nhất từ chúng tôi.</p>
+                                    </div>
+                                    <div class="newsletter-actions mt-4">
+                                        <p class="text-muted">Vui lòng sử dụng form đăng ký ở footer để đăng ký nhận bản tin.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
                             </div>
                         </div>
                     </div>
@@ -445,6 +496,45 @@
                         firstError.focus();
                     }
                 }
+            });
+        }
+        
+        // Newsletter unsubscribe from profile
+        const unsubscribeBtnVn = document.getElementById('unsubscribeBtnVn');
+        if (unsubscribeBtnVn) {
+            unsubscribeBtnVn.addEventListener('click', function() {
+                if (!confirm('Bạn có chắc chắn muốn hủy đăng ký nhận bản tin?')) {
+                    return;
+                }
+                
+                const btn = this;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Đang xử lý...';
+                
+                fetch('{{ url_for("client.newsletter_unsubscribe_from_profile") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Có lỗi xảy ra');
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Có lỗi xảy ra khi hủy đăng ký');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                });
             });
         }
     </script>

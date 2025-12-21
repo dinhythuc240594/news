@@ -73,6 +73,11 @@
                                         <i class="fas fa-comments me-2"></i>Your comments ({{ total_comments }})
                                     </button>
                                 </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="newsletter-tab" data-bs-toggle="tab" data-bs-target="#newsletter" type="button" role="tab">
+                                        <i class="fas fa-envelope me-2"></i>Newsletter
+                                    </button>
+                                </li>
                             </ul>
                         </div>
 
@@ -273,6 +278,52 @@
                                 </div>
                             {% endif %}
                         </div>
+
+                        <!-- Tab 7: Newsletter -->
+                        <div class="tab-pane fade" id="newsletter" role="tabpanel">
+                            <div class="newsletter-management">
+                                <h4 class="mb-4"><i class="fas fa-envelope me-2"></i>Newsletter Management</h4>
+                                
+                                {% if newsletter_subscription %}
+                                    {% if newsletter_subscription.is_active %}
+                                        <div class="alert alert-success">
+                                            <i class="fas fa-check-circle me-2"></i>
+                                            <strong>You are subscribed to our newsletter</strong>
+                                            <p class="mb-0 mt-2">
+                                                Email: <strong>{{ newsletter_subscription.email }}</strong><br>
+                                                Subscribed on: {{ newsletter_subscription.subscribed_at.strftime('%d/%m/%Y %H:%M') if newsletter_subscription.subscribed_at else 'N/A' }}
+                                            </p>
+                                        </div>
+                                        <div class="newsletter-actions mt-4">
+                                            <button type="button" class="btn btn-danger" id="unsubscribeBtnEn">
+                                                <i class="fas fa-times-circle me-2"></i>Unsubscribe from Newsletter
+                                            </button>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <strong>You have unsubscribed from our newsletter</strong>
+                                            <p class="mb-0 mt-2">
+                                                Email: <strong>{{ newsletter_subscription.email }}</strong><br>
+                                                Unsubscribed on: {{ newsletter_subscription.unsubscribed_at.strftime('%d/%m/%Y %H:%M') if newsletter_subscription.unsubscribed_at else 'N/A' }}
+                                            </p>
+                                        </div>
+                                        <div class="newsletter-actions mt-4">
+                                            <p class="text-muted">You can resubscribe by entering your email in the subscription form in the footer.</p>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>You are not subscribed to our newsletter</strong>
+                                        <p class="mb-0 mt-2">Subscribe now to receive the latest news and updates from us.</p>
+                                    </div>
+                                    <div class="newsletter-actions mt-4">
+                                        <p class="text-muted">Please use the subscription form in the footer to subscribe to our newsletter.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
                             </div>
                         </div>
                     </div>
@@ -445,6 +496,45 @@
                         firstError.focus();
                     }
                 }
+            });
+        }
+        
+        // Newsletter unsubscribe from profile
+        const unsubscribeBtnEn = document.getElementById('unsubscribeBtnEn');
+        if (unsubscribeBtnEn) {
+            unsubscribeBtnEn.addEventListener('click', function() {
+                if (!confirm('Are you sure you want to unsubscribe from the newsletter?')) {
+                    return;
+                }
+                
+                const btn = this;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                
+                fetch('{{ url_for("client.en_newsletter_unsubscribe_from_profile") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert(data.message || 'An error occurred');
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while unsubscribing');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                });
             });
         }
     </script>

@@ -2995,6 +2995,11 @@ class ClientController:
             Comment.user_id == user.id,
             Comment.is_active == True
         ).count()
+        
+        # Lấy thông tin newsletter subscription
+        newsletter_subscription = self.db_session.query(NewsletterSubscription).filter(
+            NewsletterSubscription.email == user.email
+        ).first()
 
         categories = self.category_model.get_all()
         return render_template(f'client/{site}/profile.html', 
@@ -3004,7 +3009,8 @@ class ClientController:
                              viewed_news=viewed_news,
                              comments=comments,
                              comment_counts=comment_counts,
-                             total_comments=total_comments)
+                             total_comments=total_comments,
+                             newsletter_subscription=newsletter_subscription)
     
     def update_profile(self):
         """
@@ -3315,6 +3321,48 @@ class ClientController:
             print(f"Error in newsletter_unsubscribe: {str(e)}")
             flash('Có lỗi xảy ra khi hủy đăng ký', 'error')
             return redirect(url_for('client.index'))
+    
+    def newsletter_unsubscribe_from_profile(self, site='vn'):
+        """
+        Hủy đăng ký newsletter từ profile
+        Route: POST /api/newsletter/unsubscribe
+        """
+        if 'user_id' not in session:
+            message = 'Vui lòng đăng nhập' if site == 'vn' else 'Please login'
+            return jsonify({'success': False, 'message': message}), 401
+        
+        try:
+            user = self.user_model.get_by_id(session['user_id'])
+            if not user:
+                message = 'Không tìm thấy người dùng' if site == 'vn' else 'User not found'
+                return jsonify({'success': False, 'message': message}), 404
+            
+            # Tìm subscription theo email của user
+            subscription = self.db_session.query(NewsletterSubscription).filter(
+                NewsletterSubscription.email == user.email
+            ).first()
+            
+            if not subscription:
+                message = 'Bạn chưa đăng ký nhận bản tin' if site == 'vn' else 'You are not subscribed to newsletter'
+                return jsonify({'success': False, 'message': message}), 404
+            
+            if not subscription.is_active:
+                message = 'Bạn đã hủy đăng ký trước đó' if site == 'vn' else 'You have already unsubscribed'
+                return jsonify({'success': False, 'message': message}), 400
+            
+            # Hủy đăng ký
+            subscription.is_active = False
+            subscription.unsubscribed_at = datetime.utcnow()
+            self.db_session.commit()
+            
+            message = 'Đã hủy đăng ký nhận bản tin thành công' if site == 'vn' else 'Successfully unsubscribed from newsletter'
+            return jsonify({'success': True, 'message': message})
+            
+        except Exception as e:
+            self.db_session.rollback()
+            print(f"Error in newsletter_unsubscribe_from_profile: {str(e)}")
+            message = 'Có lỗi xảy ra khi hủy đăng ký' if site == 'vn' else 'An error occurred while unsubscribing'
+            return jsonify({'success': False, 'message': message}), 500
     
     def forgot_password(self, site='vn'):
         """

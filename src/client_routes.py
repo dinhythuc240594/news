@@ -231,6 +231,16 @@ def newsletter_unsubscribe(token):
     """Hủy đăng ký newsletter"""
     return client_controller.newsletter_unsubscribe(token)
 
+@client_bp.route('/api/newsletter/unsubscribe', methods=['POST'])
+def newsletter_unsubscribe_from_profile():
+    """API hủy đăng ký newsletter từ profile"""
+    return client_controller.newsletter_unsubscribe_from_profile()
+
+@client_bp.route('/en/api/newsletter/unsubscribe', methods=['POST'])
+def en_newsletter_unsubscribe_from_profile():
+    """API hủy đăng ký newsletter từ profile (English)"""
+    return client_controller.newsletter_unsubscribe_from_profile(site='en')
+
 # Forgot password routes
 @client_bp.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
