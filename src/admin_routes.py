@@ -85,6 +85,21 @@ def news_delete(news_id: int):
     return admin_controller.news_delete(news_id)
 
 
+# International News Routes
+@admin_bp.route('/international/<int:news_id>/approve', methods=['POST'])
+@controller.admin_required
+def international_news_approve(news_id: int):
+    """Duyệt bài viết quốc tế"""
+    return admin_controller.international_news_approve(news_id)
+
+
+@admin_bp.route('/international/<int:news_id>/reject', methods=['POST'])
+@controller.admin_required
+def international_news_reject(news_id: int):
+    """Từ chối bài viết quốc tế"""
+    return admin_controller.international_news_reject(news_id)
+
+
 # API Routes
 @admin_bp.route('/api/news')
 @controller.editor_required

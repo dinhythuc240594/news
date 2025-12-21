@@ -364,6 +364,49 @@ class AdminController:
         
         return redirect(url_for('admin.news_list'))
     
+    def international_news_approve(self, news_id: int):
+        """
+        Duyệt bài viết quốc tế
+        Route: POST /admin/international/<news_id>/approve
+        """
+        user_id = session.get('user_id')
+        news = self.int_news_model.approve(news_id, user_id)
+        
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            if news:
+                return jsonify({'success': True, 'message': 'Đã duyệt bài viết quốc tế'})
+            else:
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+        
+        if news:
+            flash('Đã duyệt bài viết quốc tế', 'success')
+        else:
+            flash('Không tìm thấy bài viết', 'error')
+        
+        return redirect(request.referrer or url_for('admin.dashboard'))
+    
+    def international_news_reject(self, news_id: int):
+        """
+        Từ chối bài viết quốc tế
+        Route: POST /admin/international/<news_id>/reject
+        """
+        user_id = session.get('user_id')
+        reason = request.headers.get('X-Reason') or request.json.get('reason') if request.is_json else None
+        news = self.int_news_model.reject(news_id, user_id)
+        
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            if news:
+                return jsonify({'success': True, 'message': 'Đã từ chối bài viết quốc tế', 'reason': reason})
+            else:
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+        
+        if news:
+            flash('Đã từ chối bài viết quốc tế', 'success')
+        else:
+            flash('Không tìm thấy bài viết', 'error')
+        
+        return redirect(request.referrer or url_for('admin.dashboard'))
+    
     def api_news_list(self):
         """
         API lấy danh sách bài viết (JSON)

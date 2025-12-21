@@ -85,7 +85,8 @@ $(document).ready(function() {
     // Approve article
     $(document).on('click', '.btn-approve', function() {
         const articleId = $(this).data('id');
-        approveArticle(articleId);
+        const articleType = $(this).data('type'); // 'international' hoặc undefined
+        approveArticle(articleId, articleType);
     });
     
     // Save API article
@@ -103,9 +104,10 @@ $(document).ready(function() {
     // Reject article
     $(document).on('click', '.btn-reject', function() {
         const articleId = $(this).data('id');
+        const articleType = $(this).data('type'); // 'international' hoặc undefined
         const reason = prompt('Lý do từ chối:');
         if (reason) {
-            rejectArticle(articleId, reason);
+            rejectArticle(articleId, reason, articleType);
         }
     });
     
@@ -378,8 +380,8 @@ async function loadInternationalPending() {
                         <td>${article.submitted}</td>
                         <td>
                             <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}"><i class="fas fa-eye"></i> Review</button>
-                            <button class="btn btn-sm btn-success btn-approve" data-id="${article.id}"><i class="fas fa-check"></i> Approve</button>
-                            <button class="btn btn-sm btn-danger btn-reject" data-id="${article.id}"><i class="fas fa-times"></i> Reject</button>
+                            <button class="btn btn-sm btn-success btn-approve" data-id="${article.id}" data-type="international"><i class="fas fa-check"></i> Approve</button>
+                            <button class="btn btn-sm btn-danger btn-reject" data-id="${article.id}" data-type="international"><i class="fas fa-times"></i> Reject</button>
                         </td>
                     </tr>
                 `;
@@ -963,12 +965,17 @@ function clearAPIFilters() {
 }
 
 // Approve article
-async function approveArticle(articleId) {
+async function approveArticle(articleId, articleType) {
     if (confirm('Bạn có chắc muốn duyệt bài viết này?')) {
         showSpinner();
         
         try {
-            const response = await fetch(`/admin/news/${articleId}/approve`, {
+            // Xác định route dựa trên loại bài viết
+            const route = articleType === 'international' 
+                ? `/admin/international/${articleId}/approve`
+                : `/admin/news/${articleId}/approve`;
+            
+            const response = await fetch(route, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -1060,11 +1067,16 @@ function previewAPIArticle(articleData) {
 }
 
 // Reject article
-async function rejectArticle(articleId, reason) {
+async function rejectArticle(articleId, reason, articleType) {
     showSpinner();
     
     try {
-        const response = await fetch(`/admin/news/${articleId}/reject`, {
+        // Xác định route dựa trên loại bài viết
+        const route = articleType === 'international' 
+            ? `/admin/international/${articleId}/reject`
+            : `/admin/news/${articleId}/reject`;
+        
+        const response = await fetch(route, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
