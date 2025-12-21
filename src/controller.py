@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from typing import Optional
 from functools import wraps
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from database import (
     get_session,
@@ -19,6 +19,8 @@ from database import (
     CategoryInternational,
     Tag,
     NewsTag,
+    NewsletterSubscription,
+    PasswordResetToken,
 )
 from models import (
     NewsModel,
@@ -2835,7 +2837,7 @@ class ClientController:
             'parent_id': category.parent_id
         }
     
-    def user_login(self):
+    def user_login(self, site='vn'):
         """
         Trang đăng nhập cho user
         Route: GET /login
@@ -2860,9 +2862,9 @@ class ClientController:
             else:
                 flash('Tên đăng nhập hoặc mật khẩu không đúng', 'error')
         
-        return render_template('client/login.html', categories=categories)
+        return render_template(f'client/{site}/login.html', categories=categories)
     
-    def register(self):
+    def register(self, site='vn'):
         """
         Trang đăng ký cho user
         Route: GET /register
@@ -2931,16 +2933,15 @@ class ClientController:
                 except Exception as e:
                     flash('Có lỗi xảy ra khi đăng ký. Vui lòng thử lại', 'error')
         
-        return render_template('client/register.html', categories=categories)
+        return render_template(f'client/{site}/register.html', categories=categories)
     
     def user_logout(self):
         """Đăng xuất user"""
         session.clear()
         flash('Đã đăng xuất', 'success')
-        site = request.path.split('/')[1]
-        return redirect(url_for(f'client.{site}_index'))
+        return redirect(url_for(f'client.index'))
     
-    def profile(self):
+    def profile(self, site='vn'):
         """
         Trang thông tin cá nhân của user
         Route: GET /profile
@@ -2993,16 +2994,22 @@ class ClientController:
             Comment.user_id == user.id,
             Comment.is_active == True
         ).count()
+        
+        # Lấy thông tin newsletter subscription
+        newsletter_subscription = self.db_session.query(NewsletterSubscription).filter(
+            NewsletterSubscription.email == user.email
+        ).first()
 
         categories = self.category_model.get_all()
-        return render_template('client/profile.html', 
+        return render_template(f'client/{site}/profile.html', 
                              user=user, 
                              categories=categories,
                              saved_news=saved_news,
                              viewed_news=viewed_news,
                              comments=comments,
                              comment_counts=comment_counts,
-                             total_comments=total_comments)
+                             total_comments=total_comments,
+                             newsletter_subscription=newsletter_subscription)
     
     def update_profile(self):
         """
@@ -3210,6 +3217,259 @@ class ClientController:
                 }
             }
         })
+    
+    def newsletter_subscribe(self, site='vn'):
+        """
+        Đăng ký newsletter
+        Route: POST /api/newsletter/subscribe
+        """
+        try:
+            data = request.get_json() if request.is_json else request.form
+            email = data.get('email', '').strip().lower()
+            
+            from auth_utils import validate_email
+            from email_utils import generate_token, send_newsletter_subscription_email
+            
+            # Validation
+            if not email:
+                message = 'Email không được để trống' if site == 'vn' else 'Email is required'
+                return jsonify({'success': False, 'message': message}), 400
+            
+            if not validate_email(email):
+                message = 'Email không đúng định dạng' if site == 'vn' else 'Invalid email format'
+                return jsonify({'success': False, 'message': message}), 400
+            
+            # Kiểm tra xem email đã đăng ký chưa
+            existing = self.db_session.query(NewsletterSubscription).filter(
+                NewsletterSubscription.email == email
+            ).first()
+            
+            if existing:
+                if existing.is_active:
+                    message = 'Email này đã được đăng ký' if site == 'vn' else 'This email is already subscribed'
+                    return jsonify({'success': False, 'message': message}), 400
+                else:
+                    # Kích hoạt lại subscription
+                    existing.is_active = True
+                    existing.unsubscribed_at = None
+                    existing.subscribed_at = datetime.utcnow()
+                    if 'user_id' in session:
+                        existing.user_id = session['user_id']
+                    self.db_session.commit()
+                    
+                    # Gửi email xác nhận
+                    send_newsletter_subscription_email(existing.email, existing.unsubscribe_token, site)
+                    
+                    message = 'Đăng ký lại thành công' if site == 'vn' else 'Resubscribed successfully'
+                    return jsonify({'success': True, 'message': message})
+            
+            # Tạo subscription mới
+            unsubscribe_token = generate_token()
+            user_id = session.get('user_id') if 'user_id' in session else None
+            
+            subscription = NewsletterSubscription(
+                email=email,
+                unsubscribe_token=unsubscribe_token,
+                is_active=True,
+                user_id=user_id
+            )
+            
+            self.db_session.add(subscription)
+            self.db_session.commit()
+            
+            # Gửi email xác nhận
+            send_newsletter_subscription_email(email, unsubscribe_token, site)
+            
+            message = 'Đăng ký nhận bản tin thành công! Vui lòng kiểm tra email để xác nhận.' if site == 'vn' else 'Newsletter subscription successful! Please check your email for confirmation.'
+            return jsonify({'success': True, 'message': message})
+            
+        except Exception as e:
+            self.db_session.rollback()
+            print(f"Error in newsletter_subscribe: {str(e)}")
+            message = 'Có lỗi xảy ra. Vui lòng thử lại' if site == 'vn' else 'An error occurred. Please try again'
+            return jsonify({'success': False, 'message': message}), 500
+    
+    def newsletter_unsubscribe(self, token):
+        """
+        Hủy đăng ký newsletter
+        Route: GET /newsletter/unsubscribe/<token>
+        """
+        try:
+            subscription = self.db_session.query(NewsletterSubscription).filter(
+                NewsletterSubscription.unsubscribe_token == token
+            ).first()
+            
+            if not subscription:
+                flash('Token không hợp lệ', 'error')
+                return redirect(url_for('client.index'))
+            
+            if not subscription.is_active:
+                flash('Bạn đã hủy đăng ký trước đó', 'info')
+                return redirect(url_for('client.index'))
+            
+            # Hủy đăng ký
+            subscription.is_active = False
+            subscription.unsubscribed_at = datetime.utcnow()
+            self.db_session.commit()
+            
+            flash('Đã hủy đăng ký nhận bản tin thành công', 'success')
+            return redirect(url_for('client.index'))
+            
+        except Exception as e:
+            self.db_session.rollback()
+            print(f"Error in newsletter_unsubscribe: {str(e)}")
+            flash('Có lỗi xảy ra khi hủy đăng ký', 'error')
+            return redirect(url_for('client.index'))
+    
+    def newsletter_unsubscribe_from_profile(self, site='vn'):
+        """
+        Hủy đăng ký newsletter từ profile
+        Route: POST /api/newsletter/unsubscribe
+        """
+        if 'user_id' not in session:
+            message = 'Vui lòng đăng nhập' if site == 'vn' else 'Please login'
+            return jsonify({'success': False, 'message': message}), 401
+        
+        try:
+            user = self.user_model.get_by_id(session['user_id'])
+            if not user:
+                message = 'Không tìm thấy người dùng' if site == 'vn' else 'User not found'
+                return jsonify({'success': False, 'message': message}), 404
+            
+            # Tìm subscription theo email của user
+            subscription = self.db_session.query(NewsletterSubscription).filter(
+                NewsletterSubscription.email == user.email
+            ).first()
+            
+            if not subscription:
+                message = 'Bạn chưa đăng ký nhận bản tin' if site == 'vn' else 'You are not subscribed to newsletter'
+                return jsonify({'success': False, 'message': message}), 404
+            
+            if not subscription.is_active:
+                message = 'Bạn đã hủy đăng ký trước đó' if site == 'vn' else 'You have already unsubscribed'
+                return jsonify({'success': False, 'message': message}), 400
+            
+            # Hủy đăng ký
+            subscription.is_active = False
+            subscription.unsubscribed_at = datetime.utcnow()
+            self.db_session.commit()
+            
+            message = 'Đã hủy đăng ký nhận bản tin thành công' if site == 'vn' else 'Successfully unsubscribed from newsletter'
+            return jsonify({'success': True, 'message': message})
+            
+        except Exception as e:
+            self.db_session.rollback()
+            print(f"Error in newsletter_unsubscribe_from_profile: {str(e)}")
+            message = 'Có lỗi xảy ra khi hủy đăng ký' if site == 'vn' else 'An error occurred while unsubscribing'
+            return jsonify({'success': False, 'message': message}), 500
+    
+    def forgot_password(self, site='vn'):
+        """
+        Trang quên mật khẩu - Yêu cầu reset
+        Route: GET /forgot-password
+        Route: POST /forgot-password
+        """
+        categories = self.category_model.get_all()
+        
+        if request.method == 'POST':
+            email = request.form.get('email', '').strip().lower()
+            
+            from auth_utils import validate_email
+            from email_utils import generate_token, send_password_reset_email
+            
+            # Validation
+            if not email:
+                flash('Email không được để trống' if site == 'vn' else 'Email is required', 'error')
+            elif not validate_email(email):
+                flash('Email không đúng định dạng' if site == 'vn' else 'Invalid email format', 'error')
+            else:
+                # Tìm user
+                user = self.user_model.get_by_email(email)
+                
+                if user:
+                    # Tạo token reset
+                    reset_token = generate_token()
+                    expires_at = datetime.utcnow() + timedelta(hours=1)  # Token hết hạn sau 1 giờ
+                    
+                    # Vô hiệu hóa các token cũ của user này
+                    old_tokens = self.db_session.query(PasswordResetToken).filter(
+                        PasswordResetToken.user_id == user.id,
+                        PasswordResetToken.used == False
+                    ).all()
+                    for old_token in old_tokens:
+                        old_token.used = True
+                    
+                    # Tạo token mới
+                    reset_token_obj = PasswordResetToken(
+                        user_id=user.id,
+                        token=reset_token,
+                        expires_at=expires_at
+                    )
+                    self.db_session.add(reset_token_obj)
+                    self.db_session.commit()
+                    
+                    # Gửi email reset
+                    send_password_reset_email(user.email, reset_token, site)
+                
+                # Luôn hiển thị thông báo thành công (bảo mật)
+                success_msg = 'Nếu email tồn tại trong hệ thống, chúng tôi đã gửi link đặt lại mật khẩu đến email của bạn.' if site == 'vn' else 'If the email exists in our system, we have sent a password reset link to your email.'
+                flash(success_msg, 'success')
+                return redirect(url_for('client.user_login', site=site))
+        
+        return render_template(f'client/{site}/forgot_password.html', categories=categories)
+    
+    def reset_password(self, token):
+        """
+        Trang đặt lại mật khẩu
+        Route: GET /reset-password/<token>
+        Route: POST /reset-password/<token>
+        """
+        categories = self.category_model.get_all()
+        
+        # Kiểm tra token
+        reset_token_obj = self.db_session.query(PasswordResetToken).filter(
+            PasswordResetToken.token == token,
+            PasswordResetToken.used == False
+        ).first()
+        
+        if not reset_token_obj:
+            flash('Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn', 'error')
+            return redirect(url_for('client.forgot_password'))
+        
+        if reset_token_obj.expires_at < datetime.utcnow():
+            flash('Link đặt lại mật khẩu đã hết hạn', 'error')
+            return redirect(url_for('client.forgot_password'))
+        
+        if request.method == 'POST':
+            password = request.form.get('password', '')
+            confirm_password = request.form.get('confirm_password', '')
+            
+            from auth_utils import validate_password, hash_password
+            
+            # Validation
+            password_valid, password_error = validate_password(password)
+            if not password_valid:
+                flash(password_error, 'error')
+            elif password != confirm_password:
+                flash('Mật khẩu xác nhận không khớp', 'error')
+            else:
+                # Cập nhật mật khẩu
+                user = self.user_model.get_by_id(reset_token_obj.user_id)
+                if user:
+                    user.password_hash = hash_password(password)
+                    reset_token_obj.used = True
+                    self.db_session.commit()
+                    
+                    flash('Đặt lại mật khẩu thành công! Vui lòng đăng nhập', 'success')
+                    return redirect(url_for('client.user_login'))
+                else:
+                    flash('Không tìm thấy người dùng', 'error')
+        
+        # Xác định site từ request path
+        site = 'en' if '/en/' in request.path else 'vn'
+        return render_template(f'client/{site}/reset_password.html', 
+                             token=token, 
+                             categories=categories)
 
     def en_index(self):
         """Trang chủ quốc tế viết bằng tiếng Anh - sử dụng bảng NewsInternational"""

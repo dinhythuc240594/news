@@ -444,11 +444,42 @@ class CategoryInternational(Base):
     visible = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
+    
     # Relationships
     parent = relationship("CategoryInternational", remote_side=[id], backref="children")
     # Danh sách các bài viết quốc tế thuộc danh mục này
     news = relationship("NewsInternational", back_populates="category")
+
+
+class NewsletterSubscription(Base):
+    """Bảng đăng ký newsletter"""
+    __tablename__ = 'newsletter_subscriptions'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    email = Column(String(100), nullable=False, unique=True)
+    is_active = Column(Boolean, default=True)
+    unsubscribe_token = Column(String(255), nullable=False, unique=True)  # Token để hủy đăng ký
+    subscribed_at = Column(DateTime, default=datetime.utcnow)
+    unsubscribed_at = Column(DateTime, nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)  # Liên kết với user nếu có
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class PasswordResetToken(Base):
+    """Bảng lưu token reset mật khẩu"""
+    __tablename__ = 'password_reset_tokens'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    token = Column(String(255), nullable=False, unique=True)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
 
 
 # Database connection

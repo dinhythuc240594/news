@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS saved_news (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     news_id INTEGER NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+    site VARCHAR(10) DEFAULT 'vn',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, news_id)
 );
@@ -116,6 +117,7 @@ CREATE TABLE IF NOT EXISTS viewed_news (
     id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     news_id INTEGER NOT NULL REFERENCES news(id) ON DELETE CASCADE,
+    site VARCHAR(10) DEFAULT 'vn',
     viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, news_id)
 );
@@ -127,6 +129,7 @@ CREATE TABLE IF NOT EXISTS comments (
     news_id INTEGER NOT NULL REFERENCES news(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     parent_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+    site VARCHAR(10) DEFAULT 'vn',
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -184,3 +187,33 @@ CREATE TABLE IF NOT EXISTS categories_international (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS newsletter_subscriptions (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    is_active BOOLEAN DEFAULT TRUE,
+    unsubscribe_token VARCHAR(255) NOT NULL UNIQUE,
+    subscribed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    unsubscribed_at TIMESTAMP NULL,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Create index on email for faster lookups
+CREATE INDEX IF NOT EXISTS idx_newsletter_email ON newsletter_subscriptions(email);
+CREATE INDEX IF NOT EXISTS idx_newsletter_token ON newsletter_subscriptions(unsubscribe_token);
+CREATE INDEX IF NOT EXISTS idx_newsletter_user ON newsletter_subscriptions(user_id);
+
+-- Table: password_reset_tokens
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token VARCHAR(255) NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create indexes for password reset tokens
+CREATE INDEX IF NOT EXISTS idx_reset_token ON password_reset_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_reset_user ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_reset_expires ON password_reset_tokens(expires_at);

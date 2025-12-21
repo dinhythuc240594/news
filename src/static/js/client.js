@@ -83,7 +83,25 @@ $(document).ready(function() {
     $(document).on('mouseleave', '.nav-menu > li.has-submenu', function() {
         $(this).find('.submenu').hide();
     });
+   
+    var split_path = window.location.pathname.split('/')[1];
+    var site = split_path == 'en' ? 'en' : 'vi';
+    var currentActiveCategory = null;
+    if (site == 'en') {
+        currentActiveCategory = window.location.pathname.split('/')[3];
+    } else {
+        currentActiveCategory = window.location.pathname.split('/')[2];
+    }
     
+    if (currentActiveCategory) {
+        $('.nav-menu > li').each(function() {
+            if ($(this).data('slug') == currentActiveCategory) {
+                $('.nav-menu > li').removeClass('active');
+                $(this).addClass('active');
+            }
+        });
+    }
+
     // Navigation active state
     $(document).on('click', '.nav-menu > li', function(e) {
         // Only if clicking on parent, not submenu
@@ -91,7 +109,7 @@ $(document).ready(function() {
             $('.nav-menu > li').removeClass('active');
             $(this).addClass('active');
         }
-    });
+    })
     
     // Submenu active state
     $(document).on('click', '.submenu li', function(e) {
@@ -191,15 +209,111 @@ $(document).ready(function() {
     //     // In a real application, you would open a login modal or redirect to login page
     // });
 
-    // Newsletter subscription
-    $('.btn-subscribe').click(function() {
-        const email = $('.newsletter input').val();
-        // if (email && validateEmail(email)) {
-        //     alert('Cảm ơn bạn đã đăng ký nhận tin! Email: ' + email);
-        //     $('.newsletter input').val('');
-        // } else {
-        //     alert('Vui lòng nhập email hợp lệ');
-        // }
+    // Newsletter subscription (VN)
+    $('#newsletter-subscribe-btn-vn').on('click', function() {
+        const email = $('#newsletter-email-vn').val().trim();
+        const modal = new bootstrap.Modal(document.getElementById('newsletterModalVn'));
+        const modalBody = $('#newsletterModalBodyVn');
+        
+        if (!email) {
+            modalBody.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Vui lòng nhập email</div>');
+            modal.show();
+            return;
+        }
+        
+        if (!validateEmail(email)) {
+            modalBody.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Email không đúng định dạng</div>');
+            modal.show();
+            return;
+        }
+        
+        // Disable button
+        $(this).prop('disabled', true).text('Đang xử lý...');
+        
+        // Send request
+        $.ajax({
+            url: '/api/newsletter/subscribe',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ email: email }),
+            success: function(response) {
+                if (response.success) {
+                    modalBody.html('<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>' + response.message + '</div>');
+                    $('#newsletter-email-vn').val('');
+                } else {
+                    modalBody.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + response.message + '</div>');
+                }
+                modal.show();
+            },
+            error: function(xhr) {
+                const message = xhr.responseJSON && xhr.responseJSON.message 
+                    ? xhr.responseJSON.message 
+                    : 'Có lỗi xảy ra. Vui lòng thử lại.';
+                modalBody.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + message + '</div>');
+                modal.show();
+            },
+            complete: function() {
+                $('#newsletter-subscribe-btn-vn').prop('disabled', false).text('Đăng ký');
+            }
+        });
+    });
+    
+    // Newsletter subscription (EN)
+    $('#newsletter-subscribe-btn-en').on('click', function() {
+        const email = $('#newsletter-email-en').val().trim();
+        const modal = new bootstrap.Modal(document.getElementById('newsletterModalEn'));
+        const modalBody = $('#newsletterModalBodyEn');
+        
+        if (!email) {
+            modalBody.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Please enter your email</div>');
+            modal.show();
+            return;
+        }
+        
+        if (!validateEmail(email)) {
+            modalBody.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>Invalid email format</div>');
+            modal.show();
+            return;
+        }
+        
+        // Disable button
+        $(this).prop('disabled', true).text('Processing...');
+        
+        // Send request
+        $.ajax({
+            url: '/en/api/newsletter/subscribe',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ email: email }),
+            success: function(response) {
+                if (response.success) {
+                    modalBody.html('<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>' + response.message + '</div>');
+                    $('#newsletter-email-en').val('');
+                } else {
+                    modalBody.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + response.message + '</div>');
+                }
+                modal.show();
+            },
+            error: function(xhr) {
+                const message = xhr.responseJSON && xhr.responseJSON.message 
+                    ? xhr.responseJSON.message 
+                    : 'An error occurred. Please try again.';
+                modalBody.html('<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>' + message + '</div>');
+                modal.show();
+            },
+            complete: function() {
+                $('#newsletter-subscribe-btn-en').prop('disabled', false).text('Subscribe');
+            }
+        });
+    });
+    
+    // Allow Enter key to submit newsletter
+    $('#newsletter-email-vn, #newsletter-email-en').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            const site = $(this).attr('id').includes('vn') ? 'vn' : 'en';
+            $(`#newsletter-subscribe-btn-${site}`).click();
+        }
     });
 
     // Email validation

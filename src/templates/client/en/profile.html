@@ -1,5 +1,5 @@
-{% extends '/client/vn/base.html' %}
-{% block title %}Thông tin cá nhân - VnNews{% endblock %}
+{% extends '/client/en/base.html' %}
+{% block title %}Profile - VnNews International{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_client.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_register.css') }}">
@@ -45,32 +45,37 @@
                             <ul class="nav flex-column" id="profileTabs" role="tablist">
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info" type="button" role="tab">
-                                        <i class="fas fa-user me-2"></i>Thông tin cá nhân
+                                        <i class="fas fa-user me-2"></i>Personal information
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="edit-tab" data-bs-toggle="tab" data-bs-target="#edit" type="button" role="tab">
-                                        <i class="fas fa-edit me-2"></i>Chỉnh sửa thông tin
+                                        <i class="fas fa-edit me-2"></i>Edit information
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password" type="button" role="tab">
-                                        <i class="fas fa-lock me-2"></i>Đổi mật khẩu
+                                        <i class="fas fa-lock me-2"></i>Change password
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="saved-tab" data-bs-toggle="tab" data-bs-target="#saved" type="button" role="tab">
-                                        <i class="fas fa-bookmark me-2"></i>Tin đã lưu
+                                        <i class="fas fa-bookmark me-2"></i>Saved news
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="viewed-tab" data-bs-toggle="tab" data-bs-target="#viewed" type="button" role="tab">
-                                        <i class="fas fa-eye me-2"></i>Tin đã xem
+                                        <i class="fas fa-eye me-2"></i>Viewed news
                                     </button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="comments-tab" data-bs-toggle="tab" data-bs-target="#comments" type="button" role="tab">
-                                        <i class="fas fa-comments me-2"></i>Ý kiến của bạn ({{ total_comments }})
+                                        <i class="fas fa-comments me-2"></i>Your comments ({{ total_comments }})
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="newsletter-tab" data-bs-toggle="tab" data-bs-target="#newsletter" type="button" role="tab">
+                                        <i class="fas fa-envelope me-2"></i>Newsletter
                                     </button>
                                 </li>
                             </ul>
@@ -83,32 +88,32 @@
                         <div class="tab-pane fade show active" id="info" role="tabpanel">
                             <div class="profile-info">
                                 <div class="info-item">
-                                    <label class="info-label"><i class="fas fa-user me-2"></i>Tên đăng nhập:</label>
+                                    <label class="info-label"><i class="fas fa-user me-2"></i>Username:</label>
                                     <div class="info-value">{{ user.username }}</div>
                                 </div>
                                 <div class="info-item">
-                                    <label class="info-label"><i class="fas fa-id-card me-2"></i>Họ và tên:</label>
-                                    <div class="info-value">{{ user.full_name or 'Chưa cập nhật' }}</div>
+                                    <label class="info-label"><i class="fas fa-id-card me-2"></i>Full name:</label>
+                                    <div class="info-value">{{ user.full_name or 'Not updated' }}</div>
                                 </div>
                                 <div class="info-item">
-                                    <label class="info-label"><i class="fas fa-envelope me-2"></i>Email:</label>
+                                    <label class="info-label"><i class="fas fa-envelope me-2"></i>Email address:</label>
                                     <div class="info-value">{{ user.email }}</div>
                                 </div>
                                 <div class="info-item">
-                                    <label class="info-label"><i class="fas fa-phone me-2"></i>Số điện thoại:</label>
-                                    <div class="info-value">{{ user.phone or 'Chưa cập nhật' }}</div>
+                                    <label class="info-label"><i class="fas fa-phone me-2"></i>Phone number:</label>
+                                    <div class="info-value">{{ user.phone or 'Not updated' }}</div>
                                 </div>
                                 <div class="info-item">
-                                    <label class="info-label"><i class="fas fa-calendar me-2"></i>Ngày đăng ký:</label>
+                                    <label class="info-label"><i class="fas fa-calendar me-2"></i>Registration date:</label>
                                     <div class="info-value">{{ user.created_at.strftime('%d/%m/%Y %H:%M') if user.created_at else 'N/A' }}</div>
                                 </div>
                                 <div class="info-item">
-                                    <label class="info-label"><i class="fas fa-check-circle me-2"></i>Trạng thái:</label>
+                                    <label class="info-label"><i class="fas fa-check-circle me-2"></i>Status:</label>
                                     <div class="info-value">
                                         {% if user.is_active %}
-                                            <span class="badge bg-success">Đang hoạt động</span>
+                                            <span class="badge bg-success">Active</span>
                                         {% else %}
-                                            <span class="badge bg-danger">Đã khóa</span>
+                                            <span class="badge bg-danger">Inactive</span>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -121,19 +126,19 @@
                                 <form method="POST" action="{{ url_for('client.update_profile') }}" enctype="multipart/form-data">
                                     <input type="hidden" name="action" value="update_info">
                                     <div class="form-group mb-3">
-                                        <label class="form-label">Họ và tên</label>
-                                        <input type="text" class="form-control" name="full_name" value="{{ user.full_name or '' }}" placeholder="Nhập họ và tên">
+                                        <label class="form-label">Full name</label>
+                                        <input type="text" class="form-control" name="full_name" value="{{ user.full_name or '' }}" placeholder="Enter full name">
                                     </div>
                                     <div class="form-group mb-3">
-                                        <label class="form-label">Email</label>
+                                        <label class="form-label">Email address</label>
                                         <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
                                     </div>
                                     <div class="form-group mb-3">
-                                        <label class="form-label">Số điện thoại</label>
-                                        <input type="tel" class="form-control" name="phone" value="{{ user.phone or '' }}" placeholder="Nhập số điện thoại">
+                                        <label class="form-label">Phone number</label>
+                                        <input type="tel" class="form-control" name="phone" value="{{ user.phone or '' }}" placeholder="Enter phone number">
                                     </div>
                                     <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-save me-2"></i>Cập nhật thông tin
+                                        <i class="fas fa-save me-2"></i>Update information
                                     </button>
                                 </form>
                             </div>
@@ -145,7 +150,7 @@
                                 <form method="POST" action="{{ url_for('client.update_profile') }}" id="changePasswordForm">
                                     <input type="hidden" name="action" value="change_password">
                                     <div class="form-group mb-3">
-                                        <label class="form-label">Mật khẩu hiện tại</label>
+                                        <label class="form-label">Current password</label>
                                         <div class="input-group">
                                             <span class="input-group-text">
                                                 <i class="fas fa-lock"></i>
@@ -158,7 +163,7 @@
                                         <div class="invalid-feedback" id="current-password-error"></div>
                                     </div>
                                     <div class="form-group mb-3">
-                                        <label class="form-label">Mật khẩu mới</label>
+                                        <label class="form-label">New password</label>
                                         <div class="input-group">
                                             <span class="input-group-text">
                                                 <i class="fas fa-lock"></i>
@@ -177,7 +182,7 @@
                                         <div class="invalid-feedback" id="new-password-error"></div>
                                     </div>
                                     <div class="form-group mb-3">
-                                        <label class="form-label">Xác nhận mật khẩu mới</label>
+                                        <label class="form-label">Confirm new password</label>
                                         <div class="input-group">
                                             <span class="input-group-text">
                                                 <i class="fas fa-lock"></i>
@@ -189,8 +194,8 @@
                                         </div>
                                         <div class="invalid-feedback" id="confirm-password-error"></div>
                                     </div>
-                                    <button type="submit" class="btn btn-primary">
-                                        <i class="fas fa-key me-2"></i>Đổi mật khẩu
+                                    <button type="submit" class="btn btn-primary">  
+                                        <i class="fas fa-key me-2"></i>Change password
                                     </button>
                                 </form>
                             </div>
@@ -216,7 +221,7 @@
                             {% else %}
                                 <div class="empty-state">
                                     <i class="fas fa-bookmark"></i>
-                                    <p>Bạn chưa lưu tin tức nào</p>
+                                    <p>You haven't saved any news</p>
                                 </div>
                             {% endif %}
                         </div>
@@ -231,7 +236,7 @@
                                         <div class="news-list-item-content">
                                             <h5><a href="{{ url_for('client.news_detail', news_slug=viewed.news.slug) }}">{{ viewed.news.title }}</a></h5>
                                             <div class="news-meta">
-                                                <span><i class="far fa-clock"></i> Đã xem: {{ viewed.viewed_at.strftime('%d/%m/%Y %H:%M') if viewed.viewed_at else '' }}</span>
+                                                <span><i class="far fa-clock"></i> Viewed: {{ viewed.viewed_at.strftime('%d/%m/%Y %H:%M') if viewed.viewed_at else '' }}</span>
                                                 <span class="ms-3"><i class="far fa-eye"></i> {{ viewed.news.view_count or 0 }}</span>
                                             </div>
                                         </div>
@@ -241,7 +246,7 @@
                             {% else %}
                                 <div class="empty-state">
                                     <i class="fas fa-eye"></i>
-                                    <p>Bạn chưa xem tin tức nào</p>
+                                    <p>You haven't viewed any news</p>
                                 </div>
                             {% endif %}
                         </div>
@@ -257,9 +262,9 @@
                                             <p class="mt-2 mb-2">{{ comment.content }}</p>
                                             <div class="news-meta">
                                                 <span><i class="far fa-clock"></i> {{ comment.created_at.strftime('%d/%m/%Y %H:%M') if comment.created_at else '' }}</span>
-                                                <span class="ms-3"><i class="fas fa-comments"></i> {{ comment_counts.get(comment.news_id, 0) }} bình luận</span>
+                                                <span class="ms-3"><i class="fas fa-comments"></i> {{ comment_counts.get(comment.news_id, 0) }} comments</span>
                                                 {% if not comment.is_active %}
-                                                    <span class="badge bg-warning ms-2">Đang chờ duyệt</span>
+                                                    <span class="badge bg-warning ms-2">Pending approval</span>
                                                 {% endif %}
                                             </div>
                                         </div>
@@ -269,9 +274,55 @@
                             {% else %}
                                 <div class="empty-state">
                                     <i class="fas fa-comments"></i>
-                                    <p>Bạn chưa có bình luận nào</p>
+                                    <p>You haven't made any comments</p>
                                 </div>
                             {% endif %}
+                        </div>
+
+                        <!-- Tab 7: Newsletter -->
+                        <div class="tab-pane fade" id="newsletter" role="tabpanel">
+                            <div class="newsletter-management">
+                                <h4 class="mb-4"><i class="fas fa-envelope me-2"></i>Newsletter Management</h4>
+                                
+                                {% if newsletter_subscription %}
+                                    {% if newsletter_subscription.is_active %}
+                                        <div class="alert alert-success">
+                                            <i class="fas fa-check-circle me-2"></i>
+                                            <strong>You are subscribed to our newsletter</strong>
+                                            <p class="mb-0 mt-2">
+                                                Email: <strong>{{ newsletter_subscription.email }}</strong><br>
+                                                Subscribed on: {{ newsletter_subscription.subscribed_at.strftime('%d/%m/%Y %H:%M') if newsletter_subscription.subscribed_at else 'N/A' }}
+                                            </p>
+                                        </div>
+                                        <div class="newsletter-actions mt-4">
+                                            <button type="button" class="btn btn-danger" id="unsubscribeBtnEn">
+                                                <i class="fas fa-times-circle me-2"></i>Unsubscribe from Newsletter
+                                            </button>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-warning">
+                                            <i class="fas fa-exclamation-triangle me-2"></i>
+                                            <strong>You have unsubscribed from our newsletter</strong>
+                                            <p class="mb-0 mt-2">
+                                                Email: <strong>{{ newsletter_subscription.email }}</strong><br>
+                                                Unsubscribed on: {{ newsletter_subscription.unsubscribed_at.strftime('%d/%m/%Y %H:%M') if newsletter_subscription.unsubscribed_at else 'N/A' }}
+                                            </p>
+                                        </div>
+                                        <div class="newsletter-actions mt-4">
+                                            <p class="text-muted">You can resubscribe by entering your email in the subscription form in the footer.</p>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
+                                        <strong>You are not subscribed to our newsletter</strong>
+                                        <p class="mb-0 mt-2">Subscribe now to receive the latest news and updates from us.</p>
+                                    </div>
+                                    <div class="newsletter-actions mt-4">
+                                        <p class="text-muted">Please use the subscription form in the footer to subscribe to our newsletter.</p>
+                                    </div>
+                                {% endif %}
+                            </div>
                         </div>
                             </div>
                         </div>
@@ -279,7 +330,7 @@
 
                     <div class="profile-actions mt-4 text-center">
                         <a href="{{ url_for('client.index') }}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left me-2"></i> Quay lại trang chủ
+                            <i class="fas fa-arrow-left me-2"></i> Back to home
                         </a>
                     </div>
                 </div>
@@ -445,6 +496,45 @@
                         firstError.focus();
                     }
                 }
+            });
+        }
+        
+        // Newsletter unsubscribe from profile
+        const unsubscribeBtnEn = document.getElementById('unsubscribeBtnEn');
+        if (unsubscribeBtnEn) {
+            unsubscribeBtnEn.addEventListener('click', function() {
+                if (!confirm('Are you sure you want to unsubscribe from the newsletter?')) {
+                    return;
+                }
+                
+                const btn = this;
+                const originalText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                
+                fetch('{{ url_for("client.en_newsletter_unsubscribe_from_profile") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert(data.message || 'An error occurred');
+                        btn.disabled = false;
+                        btn.innerHTML = originalText;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while unsubscribing');
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                });
             });
         }
     </script>

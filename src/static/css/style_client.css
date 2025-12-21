@@ -79,7 +79,7 @@ img {
 
 .btn-search {
     position: absolute;
-    right: 5px;
+    right: 0px;
     top: 50%;
     transform: translateY(-50%);
     background-color: #c00;

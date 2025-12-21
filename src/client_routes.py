@@ -198,3 +198,61 @@ def en_security():
 def en_term_of_service():
     """Trang điều khoản sử dụng"""
     return client_controller_common.term_of_service()
+
+@client_bp.route('/en/login', methods=['GET', 'POST'])
+def en_user_login():
+    """Trang đăng nhập cho user"""
+    return client_controller.user_login(site='en')
+
+
+@client_bp.route('/en/register', methods=['GET', 'POST'])
+def en_register():
+    """Trang đăng ký cho user"""
+    return client_controller.register(site='en')
+
+@client_bp.route('/en/profile')
+def en_profile():
+    """Trang thông tin cá nhân của user"""
+    return client_controller.profile(site='en')
+
+# Newsletter routes
+@client_bp.route('/api/newsletter/subscribe', methods=['POST'])
+def newsletter_subscribe():
+    """API đăng ký newsletter"""
+    return client_controller.newsletter_subscribe()
+
+@client_bp.route('/en/api/newsletter/subscribe', methods=['POST'])
+def en_newsletter_subscribe():
+    """API đăng ký newsletter (English)"""
+    return client_controller.newsletter_subscribe(site='en')
+
+@client_bp.route('/newsletter/unsubscribe/<token>')
+def newsletter_unsubscribe(token):
+    """Hủy đăng ký newsletter"""
+    return client_controller.newsletter_unsubscribe(token)
+
+@client_bp.route('/api/newsletter/unsubscribe', methods=['POST'])
+def newsletter_unsubscribe_from_profile():
+    """API hủy đăng ký newsletter từ profile"""
+    return client_controller.newsletter_unsubscribe_from_profile()
+
+@client_bp.route('/en/api/newsletter/unsubscribe', methods=['POST'])
+def en_newsletter_unsubscribe_from_profile():
+    """API hủy đăng ký newsletter từ profile (English)"""
+    return client_controller.newsletter_unsubscribe_from_profile(site='en')
+
+# Forgot password routes
+@client_bp.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    """Trang quên mật khẩu"""
+    return client_controller.forgot_password()
+
+@client_bp.route('/en/forgot-password', methods=['GET', 'POST'])
+def en_forgot_password():
+    """Trang quên mật khẩu (English)"""
+    return client_controller.forgot_password(site='en')
+
+@client_bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    """Trang đặt lại mật khẩu"""
+    return client_controller.reset_password(token)
