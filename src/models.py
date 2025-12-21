@@ -469,6 +469,47 @@ class InternationalNewsModel:
 
         return query.all()
 
+    def update(self, news_id: int, **kwargs) -> Optional[NewsInternational]:
+        """
+        Cập nhật bài viết quốc tế
+        
+        Args:
+            news_id: ID bài viết
+            **kwargs: Các trường cần cập nhật
+            
+        Returns:
+            Updated NewsInternational object hoặc None
+        """
+        news = self.get_by_id(news_id)
+        if not news:
+            return None
+        
+        for key, value in kwargs.items():
+            if hasattr(news, key):
+                setattr(news, key, value)
+        
+        news.updated_at = datetime.utcnow()
+        self.db.commit()
+        self.db.refresh(news)
+        return news
+
+    def approve(self, news_id: int, approved_by: int) -> Optional[NewsInternational]:
+        """Duyệt bài viết quốc tế"""
+        return self.update(
+            news_id, 
+            status=NewsStatus.PUBLISHED,
+            approved_by=approved_by,
+            published_at=datetime.utcnow()
+        )
+    
+    def reject(self, news_id: int, approved_by: int) -> Optional[NewsInternational]:
+        """Từ chối bài viết quốc tế"""
+        return self.update(
+            news_id,
+            status=NewsStatus.REJECTED,
+            approved_by=approved_by
+        )
+
 
 class InternationalCategoryModel:
     """Model class quản lý CategoryInternational (danh mục tin quốc tế)"""
