@@ -2939,8 +2939,7 @@ class ClientController:
         """Đăng xuất user"""
         session.clear()
         flash('Đã đăng xuất', 'success')
-        site = request.path.split('/')[1]
-        return redirect(url_for(f'client.{site}_index'))
+        return redirect(url_for(f'client.index'))
     
     def profile(self, site='vn'):
         """
