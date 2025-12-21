@@ -22,7 +22,7 @@
             <div class="header-buttons">
                 <a href="{{ url_for('client.index') }}" class="btn-international"><i class="fas fa-globe"></i> Vietnamese</a>
                 {% if session.get('user_id') %}
-                    {% if session.get('role') == 'customer' %}
+                    {% if session.get('role') == 'user' %}
                     <div class="dropdown">
                         <button class="btn btn-link text-decoration-none text-dark dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-user"></i> {{ session.get('full_name', session.get('username', 'User')) }}

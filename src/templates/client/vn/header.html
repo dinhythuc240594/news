@@ -23,7 +23,7 @@
                 <a href="{{ url_for('client.en_index') }}" class="btn-international"><i class="fas fa-globe"></i> Quốc tế</a>
                 {% if session.get('user_id') %}
                     <div class="dropdown">
-                        {% if session.get('role') == 'customer' %}
+                        {% if session.get('role') == 'user' %}
                         <button class="btn btn-link text-decoration-none text-dark dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="fas fa-user"></i> {{ session.get('full_name', session.get('username', 'User')) }}
                         </button>
