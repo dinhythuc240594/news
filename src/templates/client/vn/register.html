@@ -29,6 +29,7 @@
             {% endwith %}
             
             <form method="POST" action="{{ url_for('client.register') }}" id="registerForm" novalidate>
+                <input type="hidden" name="site" value="vn">
                 <div class="form-group">
                     <label class="form-label">Tên đăng nhập <span class="required">*</span></label>
                     <div class="input-group">

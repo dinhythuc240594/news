@@ -29,6 +29,7 @@
             {% endwith %}
             
             <form method="POST" action="{{ url_for('client.user_login') }}">
+                <input type="hidden" name="site" value="vn">
                 <div class="form-group">
                     <label class="form-label">Tên đăng nhập hoặc Email</label>
                     <div class="input-group">

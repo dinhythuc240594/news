@@ -69,12 +69,14 @@ def api_categories():
 @client_bp.route('/login', methods=['GET', 'POST'])
 def user_login():
     """Trang đăng nhập cho user"""
-    return client_controller.user_login()
+    site = request.form.get('site', 'vn')
+    return client_controller.user_login(site=site)
 
 
 @client_bp.route('/register', methods=['GET', 'POST'])
 def register():
     """Trang đăng ký cho user"""
+    site = request.form.get('site', 'vn')
     return client_controller.register()
 
 

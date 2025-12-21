@@ -29,6 +29,7 @@
             {% endwith %}
             
             <form method="POST" action="{{ url_for('client.user_login') }}">
+                <input type="hidden" name="site" value="en">
                 <div class="form-group">
                     <label class="form-label">Username or Email</label>
                     <div class="input-group">
@@ -69,7 +70,7 @@
             </form>
             
             <div class="register-link">
-                <p>Don't have an account? <a href="{{ url_for('client.register') }}">Register now</a></p>
+                <p>Don't have an account? <a href="{{ url_for('client.en_register') }}">Register now</a></p>
             </div>
         </div>
     </div>

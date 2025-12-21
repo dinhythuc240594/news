@@ -28,7 +28,7 @@
                             <i class="fas fa-user"></i> {{ session.get('full_name', session.get('username', 'User')) }}
                         </button>
                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown" style="z-index: 1001;">
-                            <li><a class="dropdown-item" href="{{ url_for('client.profile') }}"><i class="fas fa-user-circle me-2"></i> Profile</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('client.en_profile') }}"><i class="fas fa-user-circle me-2"></i> Profile</a></li>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="{{ url_for('client.user_logout') }}"><i class="fas fa-sign-out-alt me-2"></i> Logout</a></li>
                         </ul>
@@ -44,8 +44,8 @@
                             </ul>
                         {% endif %}
                 {% else %}
-                    <a href="{{ url_for('client.user_login') }}" class="btn-login-header"><i class="fas fa-user"></i> Login</a>
-                    <a href="{{ url_for('client.register') }}"><i class="fas fa-user"></i> Register</a>
+                    <a href="{{ url_for('client.en_user_login') }}" class="btn-login-header"><i class="fas fa-user"></i> Login</a>
+                    <a href="{{ url_for('client.en_register') }}"><i class="fas fa-user"></i> Register</a>
                 {% endif %}
             </div>
         </div>

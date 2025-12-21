@@ -3262,7 +3262,11 @@ class ClientController:
         Route: GET /login
         Route: POST /login
         """
-        categories = self.category_model.get_all()
+
+        if site == 'en':
+            categories = self.int_category_model.get_all()
+        else:
+            categories = self.category_model.get_all()
         
         if request.method == 'POST':
             username = request.form.get('username')
@@ -3276,10 +3280,22 @@ class ClientController:
                 session['full_name'] = user.full_name or user.username
                 session['role'] = user.role.value
                 
-                flash('Đăng nhập thành công', 'success')
-                return redirect(url_for('client.index'))
+                
+                if site == 'en':
+                    flash('Login successful', 'success')
+                    return redirect(url_for('client.en_index'))
+                else:
+                    flash('Đăng nhập thành công', 'success')
+                    return redirect(url_for('client.index'))
             else:
-                flash('Tên đăng nhập hoặc mật khẩu không đúng', 'error')
+                if site == 'en':
+                    print('Username or password is incorrect')
+                    flash('Username or password is incorrect', 'error')
+                    return redirect(url_for('client.en_user_login'))
+                else:
+                    print('Tên đăng nhập hoặc mật khẩu không đúng')
+                    flash('Tên đăng nhập hoặc mật khẩu không đúng', 'error')
+                    return redirect(url_for('client.user_login'))
         
         return render_template(f'client/{site}/login.html', categories=categories)
     
@@ -3289,7 +3305,11 @@ class ClientController:
         Route: GET /register
         Route: POST /register
         """
-        categories = self.category_model.get_all()
+        
+        if site == 'en':
+            categories = self.int_category_model.get_all()
+        else:
+            categories = self.category_model.get_all()
         
         if request.method == 'POST':
             username = request.form.get('username', '').strip()
@@ -3788,7 +3808,10 @@ class ClientController:
         Route: GET /forgot-password
         Route: POST /forgot-password
         """
-        categories = self.category_model.get_all()
+        if site == 'en':
+            categories = self.int_category_model.get_all()
+        else:
+            categories = self.category_model.get_all()
         
         if request.method == 'POST':
             email = request.form.get('email', '').strip().lower()
