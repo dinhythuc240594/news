@@ -408,6 +408,149 @@ class AdminController:
         
         return redirect(request.referrer or url_for('admin.dashboard'))
     
+    def international_news_delete(self, news_id: int):
+        """
+        Xóa bài viết quốc tế
+        Route: POST /admin/international/<news_id>/delete
+        """
+        from database import NewsInternational
+        article = self.db_session.query(NewsInternational).filter(NewsInternational.id == news_id).first()
+        
+        if not article:
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+            flash('Không tìm thấy bài viết', 'error')
+            return redirect(request.referrer or url_for('admin.dashboard'))
+        
+        self.db_session.delete(article)
+        self.db_session.commit()
+        
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            return jsonify({'success': True, 'message': 'Đã xóa bài viết quốc tế'})
+        
+        flash('Đã xóa bài viết quốc tế', 'success')
+        return redirect(request.referrer or url_for('admin.dashboard'))
+    
+    def international_news_submit(self, news_id: int):
+        """
+        Gửi bài viết quốc tế nháp để duyệt (chuyển từ DRAFT sang PENDING)
+        Route: POST /admin/international/<news_id>/submit
+        """
+        from database import NewsInternational, NewsStatus
+        article = self.db_session.query(NewsInternational).filter(NewsInternational.id == news_id).first()
+        
+        if not article:
+            return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+        
+        if article.status != NewsStatus.DRAFT:
+            return jsonify({'success': False, 'error': 'Chỉ có thể gửi bài viết nháp để duyệt'}), 400
+        
+        article.status = NewsStatus.PENDING
+        article.updated_at = datetime.utcnow()
+        self.db_session.commit()
+        
+        return jsonify({'success': True, 'message': 'Đã gửi bài viết để duyệt'})
+    
+    def api_edit_international_article(self, article_id: int):
+        """API chỉnh sửa bài viết quốc tế theo ID"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        from database import NewsInternational, CategoryInternational, NewsStatus
+        article = self.db_session.query(NewsInternational).filter(NewsInternational.id == article_id).first()
+        if not article:
+            return jsonify({'success': False, 'error': 'Bài viết không tồn tại'}), 400
+        
+        data = request.json if request.is_json else request.form
+        
+        # Lấy dữ liệu từ form
+        title = data.get('title', '').strip()
+        content = data.get('content', '').strip()
+        category_id = data.get('category_id') or data.get('category')
+        summary = data.get('summary') or data.get('description', '').strip()
+        thumbnail = data.get('thumbnail', '').strip()
+        status = data.get('status', article.status.value)
+        
+        # Validation
+        if not title:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập tiêu đề bài viết'}), 400
+        
+        if not content:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập nội dung bài viết'}), 400
+        
+        if not category_id:
+            return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+        
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Danh mục không hợp lệ'}), 400
+        
+        # Kiểm tra category tồn tại
+        category = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == category_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+        
+        try:
+            news_status = NewsStatus(status)
+        except ValueError:
+            news_status = article.status
+        
+        # Tạo slug từ tiêu đề
+        base_slug = self._generate_slug(title)
+        slug = base_slug
+        
+        # Kiểm tra slug trùng và thêm số nếu cần (nhưng không trùng với chính nó)
+        counter = 1
+        while self.db_session.query(NewsInternational).filter(NewsInternational.slug == slug, NewsInternational.id != article_id).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        # Extract images từ HTML content
+        import re
+        image_urls = []
+        img_pattern = r'<img[^>]+src=["\']([^"\']+)["\']'
+        matches = re.findall(img_pattern, content)
+        for img_url in matches:
+            if img_url and img_url not in image_urls:
+                image_urls.append(img_url)
+        
+        # Lưu images dưới dạng JSON
+        images_json = None
+        if image_urls:
+            import json
+            images_json = json.dumps(image_urls)
+        
+        try:
+            # Cập nhật bài viết
+            article.title = title
+            article.slug = slug
+            article.content = content
+            article.summary = summary
+            article.thumbnail = thumbnail
+            article.images = images_json
+            article.category_id = category_id
+            article.status = news_status
+            article.published_at = datetime.utcnow() if news_status == NewsStatus.PUBLISHED else article.published_at
+            article.updated_at = datetime.utcnow()
+            
+            self.db_session.commit()
+            self.db_session.refresh(article)
+            
+            return jsonify({
+                'success': True,
+                'message': 'Đã cập nhật bài viết quốc tế',
+                'data': {
+                    'id': article.id,
+                    'title': article.title,
+                    'status': article.status.value
+                }
+            })
+        except Exception as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': f'Lỗi khi cập nhật bài viết: {str(e)}'}), 500
+    
     def api_news_list(self):
         """
         API lấy danh sách bài viết (JSON)

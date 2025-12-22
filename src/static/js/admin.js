@@ -129,6 +129,28 @@ $(document).ready(function() {
         previewArticle(articleId, articleType);
     });
     
+    // Edit international article
+    $(document).on('click', '.btn-edit[data-type="international"]', function() {
+        const articleId = $(this).data('id');
+        editInternationalArticle(articleId);
+    });
+    
+    // Delete international article
+    $(document).on('click', '.btn-delete[data-type="international"]', function() {
+        const articleId = $(this).data('id');
+        if (confirm('Bạn có chắc muốn xóa bài viết này?')) {
+            deleteInternationalArticle(articleId);
+        }
+    });
+    
+    // Submit international draft for approval
+    $(document).on('click', '.btn-submit[data-type="international"]', function() {
+        const articleId = $(this).data('id');
+        if (confirm('Bạn có chắc muốn gửi bài viết này để duyệt?')) {
+            submitInternationalDraft(articleId);
+        }
+    });
+    
     // Modal approve/reject
     $('#approveBtn').click(function() {
         const articleId = $(this).data('id');
@@ -455,11 +477,11 @@ async function loadInternationalDrafts() {
                             <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}" data-type="international" title="Xem trước">
                                 <i class="fas fa-eye"></i>
                             </button>
-                            <button class="btn btn-sm btn-success btn-edit" data-id="${article.id}" data-type="international" title="Sửa">
-                                <i class="fas fa-edit"></i> Edit
+                            <button class="btn btn-sm btn-info btn-submit" data-id="${article.id}" data-type="international" title="Gửi chờ duyệt">
+                                <i class="fas fa-paper-plane"></i>
                             </button>
                             <button class="btn btn-sm btn-danger btn-delete" data-id="${article.id}" data-type="international" title="Xóa">
-                                <i class="fas fa-trash"></i> Delete
+                                <i class="fas fa-trash"></i>
                             </button>
                         </td>
                     </tr>
@@ -475,6 +497,103 @@ async function loadInternationalDrafts() {
     } catch (error) {
         console.error('Lỗi tải bài viết quốc tế nháp:', error);
         $('#internationalDraftsTable').html('<tr><td colspan="6" class="text-center text-danger">Lỗi tải dữ liệu</td></tr>');
+    }
+}
+
+// Edit international article
+async function editInternationalArticle(articleId) {
+    try {
+        const response = await fetch(`/admin/api/international-article/${articleId}`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+            showToast('Lỗi', result.error || 'Không thể tải bài viết', 'warning');
+            return;
+        }
+        
+        const article = result.data;
+        
+        // Hiển thị thông báo rằng chức năng edit sẽ được thêm sau
+        // Hoặc có thể redirect đến editor page nếu có
+        showToast('Thông báo', 'Chức năng chỉnh sửa bài viết quốc tế đang được phát triển. Vui lòng sử dụng chức năng preview để xem chi tiết.', 'info');
+        
+        // Có thể mở modal preview để xem chi tiết
+        previewArticle(articleId, 'international');
+    } catch (error) {
+        console.error('Lỗi tải bài viết quốc tế:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải bài viết', 'warning');
+    }
+}
+
+// Delete international article
+async function deleteInternationalArticle(articleId) {
+    showSpinner();
+    
+    try {
+        const response = await fetch(`/admin/international/${articleId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (response.ok && result.success) {
+            showToast('Thành công', 'Đã xóa bài viết quốc tế', 'success');
+            
+            // Remove from table
+            $(`button[data-id="${articleId}"][data-type="international"]`).closest('tr').fadeOut(function() {
+                $(this).remove();
+            });
+            
+            // Reload drafts if needed
+            loadInternationalDrafts();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể xóa bài viết', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi xóa bài viết quốc tế:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi xóa bài viết', 'warning');
+    }
+}
+
+// Submit international draft for approval
+async function submitInternationalDraft(articleId) {
+    showSpinner();
+    
+    try {
+        const response = await fetch(`/admin/international/${articleId}/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (response.ok && result.success) {
+            showToast('Thành công', 'Đã gửi bài viết để duyệt', 'success');
+            
+            // Remove from table
+            $(`button[data-id="${articleId}"][data-type="international"]`).closest('tr').fadeOut(function() {
+                $(this).remove();
+            });
+            
+            // Reload drafts and pending
+            loadInternationalDrafts();
+            loadInternationalPending();
+            loadStatistics();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể gửi bài viết để duyệt', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi gửi bài viết quốc tế:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi gửi bài viết', 'warning');
     }
 }
 

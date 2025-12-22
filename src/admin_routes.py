@@ -100,6 +100,27 @@ def international_news_reject(news_id: int):
     return admin_controller.international_news_reject(news_id)
 
 
+@admin_bp.route('/international/<int:news_id>/delete', methods=['POST'])
+@controller.admin_required
+def international_news_delete(news_id: int):
+    """Xóa bài viết quốc tế"""
+    return admin_controller.international_news_delete(news_id)
+
+
+@admin_bp.route('/international/<int:news_id>/submit', methods=['POST'])
+@controller.admin_required
+def international_news_submit(news_id: int):
+    """Gửi bài viết quốc tế nháp để duyệt"""
+    return admin_controller.international_news_submit(news_id)
+
+
+@admin_bp.route('/api/edit-international-article/<int:article_id>', methods=['POST'])
+@controller.admin_required
+def api_edit_international_article(article_id: int):
+    """API chỉnh sửa bài viết quốc tế theo ID"""
+    return admin_controller.api_edit_international_article(article_id)
+
+
 # API Routes
 @admin_bp.route('/api/news')
 @controller.editor_required
