@@ -228,6 +228,9 @@ async function loadSectionData(section) {
             break;
         case 'api':
             loadAPIArticles();
+            // Tự động load categories khi vào tab API
+            const region = $('#apiRegion').val();
+            loadApiCategories(region);
             break;
         case 'international':
             loadInternationalArticles();
@@ -1595,18 +1598,10 @@ $('#saveAPIArticleBtn').off('click').on('click', async function() {
 
 // Load API Categories based on region
 function loadApiCategories(region) {
-    const apiToken = $('#apiToken').val().trim();
-    
-    if (!apiToken) {
-        const selectBox = $('#apiCategorySelect');
-        selectBox.html('<option value="">Vui lòng nhập API Token</option>');
-        return;
-    }
-    
-    // Sử dụng proxy endpoint để tránh CORS, truyền token qua query param
+    // Sử dụng proxy endpoint để tránh CORS (token sẽ được lấy từ settings tự động)
     const proxyUrl = region === 'international' 
-        ? `/admin/api/external-categories?source=en&token=${encodeURIComponent(apiToken)}`
-        : `/admin/api/external-categories?token=${encodeURIComponent(apiToken)}`;
+        ? `/admin/api/external-categories?source=en`
+        : `/admin/api/external-categories`;
     
     const selectBox = $('#apiCategorySelect');
     selectBox.html('<option value="">Đang tải...</option>');
@@ -1646,31 +1641,16 @@ $('#apiRegion').change(function() {
     loadApiCategories(region);
 });
 
-// Handle API token input - load categories when token is entered
-$('#apiToken').on('blur', function() {
-    const token = $(this).val().trim();
-    if (token) {
-        const region = $('#apiRegion').val();
-        loadApiCategories(region);
-    }
-});
-
 // Fetch API News Button
 $('#fetchApiBtn').click(function() {
-    const apiToken = $('#apiToken').val().trim();
     const limit = $('#apiLimit').val() || 20;
-    
-    if (!apiToken) {
-        alert('Vui lòng nhập API Token');
-        return;
-    }
     
     // Kiểm tra tab nào đang active
     const activeTab = $('#apiModeTabs .nav-link.active').attr('id');
     let requestData = {
         source_type: 'api',
-        api_key: apiToken,
         limit: parseInt(limit)
+        // api_key không cần gửi nữa vì server sẽ lấy từ settings
     };
     
     if (activeTab === 'category-tab') {
