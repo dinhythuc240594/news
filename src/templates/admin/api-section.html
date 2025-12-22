@@ -5,13 +5,11 @@
             <h5><i class="fas fa-cloud"></i> Lấy bài từ API News</h5>
         </div>
         <div class="card-body">
-            <!-- API Token -->
-            <div class="row mb-4">
-                <div class="col-md-12">
-                    <label class="form-label">API Token (Bearer) *</label>
-                    <input type="text" class="form-control" id="apiToken" placeholder="Nhập Bearer token của bạn">
-                    <small class="text-muted">Token sẽ được gửi trong header Authorization: Bearer {token}</small>
-                </div>
+            <!-- Thông báo về API Token -->
+            <div class="alert alert-info mb-4">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>Lưu ý:</strong> API Token được lấy từ phần <strong>Cài đặt</strong>. 
+                Vui lòng đảm bảo đã cài đặt API Token trước khi sử dụng chức năng này.
             </div>
 
             <!-- Tabs -->
@@ -45,7 +43,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Danh mục</label>
                             <select class="form-select" id="apiCategorySelect">
-                                <option value="">Vui lòng nhập API Token</option>
+                                <option value="">Chọn danh mục...</option>
                             </select>
                         </div>
                         <div class="col-md-12 mb-3">
@@ -77,7 +75,7 @@
             </div>
 
             <div id="apiArticlesList" class="mt-4">
-                <p class="text-muted text-center">Nhập API token và URLs rồi nhấn "Tải bài từ API" để xem danh sách bài viết</p>
+                <p class="text-muted text-center">Chọn danh mục hoặc nhập URLs rồi nhấn "Tải bài từ API" để xem danh sách bài viết</p>
             </div>
         </div>
     </div>

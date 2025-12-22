@@ -278,16 +278,28 @@ def api_international_categories():
 def api_external_categories():
     """Proxy API lấy danh sách danh mục từ external API (tránh CORS)"""
     import requests
+    from database import Setting, get_session
     
     # Lấy source từ query params
     source = request.args.get('source', '')
     # Lấy token từ query params hoặc header
     api_token = request.args.get('token', '') or request.headers.get('X-API-Token', '')
     
+    # Nếu không có token, lấy từ settings
+    if not api_token:
+        db = get_session()
+        try:
+            token_setting = db.query(Setting).filter(
+                Setting.key == 'api_token'
+            ).first()
+            api_token = token_setting.value if token_setting else None
+        finally:
+            db.close()
+    
     if not api_token:
         return jsonify({
             'success': False,
-            'error': 'API token is required'
+            'error': 'API token is required. Vui lòng cài đặt token trong phần Cài đặt'
         }), 400
     
     try:

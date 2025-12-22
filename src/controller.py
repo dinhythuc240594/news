@@ -740,7 +740,16 @@ class AdminController:
             data = request.json if request.is_json else {}
             source_type = data.get('source_type', 'rss')  # 'rss' hoặc 'api'
             rss_url = data.get('rss_url', 'https://vnexpress.net/rss/tin-moi-nhat.rss')
-            api_token = data.get('api_key')  # Đổi tên từ api_key thành api_token
+            
+            # Lấy API token từ settings hoặc từ request (nếu user muốn override)
+            api_token = data.get('api_key')
+            if not api_token:
+                # Lấy từ settings nếu không có trong request
+                token_setting = self.db_session.query(Setting).filter(
+                    Setting.key == 'api_token'
+                ).first()
+                api_token = token_setting.value if token_setting else None
+            
             urls = data.get('urls', [])  # Danh sách URLs để fetch
             region = data.get('region', 'domestic')  # 'domestic' hoặc 'international'
             category_id = data.get('category_id', '')  # ID danh mục
