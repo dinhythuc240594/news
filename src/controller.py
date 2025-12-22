@@ -2520,36 +2520,68 @@ class AdminController:
             session.clear()
             return redirect(url_for('admin.login'))
         
-        # Lấy tin đã lưu
+        # Lấy tin đã lưu (cả site VN và EN)
         saved_news = self.db_session.query(SavedNews).filter(
-            SavedNews.user_id == user.id,
-            (SavedNews.site == 'vn') | (SavedNews.site.is_(None))
+            SavedNews.user_id == user.id
         ).order_by(SavedNews.created_at.desc()).limit(20).all()
         
-        # Lấy tin đã xem
+        # Lấy tin đã xem (cả site VN và EN)
         viewed_news = self.db_session.query(ViewedNews).filter(
-            ViewedNews.user_id == user.id,
-            (ViewedNews.site == 'vn') | (ViewedNews.site.is_(None))
+            ViewedNews.user_id == user.id
         ).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
         
-        # Lấy bình luận
-        comments = self.db_session.query(Comment).filter(
-            Comment.user_id == user.id).order_by(Comment.created_at.desc()).limit(20).all()
+        # Lấy tất cả bình luận của user (cả site VN và EN), sau đó lọc không trùng news_id/news_international_id
+        all_comments = self.db_session.query(Comment).filter(
+            Comment.user_id == user.id
+        ).order_by(Comment.created_at.desc()).all()
+
+        comments = []
+        seen_news_ids = set()
+        seen_news_international_ids = set()
+        for comment in all_comments:
+            # Mỗi bài viết chỉ lấy 1 bình luận – ưu tiên bình luận mới nhất
+            if comment.news_id and comment.news_id not in seen_news_ids:
+                comments.append(comment)
+                seen_news_ids.add(comment.news_id)
+            elif comment.news_international_id and comment.news_international_id not in seen_news_international_ids:
+                comments.append(comment)
+                seen_news_international_ids.add(comment.news_international_id)
+            if len(comments) >= 20:
+                break
         
-        # Tính số bình luận cho mỗi bài viết
+        # Tính số bình luận cho mỗi bài viết (cả news_id và news_international_id)
         comment_counts = {}
         if comments:
-            news_ids = list(set([comment.news_id for comment in comments]))
-            from sqlalchemy import func
-            counts = self.db_session.query(
-                Comment.news_id,
-                func.count(Comment.id).label('count')
-            ).filter(
-                Comment.news_id.in_(news_ids),
-                Comment.is_active == True
-            ).group_by(Comment.news_id).all()
+            news_ids = list(set([comment.news_id for comment in comments if comment.news_id]))
+            news_international_ids = list(set([comment.news_international_id for comment in comments if comment.news_international_id]))
             
-            comment_counts = {news_id: count for news_id, count in counts}
+            from sqlalchemy import func
+            
+            # Đếm comments cho news_id
+            if news_ids:
+                counts_vn = self.db_session.query(
+                    Comment.news_id,
+                    func.count(Comment.id).label('count')
+                ).filter(
+                    Comment.news_id.in_(news_ids),
+                    Comment.is_active == True
+                ).group_by(Comment.news_id).all()
+                
+                for news_id, count in counts_vn:
+                    comment_counts[news_id] = count
+            
+            # Đếm comments cho news_international_id
+            if news_international_ids:
+                counts_en = self.db_session.query(
+                    Comment.news_international_id,
+                    func.count(Comment.id).label('count')
+                ).filter(
+                    Comment.news_international_id.in_(news_international_ids),
+                    Comment.is_active == True
+                ).group_by(Comment.news_international_id).all()
+                
+                for news_international_id, count in counts_en:
+                    comment_counts[news_international_id] = count
         
         # Tính tổng số bình luận của cá nhân
         total_comments = self.db_session.query(Comment).filter(
