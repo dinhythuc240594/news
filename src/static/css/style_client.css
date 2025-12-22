@@ -519,7 +519,7 @@ img {
 }
 
 /* Load More Button */
-.btn-load-more {
+.btn-load-more, .btn-load-more-en {
     background-color: #333;
     color: #fff;
     border: none;
@@ -529,7 +529,7 @@ img {
     font-size: 14px;
 }
 
-.btn-load-more:hover {
+.btn-load-more:hover, .btn-load-more-en:hover {
     background-color: #c00;
 }
 

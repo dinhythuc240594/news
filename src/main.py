@@ -46,34 +46,88 @@ def create_app(config_class=Config):
         print(f"{rule.rule} -> {rule.endpoint} [{', '.join(rule.methods)}]")
     print("="*50 + "\n")
     
+    # Helper function để xác định site từ request path
+    def _get_site_from_request():
+        """Xác định site (vn/en) từ request path"""
+        path = request.path if request else ''
+        if path.startswith('/en'):
+            return 'en'
+        return 'vn'
+    
     # Đăng ký Jinja2 filters
-    @app.template_filter('timeago')
-    def timeago_filter(dt):
-        """Format datetime thành 'X giờ trước', 'X ngày trước'"""
+    @app.template_filter('datetime_format')
+    def datetime_format_filter(dt):
+        """Format datetime theo site: vn hoặc en"""
         if dt is None:
-            return "Vừa xong"
+            return ''
+        
+        # Xác định site từ request path
+        site = _get_site_from_request()
+        
+        # Thiết lập time_format và time_zone theo site
+        time_format = '%d-%m-%Y %H:%M'
+        if site == 'vn':
+            time_zone = 'Asia/Ho_Chi_Minh'
+        else:  # en
+            time_zone = 'UTC'
         
         # Đảm bảo datetime có timezone
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         
-        # Chuyển sang timezone Việt Nam
-        vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
-        now = datetime.now(vn_tz)
-        dt = dt.astimezone(vn_tz)
+        # Chuyển sang timezone tương ứng và format
+        tz = pytz.timezone(time_zone)
+        dt = dt.astimezone(tz)
+        return dt.strftime(time_format)
+    
+    @app.template_filter('timeago')
+    def timeago_filter(dt):
+        """Format datetime thành 'X giờ trước', 'X ngày trước'"""
+        if dt is None:
+            return "Vừa xong" if _get_site_from_request() == 'vn' else "Just now"
+        
+        # Xác định site từ request path
+        site = _get_site_from_request()
+        
+        # Đảm bảo datetime có timezone
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        # Chuyển sang timezone tương ứng
+        if site == 'vn':
+            tz = pytz.timezone('Asia/Ho_Chi_Minh')
+            now = datetime.now(tz)
+            dt = dt.astimezone(tz)
+        else:  # en
+            tz = pytz.timezone('UTC')
+            now = datetime.now(tz)
+            dt = dt.astimezone(tz)
         
         diff = now - dt
         
-        if diff.days > 0:
-            return f"{diff.days} ngày trước"
-        elif diff.seconds >= 3600:
-            hours = diff.seconds // 3600
-            return f"{hours} giờ trước"
-        elif diff.seconds >= 60:
-            minutes = diff.seconds // 60
-            return f"{minutes} phút trước"
-        else:
-            return "Vừa xong"
+        # Format theo ngôn ngữ
+        if site == 'vn':
+            if diff.days > 0:
+                return f"{diff.days} ngày trước"
+            elif diff.seconds >= 3600:
+                hours = diff.seconds // 3600
+                return f"{hours} giờ trước"
+            elif diff.seconds >= 60:
+                minutes = diff.seconds // 60
+                return f"{minutes} phút trước"
+            else:
+                return "Vừa xong"
+        else:  # en
+            if diff.days > 0:
+                return f"{diff.days} days ago"
+            elif diff.seconds >= 3600:
+                hours = diff.seconds // 3600
+                return f"{hours} hours ago"
+            elif diff.seconds >= 60:
+                minutes = diff.seconds // 60
+                return f"{minutes} minutes ago"
+            else:
+                return "Just now"
     
     @app.template_filter('format_view')
     def format_view_filter(count):

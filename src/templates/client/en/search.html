@@ -49,7 +49,7 @@
                                         <div class="col-md-8">
                                             <div class="news-content">
                                                 <h3 class="news-title">
-                                                    <a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
+                                                    <a href="{{ url_for('client.en_news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
                                                 </h3>
                                                 <p class="news-description">
                                                     {{ news.summary or news.content[:200] + '...' }}

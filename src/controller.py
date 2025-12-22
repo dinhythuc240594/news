@@ -569,21 +569,26 @@ class AdminController:
         })
     
     def _news_to_dict(self, news) -> dict:
-        """Chuyển đổi News object thành dictionary"""
+        """Chuyển đổi News object thành dictionary dùng chung cho admin & client"""
         return {
             'id': news.id,
             'title': news.title,
             'slug': news.slug,
-            'status': news.status.value,
+            'status': news.status.value if getattr(news, "status", None) else None,
+            # Thông tin danh mục
             'category': {
                 'id': news.category.id if getattr(news, "category", None) else None,
                 'name': news.category.name if getattr(news, "category", None) else None,
+                'slug': news.category.slug if getattr(news, "category", None) else None,
             },
-            # Các field phẳng phục vụ cho UI editor
+            # Các field phẳng phục vụ cho UI editor & client
             'category_name': news.category.name if getattr(news, "category", None) else None,
+            'summary': getattr(news, "summary", None),
+            'thumbnail': getattr(news, "thumbnail", None),
             'visible': getattr(news, "visible", True),
             'created_by': news.creator.username if getattr(news, "creator", None) else None,
             'approved_by': news.approver.username if getattr(news, "approver", None) else None,
+            'view_count': getattr(news, "view_count", 0),
             'created_at': news.created_at.isoformat() if getattr(news, "created_at", None) else None,
             'published_at': news.published_at.isoformat() if getattr(news, "published_at", None) else None,
         }
@@ -4062,9 +4067,6 @@ class ClientController:
                 Comment.site == 'en'  # Chỉ lấy comment gốc, không lấy reply
             ).order_by(Comment.created_at.desc()).all()
 
-            time_format = '%d-%m-%Y %H:%M'
-            time_zone = 'UTC'
-            
             time_format = '%d-%m-%Y %H:%M'
             time_zone = 'UTC'
             
