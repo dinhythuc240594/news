@@ -2525,9 +2525,7 @@ class AdminController:
         
         # Lấy bình luận
         comments = self.db_session.query(Comment).filter(
-            Comment.user_id == user.id,
-            (Comment.site == 'vn') | (Comment.site.is_(None))
-        ).order_by(Comment.created_at.desc()).limit(20).all()
+            Comment.user_id == user.id).order_by(Comment.created_at.desc()).limit(20).all()
         
         # Tính số bình luận cho mỗi bài viết
         comment_counts = {}
@@ -2551,8 +2549,6 @@ class AdminController:
         ).count()
 
         categories = self.category_model.get_all()
-        print(f"=== DEBUG profile ===")
-        print(f"Categories: {user}")
         return render_template('admin/profile.html', 
                              user=user, 
                              categories=categories,
@@ -3409,21 +3405,15 @@ class ClientController:
         
         # Lấy tin đã lưu
         saved_news = self.db_session.query(SavedNews).filter(
-            SavedNews.user_id == user.id,
-            (SavedNews.site == 'vn') | (SavedNews.site.is_(None))
-        ).order_by(SavedNews.created_at.desc()).limit(20).all()
+            SavedNews.user_id == user.id).order_by(SavedNews.created_at.desc()).limit(20).all()
         
         # Lấy tin đã xem
         viewed_news = self.db_session.query(ViewedNews).filter(
-            ViewedNews.user_id == user.id,
-            (ViewedNews.site == 'vn') | (ViewedNews.site.is_(None))
-        ).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
+            ViewedNews.user_id == user.id).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
         
         # Lấy bình luận
         comments = self.db_session.query(Comment).filter(
-            Comment.user_id == user.id,
-            (Comment.site == 'vn') | (Comment.site.is_(None))
-        ).order_by(Comment.created_at.desc()).limit(20).all()
+            Comment.user_id == user.id).order_by(Comment.created_at.desc()).limit(20).all()
         
         # Tính số bình luận cho mỗi bài viết
         comment_counts = {}
@@ -3595,30 +3585,35 @@ class ClientController:
         user_id = session['user_id']
         news = self.news_model.get_by_id(news_id)
         
+        site = request.args.get('site') if request.args.get('site') else 'vn'
         if not news:
             return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
         
         # Kiểm tra xem đã lưu chưa
         saved_news = self.db_session.query(SavedNews).filter(
             SavedNews.user_id == user_id,
-            SavedNews.news_id == news_id
+            SavedNews.news_id == news_id,
+            SavedNews.site == site
         ).first()
         
         if saved_news:
             # Bỏ lưu
             self.db_session.delete(saved_news)
             self.db_session.commit()
-            return jsonify({'success': True, 'message': 'Đã bỏ lưu tin tức', 'is_saved': False})
+            message = 'News has been removed from saved' if site == 'en' else 'Đã bỏ lưu tin tức'
+            return jsonify({'success': True, 'message': message, 'is_saved': False})
         else:
             # Lưu
             new_saved = SavedNews(
                 user_id=user_id,
                 news_id=news_id,
-                site='vn'
+                site=site
             )
             self.db_session.add(new_saved)
             self.db_session.commit()
-            return jsonify({'success': True, 'message': 'Đã lưu tin tức', 'is_saved': True})
+
+            message = 'News has been saved' if site == 'en' else 'Đã lưu tin tức'
+            return jsonify({'success': True, 'message': message, 'is_saved': True})
     
     def submit_comment(self, news_id: int):
         """
@@ -3631,16 +3626,21 @@ class ClientController:
         user_id = session['user_id']
         news = self.news_model.get_by_id(news_id)
         
+        site = request.args.get('site') if request.args.get('site') else 'vn'
+
         if not news:
-            return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
+            message = 'News not found' if site == 'en' else 'Không tìm thấy tin tức'
+            return jsonify({'success': False, 'message': message}), 404
         
         content = request.json.get('content', '').strip() if request.is_json else request.form.get('content', '').strip()
         parent_id = request.json.get('parent_id') if request.is_json else request.form.get('parent_id')
         
         if not content:
-            return jsonify({'success': False, 'message': 'Vui lòng nhập nội dung bình luận'}), 400
+            message = 'Please enter your comment' if site == 'en' else 'Vui lòng nhập nội dung bình luận'
+            return jsonify({'success': False, 'message': message}), 400
         
         if len(content) > 1000:
+            message = 'Comment cannot exceed 1000 characters' if site == 'en' else 'Bình luận không được vượt quá 1000 ký tự'
             return jsonify({'success': False, 'message': 'Bình luận không được vượt quá 1000 ký tự'}), 400
         
         # Tạo bình luận
@@ -3649,7 +3649,7 @@ class ClientController:
             news_id=news_id,
             content=content,
             parent_id=int(parent_id) if parent_id else None,
-            site='vn',
+            site=site,
             is_active=True
         )
         self.db_session.add(comment)
@@ -3661,7 +3661,7 @@ class ClientController:
         
         return jsonify({
             'success': True,
-            'message': 'Bình luận đã được gửi',
+            'message': 'Comment has been sent' if site == 'en' else 'Bình luận đã được gửi',
             'comment': {
                 'id': comment.id,
                 'content': comment.content,
@@ -4031,7 +4031,7 @@ class ClientController:
                     viewed_news = ViewedNews(
                         user_id=user_id,
                         news_id=news.id,
-                        site='vn'
+                        site='en'
                     )
                     db_session.add(viewed_news)
                     db_session.commit()
@@ -4072,6 +4072,8 @@ class ClientController:
                 related_news=related_news,
                 categories=categories,
                 format_time=format_time,
+                is_saved=is_saved,
+                user_id=user_id,
                 comments=comments,
             )
         except Exception as e:
