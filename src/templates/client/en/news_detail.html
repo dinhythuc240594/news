@@ -148,7 +148,7 @@
                                         <div class="col-md-8">
                                             <div class="news-content">
                                                 <h3 class="news-title">
-                                                    <a href="{{ url_for('client.news_detail', news_slug=related.slug) }}">{{ related.title }}</a>
+                                                    <a href="{{ url_for('client.en_news_detail', news_slug=related.slug) }}">{{ related.title }}</a>
                                                 </h3>
                                                 <div class="news-meta">
                                                     <span><i class="far fa-clock"></i> {{ (related.published_at or related.created_at)|timeago }}</span>

@@ -118,89 +118,201 @@ $(document).ready(function() {
         $(this).addClass('active');
     });
 
-    // Load more news
-    let newsLoadCount = 0;
+    // Load more news (VN) - lấy từ database qua API
+    let newsOffsetVn = $('.news-list .news-card').length || 0;
+    const NEWS_PAGE_SIZE_VN = 5;
+    let isLoadingMoreVn = false;
+
+    function formatTimeAgoFromIso(dateStr) {
+        if (!dateStr) return 'Vừa xong';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMinutes = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMinutes / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffDays > 0) return diffDays + ' ngày trước';
+        if (diffHours > 0) return diffHours + ' giờ trước';
+        if (diffMinutes > 0) return diffMinutes + ' phút trước';
+        return 'Vừa xong';
+    }
+
     $('.btn-load-more').click(function() {
         const button = $(this);
+        if (isLoadingMoreVn) return;
+        isLoadingMoreVn = true;
+
         button.html('<i class="fas fa-spinner fa-spin"></i> Đang tải...');
         button.prop('disabled', true);
 
-        // Simulate loading delay
-        setTimeout(function() {
-            newsLoadCount++;
-            
-            // Sample news data
-            const newNews = [
-                {
-                    image: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400',
-                    category: 'Thời sự',
-                    title: 'Tin tức mới số ' + (newsLoadCount * 3 + 1),
-                    description: 'Mô tả ngắn gọn về tin tức này, cung cấp thông tin tổng quan cho người đọc.',
-                    time: '1 giờ trước',
-                    comments: 45
-                },
-                {
-                    image: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?w=400',
-                    category: 'Kinh doanh',
-                    title: 'Tin tức mới số ' + (newsLoadCount * 3 + 2),
-                    description: 'Mô tả ngắn gọn về tin tức này, cung cấp thông tin tổng quan cho người đọc.',
-                    time: '2 giờ trước',
-                    comments: 32
-                },
-                {
-                    image: 'https://images.unsplash.com/photo-1461088945293-0c17689e48ac?w=400',
-                    category: 'Thể thao',
-                    title: 'Tin tức mới số ' + (newsLoadCount * 3 + 3),
-                    description: 'Mô tả ngắn gọn về tin tức này, cung cấp thông tin tổng quan cho người đọc.',
-                    time: '3 giờ trước',
-                    comments: 28
+        $.ajax({
+            url: '/api/latest-news',
+            method: 'GET',
+            data: {
+                limit: NEWS_PAGE_SIZE_VN,
+                offset: newsOffsetVn
+            },
+            success: function(response) {
+                if (!response || !response.success || !response.data || response.data.length === 0) {
+                    button.fadeOut();
+                    $('.news-list').after('<p class="text-center text-muted mt-3">Đã tải hết tin tức</p>');
+                    return;
                 }
-            ];
 
-            // Add new news to the list
-            newNews.forEach(function(news) {
-                const newsHTML = `
-                    <article class="news-card horizontal-card" style="display: none;">
-                        <div class="row g-0">
-                            <div class="col-md-4">
-                                <div class="news-image">
-                                    <img src="${news.image}" alt="Tin tức">
-                                    <span class="badge-category">${news.category}</span>
+                response.data.forEach(function(news) {
+                    const image = news.thumbnail || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800';
+                    const category = (news.category && news.category.name) ? news.category.name : 'Tin tức';
+                    const description = news.summary || '';
+                    const time = formatTimeAgoFromIso(news.published_at || news.created_at);
+
+                    const newsHTML = `
+                        <article class="news-card horizontal-card" style="display: none;">
+                            <div class="row g-0">
+                                <div class="col-md-4">
+                                    <div class="news-image">
+                                        <img src="${image}" alt="${news.title}">
+                                        <span class="badge-category">${category}</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="col-md-8">
-                                <div class="news-content">
-                                    <h3 class="news-title">
-                                        <a href="#">${news.title}</a>
-                                    </h3>
-                                    <p class="news-description">
-                                        ${news.description}
-                                    </p>
-                                    <div class="news-meta">
-                                        <span><i class="far fa-clock"></i> ${news.time}</span>
-                                        <span><i class="far fa-comment"></i> ${news.comments}</span>
+                                <div class="col-md-8">
+                                    <div class="news-content">
+                                        <h3 class="news-title">
+                                            <a href="/news/${news.slug}">${news.title}</a>
+                                        </h3>
+                                        <p class="news-description">
+                                            ${description}
+                                        </p>
+                                        <div class="news-meta">
+                                            <span><i class="far fa-clock"></i> ${time}</span>
+                                            <span><i class="far fa-eye"></i> ${news.view_count || 0}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </article>
-                `;
-                $('.news-list').append(newsHTML);
-            });
+                        </article>
+                    `;
+                    $('.news-list').append(newsHTML);
+                });
 
-            // Fade in new news
-            $('.news-card:hidden').fadeIn(600);
+                // Fade in new news
+                $('.news-card:hidden').fadeIn(600);
 
-            // Reset button
-            button.html('<i class="fas fa-sync-alt"></i> Xem thêm');
-            button.prop('disabled', false);
+                newsOffsetVn += response.data.length;
 
-            // Hide button after 5 loads
-            if (newsLoadCount >= 5) {
-                button.fadeOut();
-                $('.news-list').after('<p class="text-center text-muted mt-3">Đã tải hết tin tức</p>');
+                // Nếu số bản ghi trả về ít hơn page size thì coi như đã hết
+                if (response.data.length < NEWS_PAGE_SIZE_VN) {
+                    button.fadeOut();
+                    $('.news-list').after('<p class="text-center text-muted mt-3">Đã tải hết tin tức</p>');
+                }
+            },
+            error: function() {
+                alert('Không thể tải thêm tin tức. Vui lòng thử lại sau.');
+            },
+            complete: function() {
+                isLoadingMoreVn = false;
+                button.html('<i class="fas fa-sync-alt"></i> Xem thêm');
+                button.prop('disabled', false);
             }
-        }, 1000);
+        });
+    });
+
+    // Load more news (EN) - lấy từ database qua API
+    let newsOffsetEn = $('.news-list .news-card').length || 0;
+    const NEWS_PAGE_SIZE_EN = 5;
+    let isLoadingMoreEn = false;
+
+    function formatTimeAgoEnFromIso(dateStr) {
+        if (!dateStr) return 'Just now';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMinutes = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMinutes / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffDays > 0) return diffDays + ' days ago';
+        if (diffHours > 0) return diffHours + ' hours ago';
+        if (diffMinutes > 0) return diffMinutes + ' minutes ago';
+        return 'Just now';
+    }
+
+    $('.btn-load-more-en').click(function() {
+        const button = $(this);
+        if (isLoadingMoreEn) return;
+        isLoadingMoreEn = true;
+
+        button.html('<i class="fas fa-spinner fa-spin"></i> Loading...');
+        button.prop('disabled', true);
+
+        $.ajax({
+            url: '/en/api/latest-news',
+            method: 'GET',
+            data: {
+                limit: NEWS_PAGE_SIZE_EN,
+                offset: newsOffsetEn
+            },
+            success: function(response) {
+                if (!response || !response.success || !response.data || response.data.length === 0) {
+                    button.fadeOut();
+                    $('.news-list').after('<p class="text-center text-muted mt-3">All news loaded</p>');
+                    return;
+                }
+
+                response.data.forEach(function(news) {
+                    const image = news.thumbnail || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800';
+                    const category = (news.category && news.category.name) ? news.category.name : 'News';
+                    const description = news.summary || '';
+                    const time = formatTimeAgoEnFromIso(news.published_at || news.created_at);
+
+                    const newsHTML = `
+                        <article class="news-card horizontal-card" style="display: none;">
+                            <div class="row g-0">
+                                <div class="col-md-4">
+                                    <div class="news-image">
+                                        <img src="${image}" alt="${news.title}">
+                                        <span class="badge-category">${category}</span>
+                                    </div>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="news-content">
+                                        <h3 class="news-title">
+                                            <a href="/en/news/${news.slug}">${news.title}</a>
+                                        </h3>
+                                        <p class="news-description">
+                                            ${description}
+                                        </p>
+                                        <div class="news-meta">
+                                            <span><i class="far fa-clock"></i> ${time}</span>
+                                            <span><i class="far fa-eye"></i> ${news.view_count || 0}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    `;
+                    $('.news-list').append(newsHTML);
+                });
+
+                // Fade in new news
+                $('.news-card:hidden').fadeIn(600);
+
+                newsOffsetEn += response.data.length;
+
+                if (response.data.length < NEWS_PAGE_SIZE_EN) {
+                    button.fadeOut();
+                    $('.news-list').after('<p class="text-center text-muted mt-3">All news loaded</p>');
+                }
+            },
+            error: function() {
+                alert('Cannot load more news. Please try again later.');
+            },
+            complete: function() {
+                isLoadingMoreEn = false;
+                button.html('<i class="fas fa-sync-alt"></i> Load more');
+                button.prop('disabled', false);
+            }
+        });
     });
 
     // // Login button
