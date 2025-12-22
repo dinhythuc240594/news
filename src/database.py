@@ -411,6 +411,10 @@ class NewsInternational(Base):
     category_id = Column(Integer, ForeignKey('categories_international.id'), nullable=False)
     created_by = Column(Integer, ForeignKey('users.id'), nullable=False)
     approved_by = Column(Integer, ForeignKey('users.id'), nullable=True)
+    
+    # Author info (for API articles)
+    author = Column(String(255), nullable=True)  # Tên tác giả gốc từ nguồn bên ngoài
+    
     status = Column(NewsStatusType(), default=NewsStatus.DRAFT)
     is_featured = Column(Boolean, default=False)
     is_hot = Column(Boolean, default=False)

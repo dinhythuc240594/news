@@ -177,6 +177,13 @@ def api_international_pending():
     return admin_controller.api_international_pending()
 
 
+@admin_bp.route('/api/international-drafts')
+@controller.admin_required
+def api_international_drafts():
+    """API lấy danh sách bài viết quốc tế nháp"""
+    return admin_controller.api_international_drafts()
+
+
 @admin_bp.route('/api/fetch-api-news', methods=['POST'])
 @controller.admin_required
 def api_fetch_api_news():
@@ -210,6 +217,13 @@ def api_hot_articles():
 def api_article_detail(article_id: int):
     """API lấy chi tiết bài viết theo ID"""
     return admin_controller.api_article_detail(article_id)
+
+
+@admin_bp.route('/api/international-article/<int:article_id>')
+@controller.admin_required
+def api_international_article_detail(article_id: int):
+    """API lấy chi tiết bài viết quốc tế theo ID"""
+    return admin_controller.api_international_article_detail(article_id)
 
 
 @admin_bp.route('/api/create-article', methods=['POST'])

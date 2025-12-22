@@ -699,7 +699,9 @@ class AdminController:
                 'id': article.id,
                 'title': article.title,
                 'category': article.category.name if article.category else 'N/A',
-                'author': article.creator.username if article.creator else 'N/A',
+                'author': article.author if article.is_api and article.author else (article.creator.username if article.creator else 'N/A'),
+                'approver': article.approver.username if article.approver else 'N/A',
+                'is_api': article.is_api,
                 'status': 'Approved',
                 'views': article.view_count,
                 'published': article.published_at.strftime('%d/%m/%Y') if article.published_at else ''
@@ -723,8 +725,38 @@ class AdminController:
                 'id': article.id,
                 'title': article.title,
                 'category': article.category.name if article.category else 'N/A',
-                'author': article.creator.username if article.creator else 'N/A',
+                'author': article.author if article.is_api and article.author else (article.creator.username if article.creator else 'N/A'),
+                'approver': article.approver.username if article.approver else None,
+                'is_api': article.is_api,
                 'submitted': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else ''
+            } for article in articles]
+        })
+    
+    def api_international_drafts(self):
+        """API lấy danh sách bài viết quốc tế nháp từ bảng NewsInternational"""
+        search = request.args.get('search', '').strip()
+        
+        query = (
+            self.db_session.query(NewsInternational)
+            .join(CategoryInternational)
+            .filter(NewsInternational.status == NewsStatus.DRAFT)
+        )
+        
+        # Tìm kiếm theo title nếu có
+        if search:
+            query = query.filter(NewsInternational.title.ilike(f'%{search}%'))
+        
+        articles = query.order_by(NewsInternational.created_at.desc()).limit(100).all()
+
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'category': article.category.name if article.category else 'N/A',
+                'author': article.author if article.is_api and article.author else (article.creator.username if article.creator else 'N/A'),
+                'is_api': article.is_api,
+                'created': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else ''
             } for article in articles]
         })
     
@@ -1089,6 +1121,7 @@ class AdminController:
                     status=news_status,
                     is_api=True,  # Đánh dấu bài từ API
                     published_at=published_at if news_status == NewsStatus.PUBLISHED else None,
+                    author=article_data.get('author'),  # Lưu tác giả gốc từ API
                 )
             else:
                 existing_news = db_session.query(News).filter(News.slug == base_slug).first()
@@ -1248,6 +1281,10 @@ class AdminController:
         tags_list = [f"#{tag.name}" for tag in tags]
         tags_string = ' '.join(tags_list) if tags_list else ''
         
+        # Xác định author: nếu là bài từ API thì dùng author field, không thì dùng creator
+        author_name = article.author if (hasattr(article, 'is_api') and article.is_api and hasattr(article, 'author') and article.author) else (article.creator.username if article.creator else 'N/A')
+        author_full_name = article.author if (hasattr(article, 'is_api') and article.is_api and hasattr(article, 'author') and article.author) else (article.creator.full_name if article.creator and article.creator.full_name else article.creator.username if article.creator else 'N/A')
+        
         return jsonify({
             'success': True,
             'data': {
@@ -1259,8 +1296,11 @@ class AdminController:
                 'thumbnail': article.thumbnail or '',
                 'category': article.category.name if article.category else 'N/A',
                 'category_id': article.category_id,
-                'author': article.creator.username if article.creator else 'N/A',
-                'author_full_name': article.creator.full_name if article.creator and article.creator.full_name else article.creator.username if article.creator else 'N/A',
+                'author': author_name,
+                'author_full_name': author_full_name,
+                'approver': article.approver.username if article.approver else None,
+                'approver_full_name': article.approver.full_name if article.approver and article.approver.full_name else (article.approver.username if article.approver else None),
+                'is_api': article.is_api if hasattr(article, 'is_api') else False,
                 'status': article.status.value,
                 'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
                 'published_at': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
@@ -1270,6 +1310,47 @@ class AdminController:
                 'is_hot': article.is_hot if hasattr(article, 'is_hot') else False,
                 'is_deleted': article.is_deleted if hasattr(article, 'is_deleted') else False,
                 'tags': tags_string
+            }
+        })
+    
+    def api_international_article_detail(self, article_id: int):
+        """API lấy chi tiết bài viết quốc tế theo ID"""
+        from database import NewsInternational
+        article = self.db_session.query(NewsInternational).filter(NewsInternational.id == article_id).first()
+        
+        if not article:
+            return jsonify({
+                'success': False,
+                'message': 'Bài viết không tồn tại'
+            }), 404
+        
+        # Xác định author: nếu là bài từ API thì dùng author field, không thì dùng creator
+        author_name = article.author if (article.is_api and article.author) else (article.creator.username if article.creator else 'N/A')
+        author_full_name = article.author if (article.is_api and article.author) else (article.creator.full_name if article.creator and article.creator.full_name else article.creator.username if article.creator else 'N/A')
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': article.id,
+                'title': article.title,
+                'slug': article.slug,
+                'summary': article.summary or '',
+                'content': article.content or '',
+                'thumbnail': article.thumbnail or '',
+                'category': article.category.name if article.category else 'N/A',
+                'category_id': article.category_id,
+                'author': author_name,
+                'author_full_name': author_full_name,
+                'approver': article.approver.username if article.approver else None,
+                'approver_full_name': article.approver.full_name if article.approver and article.approver.full_name else (article.approver.username if article.approver else None),
+                'is_api': article.is_api,
+                'status': article.status.value,
+                'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'published_at': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
+                'updated_at': article.updated_at.strftime('%d/%m/%Y %H:%M') if article.updated_at else '',
+                'view_count': article.view_count,
+                'is_featured': article.is_featured,
+                'is_hot': article.is_hot
             }
         })
     
