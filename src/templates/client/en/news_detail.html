@@ -13,8 +13,8 @@
                     <!-- Breadcrumb -->
                     <nav aria-label="breadcrumb" class="mb-4">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="{{ url_for('client.index') }}">Home</a></li>
-                            <li class="breadcrumb-item"><a href="{{ url_for('client.category', category_slug=news.category.slug) }}">{{ news.category.name }}</a></li>
+                            <li class="breadcrumb-item"><a href="{{ url_for('client.en_index') }}">Home</a></li>
+                            <li class="breadcrumb-item"><a href="{{ url_for('client.en_category', category_slug=news.category.slug) }}">{{ news.category.name }}</a></li>
                             <li class="breadcrumb-item active" aria-current="page">{{ news.title[:50] }}{% if news.title|length > 50 %}...{% endif %}</li>
                         </ol>
                     </nav>
@@ -74,7 +74,7 @@
                     <!-- Comments Section -->
                     <section class="comments-section mt-5 pt-4 border-top">
                         <h2 class="section-title mb-4">
-                            <span>Bình luận ({{ comments|length }})</span>
+                            <span>Comments ({{ comments|length }})</span>
                         </h2>
 
                         {% if user_id %}
@@ -82,7 +82,7 @@
                         <div class="comment-form mb-4">
                             <form id="commentForm" data-news-id="{{ news.id }}">
                                 <div class="mb-3">
-                                    <textarea class="form-control" id="commentContent" rows="4" placeholder="Viết bình luận của bạn..." required></textarea>
+                                    <textarea class="form-control" id="commentContent" rows="4" placeholder="Write your comment here..." required></textarea>
                                 </div>
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-paper-plane me-2"></i>Send comment
@@ -192,7 +192,7 @@
             const newsId = this.getAttribute('data-news-id');
             const isSaved = this.getAttribute('data-is-saved') === 'true';
             
-            fetch(`/api/save-news/${newsId}`, {
+            fetch(`/api/save-news/${newsId}?site=en`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -210,26 +210,26 @@
                         this.classList.add('btn-warning');
                         icon.classList.remove('fa-bookmark-o');
                         icon.classList.add('fa-bookmark');
-                        saveNewsText.textContent = 'Đã lưu';
+                        saveNewsText.textContent = 'Saved';
                         this.setAttribute('data-is-saved', 'true');
                     } else {
                         this.classList.remove('btn-warning');
                         this.classList.add('btn-outline-warning');
                         icon.classList.remove('fa-bookmark');
                         icon.classList.add('fa-bookmark-o');
-                        saveNewsText.textContent = 'Lưu tin';
+                        saveNewsText.textContent = 'Save news';
                         this.setAttribute('data-is-saved', 'false');
                     }
                     
                     // Show notification
                     showNotification(data.message, 'success');
                 } else {
-                    showNotification(data.message || 'Có lỗi xảy ra', 'error');
+                    showNotification(data.message || 'An error occurred', 'error');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showNotification('Có lỗi xảy ra khi lưu tin', 'error');
+                showNotification('An error occurred when saving news', 'error');
             });
         });
     }
@@ -244,11 +244,11 @@
             const newsId = this.getAttribute('data-news-id');
             
             if (!content) {
-                showNotification('Vui lòng nhập nội dung bình luận', 'error');
+                showNotification('Please enter your comment', 'error');
                 return;
             }
             
-            fetch(`/api/comment/${newsId}`, {
+            fetch(`/api/comment/${newsId}?site=en`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -271,12 +271,12 @@
                     
                     showNotification(data.message, 'success');
                 } else {
-                    showNotification(data.message || 'Có lỗi xảy ra', 'error');
+                    showNotification(data.message || 'An error occurred', 'error');
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showNotification('Có lỗi xảy ra khi gửi bình luận', 'error');
+                showNotification('An error occurred when sending comment', 'error');
             });
         });
     }

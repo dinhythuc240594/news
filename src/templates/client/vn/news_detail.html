@@ -235,7 +235,7 @@
             const newsId = this.getAttribute('data-news-id');
             const isSaved = this.getAttribute('data-is-saved') === 'true';
             
-            fetch(`/api/save-news/${newsId}`, {
+            fetch(`/api/save-news/${newsId}?site=vn`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -291,7 +291,7 @@
                 return;
             }
             
-            fetch(`/api/comment/${newsId}`, {
+            fetch(`/api/comment/${newsId}?site=vn`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
