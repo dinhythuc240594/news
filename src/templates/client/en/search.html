@@ -129,12 +129,9 @@
                             <i class="fas fa-tags"></i> Popular Searches
                         </h3>
                         <div class="popular-searches">
-                            <a href="{{ url_for('client.search', q='news') }}" class="badge bg-secondary me-2 mb-2">News</a>
-                            <a href="{{ url_for('client.search', q='economy') }}" class="badge bg-secondary me-2 mb-2">Economy</a>
-                            <a href="{{ url_for('client.search', q='sports') }}" class="badge bg-secondary me-2 mb-2">Sports</a>
-                            <a href="{{ url_for('client.search', q='entertainment') }}" class="badge bg-secondary me-2 mb-2">Entertainment</a>
-                            <a href="{{ url_for('client.search', q='technology') }}" class="badge bg-secondary me-2 mb-2">Technology</a>
-                            <a href="{{ url_for('client.search', q='health') }}" class="badge bg-secondary me-2 mb-2">Health</a>
+                            {% for category in categories %}
+                                <a href="{{ url_for('client.en_search', q=category.name) }}" class="badge bg-secondary me-2 mb-2">{{ category.name }}</a>
+                            {% endfor %}
                         </div>
                     </aside>
                 </div>
