@@ -206,16 +206,19 @@
                             {% if saved_news %}
                                 <div class="news-list">
                                     {% for saved in saved_news %}
+                                    {% set news_item = saved.news_international if saved.news_international else saved.news %}
+                                    {% if news_item %}
                                     <div class="news-list-item">
-                                        <img src="{{ saved.news.thumbnail or 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800' }}" alt="{{ saved.news.title }}">
+                                        <img src="{{ news_item.thumbnail or 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800' }}" alt="{{ news_item.title }}">
                                         <div class="news-list-item-content">
-                                            <h5><a href="{{ url_for('client.news_detail', news_slug=saved.news.slug) }}">{{ saved.news.title }}</a></h5>
+                                            <h5><a href="{{ url_for('client.en_news_detail', news_slug=news_item.slug) if saved.news_international else url_for('client.news_detail', news_slug=news_item.slug) }}">{{ news_item.title }}</a></h5>
                                             <div class="news-meta">
                                                 <span><i class="far fa-clock"></i> {{ saved.created_at.strftime('%d/%m/%Y') if saved.created_at else '' }}</span>
-                                                <span class="ms-3"><i class="far fa-eye"></i> {{ saved.news.view_count or 0 }}</span>
+                                                <span class="ms-3"><i class="far fa-eye"></i> {{ news_item.view_count or 0 }}</span>
                                             </div>
                                         </div>
                                     </div>
+                                    {% endif %}
                                     {% endfor %}
                                 </div>
                             {% else %}
@@ -231,16 +234,19 @@
                             {% if viewed_news %}
                                 <div class="news-list">
                                     {% for viewed in viewed_news %}
+                                    {% set news_item = viewed.news_international if viewed.news_international else viewed.news %}
+                                    {% if news_item %}
                                     <div class="news-list-item">
-                                        <img src="{{ viewed.news.thumbnail or 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800' }}" alt="{{ viewed.news.title }}">
+                                        <img src="{{ news_item.thumbnail or 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800' }}" alt="{{ news_item.title }}">
                                         <div class="news-list-item-content">
-                                            <h5><a href="{{ url_for('client.news_detail', news_slug=viewed.news.slug) }}">{{ viewed.news.title }}</a></h5>
+                                            <h5><a href="{{ url_for('client.en_news_detail', news_slug=news_item.slug) if viewed.news_international else url_for('client.news_detail', news_slug=news_item.slug) }}">{{ news_item.title }}</a></h5>
                                             <div class="news-meta">
                                                 <span><i class="far fa-clock"></i> Đã xem: {{ viewed.viewed_at.strftime('%d/%m/%Y %H:%M') if viewed.viewed_at else '' }}</span>
-                                                <span class="ms-3"><i class="far fa-eye"></i> {{ viewed.news.view_count or 0 }}</span>
+                                                <span class="ms-3"><i class="far fa-eye"></i> {{ news_item.view_count or 0 }}</span>
                                             </div>
                                         </div>
                                     </div>
+                                    {% endif %}
                                     {% endfor %}
                                 </div>
                             {% else %}
@@ -256,19 +262,23 @@
                             {% if comments %}
                                 <div class="news-list">
                                     {% for comment in comments %}
+                                    {% set news_item = comment.news_international if comment.news_international else comment.news %}
+                                    {% set news_id = comment.news_international_id if comment.news_international_id else comment.news_id %}
+                                    {% if news_item %}
                                     <div class="news-list-item">
                                         <div class="news-list-item-content">
-                                            <h5><a href="{{ url_for('client.news_detail', news_slug=comment.news.slug) }}">{{ comment.news.title }}</a></h5>
+                                            <h5><a href="{{ url_for('client.en_news_detail', news_slug=news_item.slug) if comment.news_international else url_for('client.news_detail', news_slug=news_item.slug) }}">{{ news_item.title }}</a></h5>
                                             <p class="mt-2 mb-2">{{ comment.content }}</p>
                                             <div class="news-meta">
                                                 <span><i class="far fa-clock"></i> {{ comment.created_at.strftime('%d/%m/%Y %H:%M') if comment.created_at else '' }}</span>
-                                                <span class="ms-3"><i class="fas fa-comments"></i> {{ comment_counts.get(comment.news_id, 0) }} bình luận</span>
+                                                <span class="ms-3"><i class="fas fa-comments"></i> {{ comment_counts.get(news_id, 0) }} bình luận</span>
                                                 {% if not comment.is_active %}
                                                     <span class="badge bg-warning ms-2">Đang chờ duyệt</span>
                                                 {% endif %}
                                             </div>
                                         </div>
                                     </div>
+                                    {% endif %}
                                     {% endfor %}
                                 </div>
                             {% else %}

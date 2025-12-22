@@ -3052,10 +3052,11 @@ class ClientController:
             user_id = None
             if 'user_id' in session:
                 user_id = session['user_id']
-                # Lưu vào tin đã xem
+                # Lưu vào tin đã xem (site vn sử dụng news_id)
                 existing_viewed = db_session.query(ViewedNews).filter(
                     ViewedNews.user_id == user_id,
-                    ViewedNews.news_id == news.id
+                    ViewedNews.news_id == news.id,
+                    ViewedNews.site == 'vn'
                 ).first()
                 
                 if not existing_viewed:
@@ -3071,21 +3072,23 @@ class ClientController:
                     existing_viewed.viewed_at = datetime.utcnow()
                     db_session.commit()
                 
-                # Kiểm tra xem tin đã được lưu chưa
+                # Kiểm tra xem tin đã được lưu chưa (site vn sử dụng news_id)
                 saved_news = db_session.query(SavedNews).filter(
                     SavedNews.user_id == user_id,
-                    SavedNews.news_id == news.id
+                    SavedNews.news_id == news.id,
+                    SavedNews.site == 'vn'
                 ).first()
                 is_saved = saved_news is not None
             
-            # Lấy bình luận
+            # Lấy bình luận (site vn sử dụng news_id)
             from sqlalchemy.orm import joinedload
             comments = db_session.query(Comment).options(
                 joinedload(Comment.user)
             ).filter(
                 Comment.news_id == news.id,
                 Comment.is_active == True,
-                Comment.parent_id == None  # Chỉ lấy comment gốc, không lấy reply
+                Comment.parent_id == None,  # Chỉ lấy comment gốc, không lấy reply
+                Comment.site == 'vn'
             ).order_by(Comment.created_at.desc()).all()
             
             time_format = '%d-%m-%Y %H:%M'
@@ -3403,32 +3406,68 @@ class ClientController:
             session.clear()
             return redirect(url_for('client.user_login'))
         
-        # Lấy tin đã lưu
+        # Lấy tin đã lưu (cả site VN và EN)
         saved_news = self.db_session.query(SavedNews).filter(
-            SavedNews.user_id == user.id).order_by(SavedNews.created_at.desc()).limit(20).all()
+            SavedNews.user_id == user.id
+        ).order_by(SavedNews.created_at.desc()).limit(20).all()
         
-        # Lấy tin đã xem
+        # Lấy tin đã xem (cả site VN và EN)
         viewed_news = self.db_session.query(ViewedNews).filter(
-            ViewedNews.user_id == user.id).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
+            ViewedNews.user_id == user.id
+        ).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
         
-        # Lấy bình luận
-        comments = self.db_session.query(Comment).filter(
-            Comment.user_id == user.id).order_by(Comment.created_at.desc()).limit(20).all()
+        # Lấy tất cả bình luận của user (cả site VN và EN), sau đó lọc không trùng news_id/news_international_id
+        all_comments = self.db_session.query(Comment).filter(
+            Comment.user_id == user.id
+        ).order_by(Comment.created_at.desc()).all()
+
+        comments = []
+        seen_news_ids = set()
+        seen_news_international_ids = set()
+        for comment in all_comments:
+            # Mỗi bài viết chỉ lấy 1 bình luận – ưu tiên bình luận mới nhất
+            if comment.news_id and comment.news_id not in seen_news_ids:
+                comments.append(comment)
+                seen_news_ids.add(comment.news_id)
+            elif comment.news_international_id and comment.news_international_id not in seen_news_international_ids:
+                comments.append(comment)
+                seen_news_international_ids.add(comment.news_international_id)
+            if len(comments) >= 20:
+                break
         
-        # Tính số bình luận cho mỗi bài viết
+        # Tính số bình luận cho mỗi bài viết (cả news_id và news_international_id)
         comment_counts = {}
         if comments:
-            news_ids = list(set([comment.news_id for comment in comments]))
-            from sqlalchemy import func
-            counts = self.db_session.query(
-                Comment.news_id,
-                func.count(Comment.id).label('count')
-            ).filter(
-                Comment.news_id.in_(news_ids),
-                Comment.is_active == True
-            ).group_by(Comment.news_id).all()
+            news_ids = list(set([comment.news_id for comment in comments if comment.news_id]))
+            news_international_ids = list(set([comment.news_international_id for comment in comments if comment.news_international_id]))
             
-            comment_counts = {news_id: count for news_id, count in counts}
+            from sqlalchemy import func, or_
+            
+            # Đếm comments cho news_id
+            if news_ids:
+                counts_vn = self.db_session.query(
+                    Comment.news_id,
+                    func.count(Comment.id).label('count')
+                ).filter(
+                    Comment.news_id.in_(news_ids),
+                    Comment.is_active == True
+                ).group_by(Comment.news_id).all()
+                
+                for news_id, count in counts_vn:
+                    comment_counts[news_id] = count
+            
+            # Đếm comments cho news_international_id
+            if news_international_ids:
+                counts_en = self.db_session.query(
+                    Comment.news_international_id,
+                    func.count(Comment.id).label('count')
+                ).filter(
+                    Comment.news_international_id.in_(news_international_ids),
+                    Comment.is_active == True
+                ).group_by(Comment.news_international_id).all()
+                
+                for news_international_id, count in counts_en:
+                    comment_counts[news_international_id] = count
         
         # Tính tổng số bình luận của cá nhân
         total_comments = self.db_session.query(Comment).filter(
@@ -3578,23 +3617,43 @@ class ClientController:
         """
         API lưu/bỏ lưu tin tức
         Route: POST /api/save-news/<news_id>
+        Hỗ trợ cả news_id (site vn) và news_international_id (site en)
         """
         if 'user_id' not in session:
             return jsonify({'success': False, 'message': 'Vui lòng đăng nhập'}), 401
         
         user_id = session['user_id']
-        news = self.news_model.get_by_id(news_id)
+        site = request.args.get('site', 'vn')
         
-        site = request.args.get('site') if request.args.get('site') else 'vn'
-        if not news:
-            return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
+        # Xác định loại news và lấy thông tin
+        news = None
+        news_international = None
+        
+        if site == 'en':
+            # Site EN: tìm trong news_international
+            int_news_model = InternationalNewsModel(self.db_session)
+            news_international = int_news_model.get_by_id(news_id)
+            if not news_international:
+                return jsonify({'success': False, 'message': 'News not found'}), 404
+        else:
+            # Site VN: tìm trong news
+            news = self.news_model.get_by_id(news_id)
+            if not news:
+                return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
         
         # Kiểm tra xem đã lưu chưa
-        saved_news = self.db_session.query(SavedNews).filter(
-            SavedNews.user_id == user_id,
-            SavedNews.news_id == news_id,
-            SavedNews.site == site
-        ).first()
+        if site == 'en':
+            saved_news = self.db_session.query(SavedNews).filter(
+                SavedNews.user_id == user_id,
+                SavedNews.news_international_id == news_id,
+                SavedNews.site == site
+            ).first()
+        else:
+            saved_news = self.db_session.query(SavedNews).filter(
+                SavedNews.user_id == user_id,
+                SavedNews.news_id == news_id,
+                SavedNews.site == site
+            ).first()
         
         if saved_news:
             # Bỏ lưu
@@ -3604,11 +3663,18 @@ class ClientController:
             return jsonify({'success': True, 'message': message, 'is_saved': False})
         else:
             # Lưu
-            new_saved = SavedNews(
-                user_id=user_id,
-                news_id=news_id,
-                site=site
-            )
+            if site == 'en':
+                new_saved = SavedNews(
+                    user_id=user_id,
+                    news_international_id=news_id,
+                    site=site
+                )
+            else:
+                new_saved = SavedNews(
+                    user_id=user_id,
+                    news_id=news_id,
+                    site=site
+                )
             self.db_session.add(new_saved)
             self.db_session.commit()
 
@@ -3619,18 +3685,29 @@ class ClientController:
         """
         API gửi bình luận
         Route: POST /api/comment/<news_id>
+        Hỗ trợ cả news_id (site vn) và news_international_id (site en)
         """
         if 'user_id' not in session:
             return jsonify({'success': False, 'message': 'Vui lòng đăng nhập để bình luận'}), 401
         
         user_id = session['user_id']
-        news = self.news_model.get_by_id(news_id)
+        site = request.args.get('site', 'vn')
         
-        site = request.args.get('site') if request.args.get('site') else 'vn'
-
-        if not news:
-            message = 'News not found' if site == 'en' else 'Không tìm thấy tin tức'
-            return jsonify({'success': False, 'message': message}), 404
+        # Xác định loại news và lấy thông tin
+        news = None
+        news_international = None
+        
+        if site == 'en':
+            # Site EN: tìm trong news_international
+            int_news_model = InternationalNewsModel(self.db_session)
+            news_international = int_news_model.get_by_id(news_id)
+            if not news_international:
+                return jsonify({'success': False, 'message': 'News not found'}), 404
+        else:
+            # Site VN: tìm trong news
+            news = self.news_model.get_by_id(news_id)
+            if not news:
+                return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
         
         content = request.json.get('content', '').strip() if request.is_json else request.form.get('content', '').strip()
         parent_id = request.json.get('parent_id') if request.is_json else request.form.get('parent_id')
@@ -3641,17 +3718,27 @@ class ClientController:
         
         if len(content) > 1000:
             message = 'Comment cannot exceed 1000 characters' if site == 'en' else 'Bình luận không được vượt quá 1000 ký tự'
-            return jsonify({'success': False, 'message': 'Bình luận không được vượt quá 1000 ký tự'}), 400
+            return jsonify({'success': False, 'message': message}), 400
         
         # Tạo bình luận
-        comment = Comment(
-            user_id=user_id,
-            news_id=news_id,
-            content=content,
-            parent_id=int(parent_id) if parent_id else None,
-            site=site,
-            is_active=True
-        )
+        if site == 'en':
+            comment = Comment(
+                user_id=user_id,
+                news_international_id=news_id,
+                content=content,
+                parent_id=int(parent_id) if parent_id else None,
+                site=site,
+                is_active=True
+            )
+        else:
+            comment = Comment(
+                user_id=user_id,
+                news_id=news_id,
+                content=content,
+                parent_id=int(parent_id) if parent_id else None,
+                site=site,
+                is_active=True
+            )
         self.db_session.add(comment)
         self.db_session.commit()
         self.db_session.refresh(comment)
@@ -4021,16 +4108,17 @@ class ClientController:
             user_id = None
             if 'user_id' in session:
                 user_id = session['user_id']
-                # Lưu vào tin đã xem
+                # Lưu vào tin đã xem (site en sử dụng news_international_id)
                 existing_viewed = db_session.query(ViewedNews).filter(
                     ViewedNews.user_id == user_id,
-                    ViewedNews.news_id == news.id
+                    ViewedNews.news_international_id == news.id,
+                    ViewedNews.site == 'en'
                 ).first()
                 
                 if not existing_viewed:
                     viewed_news = ViewedNews(
                         user_id=user_id,
-                        news_id=news.id,
+                        news_international_id=news.id,
                         site='en'
                     )
                     db_session.add(viewed_news)
@@ -4040,22 +4128,23 @@ class ClientController:
                     existing_viewed.viewed_at = datetime.utcnow()
                     db_session.commit()
                 
-                # Kiểm tra xem tin đã được lưu chưa
+                # Kiểm tra xem tin đã được lưu chưa (site en sử dụng news_international_id)
                 saved_news = db_session.query(SavedNews).filter(
                     SavedNews.user_id == user_id,
-                    SavedNews.news_id == news.id
+                    SavedNews.news_international_id == news.id,
+                    SavedNews.site == 'en'
                 ).first()
                 is_saved = saved_news is not None
             
-            # Lấy bình luận
+            # Lấy bình luận (site en sử dụng news_international_id)
             from sqlalchemy.orm import joinedload
             comments = db_session.query(Comment).options(
                 joinedload(Comment.user)
             ).filter(
-                Comment.news_id == news.id,
+                Comment.news_international_id == news.id,
                 Comment.is_active == True,
-                Comment.parent_id == None,
-                Comment.site == 'en'  # Chỉ lấy comment gốc, không lấy reply
+                Comment.parent_id == None,  # Chỉ lấy comment gốc, không lấy reply
+                Comment.site == 'en'
             ).order_by(Comment.created_at.desc()).all()
 
             time_format = '%d-%m-%Y %H:%M'
