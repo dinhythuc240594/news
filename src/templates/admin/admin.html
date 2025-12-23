@@ -2,6 +2,9 @@
 {% block title %}Dashboard - VnNews Admin{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">
+    <script src="{{ url_for('static', filename='js/menu-manager.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/menu-admin.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 {% endblock %}
 {% block template %}
     <!-- Sidebar -->
@@ -56,11 +59,11 @@
                     <i class="fas fa-cloud-download-alt"></i> Bài từ API
                 </a>
             </li> -->
-            <li>
+            <!-- <li>
                 <a href="#" data-section="tags-manager">
                     <i class="fas fa-hashtag"></i> Quản lý Hashtag
                 </a>
-            </li>
+            </li> -->
             <li>
                 <a href="#" data-section="menu-manager">
                     <i class="fas fa-bars"></i> Quản lý Menu
@@ -255,9 +258,493 @@
                 </div>
             </div>
         </div>
-
     </div>
-
 {% endblock %}
 {% block scripts_url %}
+    <script>
+        // Users Management
+        let currentUserPage = 1;
+        let userFilters = {};
+        
+        function loadUsers(page = 1) {
+            currentUserPage = page;
+            const params = new URLSearchParams({
+                page: page,
+                per_page: 20,
+                ...userFilters
+            });
+            
+            $.ajax({
+                url: '/admin/api/users?' + params.toString(),
+                method: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        renderUsersTable(response.users);
+                        renderUsersPagination(response.page, response.total_pages);
+                    }
+                },
+                error: function() {
+                    $('#usersTableBody').html('<tr><td colspan="10" class="text-center text-danger">Lỗi khi tải dữ liệu</td></tr>');
+                }
+            });
+        }
+        
+        function renderUsersTable(users) {
+            const tbody = $('#usersTableBody');
+            if (users.length === 0) {
+                tbody.html('<tr><td colspan="10" class="text-center">Không có dữ liệu</td></tr>');
+                return;
+            }
+            
+            let html = '';
+            users.forEach(user => {
+                const avatar = user.avatar ? `<img src="/${user.avatar}" class="rounded-circle" width="40" height="40">` 
+                    : `<div class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;">${user.username.charAt(0).toUpperCase()}</div>`;
+                
+                const roleBadge = {
+                    'admin': '<span class="badge bg-danger">Admin</span>',
+                    'editor': '<span class="badge bg-info">Editor</span>',
+                    'user': '<span class="badge bg-secondary">User</span>'
+                }[user.role] || '<span class="badge bg-secondary">User</span>';
+                
+                const statusBadge = user.is_active 
+                    ? '<span class="badge bg-success">Hoạt động</span>'
+                    : '<span class="badge bg-danger">Đã khóa</span>';
+                
+                html += `
+                    <tr>
+                        <td>${avatar}</td>
+                        <td>${user.username}</td>
+                        <td>${user.email}</td>
+                        <td>${user.full_name || '-'}</td>
+                        <td>${user.phone || '-'}</td>
+                        <td>${roleBadge}</td>
+                        <td>${statusBadge}</td>
+                        <td>${user.created_at}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary edit-user" data-id="${user.id}" title="Chỉnh sửa">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm ${user.is_active ? 'btn-warning' : 'btn-success'} toggle-user-status" data-id="${user.id}" title="${user.is_active ? 'Khóa' : 'Mở khóa'}">
+                                <i class="fas fa-${user.is_active ? 'lock' : 'unlock'}"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            tbody.html(html);
+        }
+        
+        function renderUsersPagination(currentPage, totalPages) {
+            const pagination = $('#usersPagination');
+            if (totalPages <= 1) {
+                pagination.html('');
+                return;
+            }
+            
+            let html = '';
+            if (currentPage > 1) {
+                html += `<li class="page-item"><a class="page-link" href="#" data-page="${currentPage - 1}">Trước</a></li>`;
+            }
+            
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" data-page="${i}">${i}</a>
+                    </li>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+            }
+            
+            if (currentPage < totalPages) {
+                html += `<li class="page-item"><a class="page-link" href="#" data-page="${currentPage + 1}">Sau</a></li>`;
+            }
+            
+            pagination.html(html);
+        }
+        
+        // Event handlers
+        $(document).on('click', '#addUserBtn', function() {
+            $('#userModalLabel').html('<i class="fas fa-user-plus me-2"></i>Thêm người dùng mới');
+            $('#userForm')[0].reset();
+            $('#userId').val('');
+            $('#passwordRequired').show();
+            $('#passwordHint').hide();
+            $('#password').prop('required', true);
+            $('#userModal').modal('show');
+        });
+        
+        $(document).on('click', '.edit-user', function() {
+            const userId = $(this).data('id');
+            $.ajax({
+                url: `/admin/api/users/${userId}`,
+                method: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        const user = response.user;
+                        $('#userModalLabel').html('<i class="fas fa-user-edit me-2"></i>Chỉnh sửa người dùng');
+                        $('#userId').val(user.id);
+                        $('#username').val(user.username).prop('disabled', true);
+                        $('#email').val(user.email);
+                        $('#fullName').val(user.full_name || '');
+                        $('#phone').val(user.phone || '');
+                        $('#role').val(user.role);
+                        $('#passwordRequired').hide();
+                        $('#passwordHint').show();
+                        $('#password').prop('required', false).val('');
+                        $('#userModal').modal('show');
+                    }
+                }
+            });
+        });
+        
+        $(document).on('click', '#saveUserBtn', function() {
+            const form = $('#userForm')[0];
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                return;
+            }
+            
+            const data = {
+                username: $('#username').val(),
+                email: $('#email').val(),
+                full_name: $('#fullName').val(),
+                phone: $('#phone').val(),
+                role: $('#role').val()
+            };
+            
+            const password = $('#password').val();
+            if (password) {
+                data.password = password;
+            }
+            
+            const userId = $('#userId').val();
+            const url = userId ? `/admin/api/users/${userId}` : '/admin/api/users';
+            const method = userId ? 'PUT' : 'POST';
+            
+            $.ajax({
+                url: url,
+                method: method,
+                contentType: 'application/json',
+                data: JSON.stringify(data),
+                success: function(response) {
+                    if (response.success) {
+                        $('#userModal').modal('hide');
+                        loadUsers(currentUserPage);
+                        alert(response.message || 'Thành công');
+                    } else {
+                        alert(response.error || 'Có lỗi xảy ra');
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || 'Có lỗi xảy ra';
+                    alert(error);
+                }
+            });
+        });
+        
+        $(document).on('click', '.toggle-user-status', function() {
+            const userId = $(this).data('id');
+            const action = $(this).hasClass('btn-warning') ? 'khóa' : 'mở khóa';
+            
+            if (!confirm(`Bạn có chắc muốn ${action} tài khoản này?`)) {
+                return;
+            }
+            
+            $.ajax({
+                url: `/admin/api/users/${userId}/toggle-status`,
+                method: 'POST',
+                success: function(response) {
+                    if (response.success) {
+                        loadUsers(currentUserPage);
+                        alert(response.message);
+                    } else {
+                        alert(response.error || 'Có lỗi xảy ra');
+                    }
+                }
+            });
+        });
+        
+        $('#userSearchInput, #userRoleFilter, #userStatusFilter').on('change keyup', function() {
+            userFilters = {};
+            const search = $('#userSearchInput').val();
+            const role = $('#userRoleFilter').val();
+            const status = $('#userStatusFilter').val();
+            
+            if (search) userFilters.search = search;
+            if (role) userFilters.role = role;
+            if (status) userFilters.status = status;
+            
+            loadUsers(1);
+        });
+        
+        $('#clearUserFilters').on('click', function() {
+            $('#userSearchInput').val('');
+            $('#userRoleFilter').val('');
+            $('#userStatusFilter').val('');
+            userFilters = {};
+            loadUsers(1);
+        });
+        
+        $(document).on('click', '#usersPagination .page-link', function(e) {
+            e.preventDefault();
+            const page = $(this).data('page');
+            if (page) {
+                loadUsers(page);
+            }
+        });
+        
+        // Load users when section is shown
+        $('a[data-section="users-manager"]').on('click', function() {
+            setTimeout(() => {
+                if ($('#users-manager').hasClass('active')) {
+                    loadUsers();
+                }
+            }, 100);
+        });
+    </script>
+
+<script>
+    // Settings Management
+    let settingsLoaded = false;
+    
+    function loadSettings() {
+        if (settingsLoaded) return;
+        
+        $.ajax({
+            url: '/admin/api/settings',
+            method: 'GET',
+            success: function(response) {
+                if (response.success && response.settings) {
+                    const settings = response.settings;
+                    
+                    // Load API settings
+                    $('#apiToken').val(settings.api_token?.value || '');
+                    $('#apiBaseUrl').val(settings.api_base_url?.value || 'https://news-api.techreview.pro');
+                    
+                    // Load SMTP settings
+                    $('#smtpServer').val(settings.smtp_server?.value || 'smtp.gmail.com');
+                    $('#smtpPort').val(settings.smtp_port?.value || '587');
+                    $('#smtpUsername').val(settings.smtp_username?.value || '');
+                    $('#smtpPassword').val(settings.smtp_password?.value || '');
+                    $('#smtpFromEmail').val(settings.smtp_from_email?.value || '');
+                    $('#smtpUseTls').val(settings.smtp_use_tls?.value || 'true');
+                    
+                    settingsLoaded = true;
+                }
+            },
+            error: function() {
+                console.error('Error loading settings');
+            }
+        });
+    }
+    
+    function saveSettings() {
+        // Validate required fields
+        let isValid = true;
+        $('.form-control').removeClass('is-invalid');
+        
+        // Validate API Token
+        if (!$('#apiToken').val().trim()) {
+            $('#apiToken').addClass('is-invalid');
+            $('#apiToken').next('.invalid-feedback').text('API Token là bắt buộc');
+            isValid = false;
+        }
+        
+        // Validate SMTP required fields
+        if (!$('#smtpServer').val().trim()) {
+            $('#smtpServer').addClass('is-invalid');
+            $('#smtpServer').next('.invalid-feedback').text('SMTP Server là bắt buộc');
+            isValid = false;
+        }
+        
+        if (!$('#smtpPort').val().trim()) {
+            $('#smtpPort').addClass('is-invalid');
+            $('#smtpPort').next('.invalid-feedback').text('SMTP Port là bắt buộc');
+            isValid = false;
+        }
+        
+        if (!$('#smtpUsername').val().trim()) {
+            $('#smtpUsername').addClass('is-invalid');
+            $('#smtpUsername').next('.invalid-feedback').text('SMTP Username là bắt buộc');
+            isValid = false;
+        }
+        
+        if (!$('#smtpPassword').val().trim()) {
+            $('#smtpPassword').addClass('is-invalid');
+            $('#smtpPassword').parent().next('.invalid-feedback').text('SMTP Password là bắt buộc');
+            isValid = false;
+        }
+        
+        if (!isValid) {
+            alert('Vui lòng điền đầy đủ các trường bắt buộc');
+            return;
+        }
+        
+        const btn = $('#saveSettingsBtn');
+        const originalText = btn.html();
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Đang lưu...');
+        
+        const settings = {
+            api_token: $('#apiToken').val().trim(),
+            api_base_url: $('#apiBaseUrl').val().trim() || 'https://news-api.techreview.pro',
+            smtp_server: $('#smtpServer').val().trim(),
+            smtp_port: $('#smtpPort').val().trim(),
+            smtp_username: $('#smtpUsername').val().trim(),
+            smtp_password: $('#smtpPassword').val().trim(),
+            smtp_from_email: $('#smtpFromEmail').val().trim() || $('#smtpUsername').val().trim(),
+            smtp_use_tls: $('#smtpUseTls').val()
+        };
+        
+        $.ajax({
+            url: '/admin/api/settings',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(settings),
+            success: function(response) {
+                if (response.success) {
+                    alert('Lưu cài đặt thành công!');
+                    settingsLoaded = false; // Reload on next show
+                } else {
+                    alert(response.error || 'Có lỗi xảy ra khi lưu cài đặt');
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Có lỗi xảy ra khi lưu cài đặt';
+                alert(error);
+            },
+            complete: function() {
+                btn.prop('disabled', false).html(originalText);
+            }
+        });
+    }
+    
+    function testSmtpConnection() {
+        const btn = $('#testSmtpBtn');
+        const originalText = btn.html();
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Đang kiểm tra...');
+        
+        // Get current user email from session or prompt
+        const testEmail = prompt('Nhập email để gửi email test:', '');
+        if (!testEmail) {
+            btn.prop('disabled', false).html(originalText);
+            return;
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(testEmail)) {
+            alert('Email không đúng định dạng');
+            btn.prop('disabled', false).html(originalText);
+            return;
+        }
+        
+        // Save settings first, then test
+        const settings = {
+            api_token: $('#apiToken').val().trim(),
+            api_base_url: $('#apiBaseUrl').val().trim() || 'https://news-api.techreview.pro',
+            smtp_server: $('#smtpServer').val().trim(),
+            smtp_port: $('#smtpPort').val().trim(),
+            smtp_username: $('#smtpUsername').val().trim(),
+            smtp_password: $('#smtpPassword').val().trim(),
+            smtp_from_email: $('#smtpFromEmail').val().trim() || $('#smtpUsername').val().trim(),
+            smtp_use_tls: $('#smtpUseTls').val()
+        };
+        
+        $.ajax({
+            url: '/admin/api/settings',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(settings),
+            success: function(response) {
+                if (response.success) {
+                    // Test email sending
+                    $.ajax({
+                        url: '/admin/api/test-email',
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ email: testEmail }),
+                        success: function(testResponse) {
+                            if (testResponse.success) {
+                                alert('Gửi email test thành công! Vui lòng kiểm tra hộp thư của bạn.');
+                            } else {
+                                alert('Lỗi khi gửi email test: ' + (testResponse.error || 'Vui lòng kiểm tra lại cài đặt SMTP'));
+                            }
+                        },
+                        error: function() {
+                            alert('Lỗi khi gửi email test. Vui lòng kiểm tra lại cài đặt SMTP.');
+                        },
+                        complete: function() {
+                            btn.prop('disabled', false).html(originalText);
+                        }
+                    });
+                } else {
+                    alert('Lỗi khi lưu cài đặt: ' + (response.error || 'Vui lòng kiểm tra lại'));
+                    btn.prop('disabled', false).html(originalText);
+                }
+            },
+            error: function(xhr) {
+                const error = xhr.responseJSON?.error || 'Lỗi khi lưu cài đặt';
+                alert(error);
+                btn.prop('disabled', false).html(originalText);
+            }
+        });
+    }
+    
+    // Toggle password visibility
+    $('#toggleSmtpPassword').on('click', function() {
+        const passwordInput = $('#smtpPassword');
+        const icon = $(this).find('i');
+        
+        if (passwordInput.attr('type') === 'password') {
+            passwordInput.attr('type', 'text');
+            icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        } else {
+            passwordInput.attr('type', 'password');
+            icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        }
+    });
+    
+    // Event handlers
+    $('#saveSettingsBtn').on('click', saveSettings);
+    $('#testSmtpBtn').on('click', testSmtpConnection);
+    
+    // Load settings when section is shown
+    function loadSettingsSection() {
+        if ($('#settings').hasClass('active')) {
+            loadSettings();
+        }
+    }
+    
+    // Event handler for settings section
+    $(document).on('click', 'a[data-section="settings"]', function() {
+        setTimeout(loadSettingsSection, 100);
+    });
+    
+    // Also load when section becomes active (for programmatic activation)
+    $(document).ready(function() {
+        // Check if settings section is already active
+        if ($('#settings').hasClass('active')) {
+            loadSettings();
+        }
+        
+        // Watch for section changes
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.target.id === 'settings' && mutation.target.classList.contains('active')) {
+                    loadSettings();
+                }
+            });
+        });
+        
+        const settingsSection = document.getElementById('settings');
+        if (settingsSection) {
+            observer.observe(settingsSection, {
+                attributes: true,
+                attributeFilter: ['class']
+            });
+        }
+    });
+    </script>
 {% endblock %}

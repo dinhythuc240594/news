@@ -1,9 +1,7 @@
 {% extends '/admin/base_admin.html' %}
 {% block title %}Dashboard - VnNews Editor{% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">
-    <!-- Summernote CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.css" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
 {% endblock %}
 {% block template %}
     <!-- Sidebar -->
@@ -267,12 +265,12 @@
                                     <textarea class="form-control" id="editArticleDescription" rows="3" placeholder="Mô tả ngắn gọn về bài viết..."></textarea>
                                 </div>
                                 
-                                <div class="mb-3" style="position: relative;">
+                                <!-- <div class="mb-3" style="position: relative;">
                                     <label class="form-label">Tags</label>
                                     <input type="text" class="form-control" id="editArticleTags" placeholder="Gõ # để gợi ý tag, ví dụ: #công_nghệ #AI #iPhone">
                                     <small class="text-muted">Nhập tags theo định dạng hashtag: #tên_tag</small>
                                     <div id="editTagSuggestions" class="tag-suggestions" style="display: none;"></div>
-                                </div>
+                                </div> -->
                             </div>
                         </div>
                     </form>
@@ -290,16 +288,4 @@
         </div>
     </div>
 
-{% endblock %}
-{% block scripts_url %}
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Summernote -->
-    <script src="https://cdn.jsdelivr.net/npm/summernote@0.8.18/dist/summernote-lite.min.js"></script>
-
-    <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
 {% endblock %}

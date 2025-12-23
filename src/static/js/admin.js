@@ -205,10 +205,8 @@ async function checkAuth() {
     try {
         const response = await fetch('/admin/api/current-user');
         const result = await response.json();
-        console.log(result.data);
-        alert(result.data.role);
-        
-        if (!result.success || result.data.role !== 'admin' || result.data.role !== 'editor') {
+
+        if (!result.success || result.data.role !== 'admin') {
             window.location.href = '/admin/login';
             return;
         }

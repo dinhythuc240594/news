@@ -194,37 +194,6 @@ $(document).ready(function() {
     });
 });
 
-// // Check authentication
-// async function checkAuth() {
-//     try {
-//         const response = await fetch('/admin/api/current-user');
-//         const result = await response.json();
-        
-//         if (!result.success || result.data.role !== 'admin') {
-//             window.location.href = 'login.html';
-//             return;
-//         }
-//     } catch (error) {
-//         console.error('Lỗi kiểm tra đăng nhập:', error);
-//         window.location.href = 'login.html';
-//     }
-// }
-
-// Load user info
-// async function loadUserInfo() {
-//     try {
-//         const response = await fetch('/admin/api/current-user');
-//         const result = await response.json();
-        
-//         if (result.success && result.data) {
-//             var html = `<a href="/admin/profile">${result.data.name}</a>`;
-//             $('#userName').html(html);
-//         }
-//     } catch (error) {
-//         console.error('Error loading user info:', error);
-//     }
-// }
-
 // Check and init default menu items
 async function checkAndInitDefaultMenus() {
     try {
