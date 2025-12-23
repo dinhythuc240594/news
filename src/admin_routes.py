@@ -100,6 +100,27 @@ def international_news_reject(news_id: int):
     return admin_controller.international_news_reject(news_id)
 
 
+@admin_bp.route('/international/<int:news_id>/delete', methods=['POST'])
+@controller.admin_required
+def international_news_delete(news_id: int):
+    """Xóa bài viết quốc tế"""
+    return admin_controller.international_news_delete(news_id)
+
+
+@admin_bp.route('/international/<int:news_id>/submit', methods=['POST'])
+@controller.admin_required
+def international_news_submit(news_id: int):
+    """Gửi bài viết quốc tế nháp để duyệt"""
+    return admin_controller.international_news_submit(news_id)
+
+
+@admin_bp.route('/api/edit-international-article/<int:article_id>', methods=['POST'])
+@controller.admin_required
+def api_edit_international_article(article_id: int):
+    """API chỉnh sửa bài viết quốc tế theo ID"""
+    return admin_controller.api_edit_international_article(article_id)
+
+
 # API Routes
 @admin_bp.route('/api/news')
 @controller.editor_required
@@ -113,6 +134,41 @@ def api_news_list():
 def api_my_articles():
     """API lấy danh sách bài viết của editor hiện tại"""
     return admin_controller.api_my_articles()
+
+
+@admin_bp.route('/api/my-international-articles')
+@controller.editor_required
+def api_my_international_articles():
+    """API lấy danh sách bài viết quốc tế của editor hiện tại"""
+    return admin_controller.api_my_international_articles()
+
+
+@admin_bp.route('/api/international-drafts')
+@controller.editor_required
+def api_international_drafts_editor():
+    """API lấy danh sách bài viết quốc tế nháp của editor"""
+    return admin_controller.api_international_drafts()
+
+
+@admin_bp.route('/api/international-pending-editor')
+@controller.editor_required
+def api_international_pending_editor():
+    """API lấy danh sách bài viết quốc tế chờ duyệt của editor"""
+    return admin_controller.api_international_pending_editor()
+
+
+@admin_bp.route('/api/international-published-editor')
+@controller.editor_required
+def api_international_published_editor():
+    """API lấy danh sách bài viết quốc tế đã xuất bản của editor"""
+    return admin_controller.api_international_published_editor()
+
+
+@admin_bp.route('/api/create-international-article', methods=['POST'])
+@controller.editor_required
+def api_create_international_article():
+    """API tạo bài viết quốc tế mới từ editor form"""
+    return admin_controller.api_create_international_article()
 
 
 @admin_bp.route('/api/editor-notifications')
@@ -177,6 +233,13 @@ def api_international_pending():
     return admin_controller.api_international_pending()
 
 
+@admin_bp.route('/api/international-drafts')
+@controller.admin_required
+def api_international_drafts():
+    """API lấy danh sách bài viết quốc tế nháp"""
+    return admin_controller.api_international_drafts()
+
+
 @admin_bp.route('/api/fetch-api-news', methods=['POST'])
 @controller.admin_required
 def api_fetch_api_news():
@@ -210,6 +273,13 @@ def api_hot_articles():
 def api_article_detail(article_id: int):
     """API lấy chi tiết bài viết theo ID"""
     return admin_controller.api_article_detail(article_id)
+
+
+@admin_bp.route('/api/international-article/<int:article_id>')
+@controller.admin_required
+def api_international_article_detail(article_id: int):
+    """API lấy chi tiết bài viết quốc tế theo ID"""
+    return admin_controller.api_international_article_detail(article_id)
 
 
 @admin_bp.route('/api/create-article', methods=['POST'])

@@ -348,13 +348,15 @@ class SavedNews(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    news_id = Column(Integer, ForeignKey('news.id'), nullable=True)  # Nullable để hỗ trợ cả news và news_international
+    news_international_id = Column(Integer, ForeignKey('news_international.id'), nullable=True)  # Foreign key tới news_international
     site = Column(String(10), default='vn')  # Phân biệt site: vn / en
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="saved_news")
-    news = relationship("News")
+    news = relationship("News", foreign_keys=[news_id])
+    news_international = relationship("NewsInternational", foreign_keys=[news_international_id])
 
 
 class ViewedNews(Base):
@@ -363,14 +365,15 @@ class ViewedNews(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    news_id = Column(Integer, ForeignKey('news.id'), nullable=True)  # Nullable để hỗ trợ cả news và news_international
+    news_international_id = Column(Integer, ForeignKey('news_international.id'), nullable=True)  # Foreign key tới news_international
     site = Column(String(10), default='vn')  # Phân biệt site: vn / en
     viewed_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="viewed_news")
-    news = relationship("News")
-
+    news = relationship("News", foreign_keys=[news_id])
+    news_international = relationship("NewsInternational", foreign_keys=[news_international_id])
 
 class Comment(Base):
     """Bảng bình luận của người dùng"""
@@ -378,7 +381,8 @@ class Comment(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    news_id = Column(Integer, ForeignKey('news.id'), nullable=True)  # Nullable để hỗ trợ cả news và news_international
+    news_international_id = Column(Integer, ForeignKey('news_international.id'), nullable=True)  # Foreign key tới news_international
     content = Column(Text, nullable=False)
     parent_id = Column(Integer, ForeignKey('comments.id'), nullable=True)  # For reply comments
     site = Column(String(10), default='vn')  # Phân biệt site: vn / en
@@ -388,7 +392,8 @@ class Comment(Base):
     
     # Relationships
     user = relationship("User", back_populates="comments")
-    news = relationship("News")
+    news = relationship("News", foreign_keys=[news_id])
+    news_international = relationship("NewsInternational", foreign_keys=[news_international_id])
     parent = relationship("Comment", remote_side=[id], backref="replies")
 
 
@@ -406,6 +411,10 @@ class NewsInternational(Base):
     category_id = Column(Integer, ForeignKey('categories_international.id'), nullable=False)
     created_by = Column(Integer, ForeignKey('users.id'), nullable=False)
     approved_by = Column(Integer, ForeignKey('users.id'), nullable=True)
+    
+    # Author info (for API articles)
+    author = Column(String(255), nullable=True)  # Tên tác giả gốc từ nguồn bên ngoài
+    
     status = Column(NewsStatusType(), default=NewsStatus.DRAFT)
     is_featured = Column(Boolean, default=False)
     is_hot = Column(Boolean, default=False)

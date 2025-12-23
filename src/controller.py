@@ -408,6 +408,149 @@ class AdminController:
         
         return redirect(request.referrer or url_for('admin.dashboard'))
     
+    def international_news_delete(self, news_id: int):
+        """
+        Xóa bài viết quốc tế
+        Route: POST /admin/international/<news_id>/delete
+        """
+        from database import NewsInternational
+        article = self.db_session.query(NewsInternational).filter(NewsInternational.id == news_id).first()
+        
+        if not article:
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+            flash('Không tìm thấy bài viết', 'error')
+            return redirect(request.referrer or url_for('admin.dashboard'))
+        
+        self.db_session.delete(article)
+        self.db_session.commit()
+        
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            return jsonify({'success': True, 'message': 'Đã xóa bài viết quốc tế'})
+        
+        flash('Đã xóa bài viết quốc tế', 'success')
+        return redirect(request.referrer or url_for('admin.dashboard'))
+    
+    def international_news_submit(self, news_id: int):
+        """
+        Gửi bài viết quốc tế nháp để duyệt (chuyển từ DRAFT sang PENDING)
+        Route: POST /admin/international/<news_id>/submit
+        """
+        from database import NewsInternational, NewsStatus
+        article = self.db_session.query(NewsInternational).filter(NewsInternational.id == news_id).first()
+        
+        if not article:
+            return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+        
+        if article.status != NewsStatus.DRAFT:
+            return jsonify({'success': False, 'error': 'Chỉ có thể gửi bài viết nháp để duyệt'}), 400
+        
+        article.status = NewsStatus.PENDING
+        article.updated_at = datetime.utcnow()
+        self.db_session.commit()
+        
+        return jsonify({'success': True, 'message': 'Đã gửi bài viết để duyệt'})
+    
+    def api_edit_international_article(self, article_id: int):
+        """API chỉnh sửa bài viết quốc tế theo ID"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        from database import NewsInternational, CategoryInternational, NewsStatus
+        article = self.db_session.query(NewsInternational).filter(NewsInternational.id == article_id).first()
+        if not article:
+            return jsonify({'success': False, 'error': 'Bài viết không tồn tại'}), 400
+        
+        data = request.json if request.is_json else request.form
+        
+        # Lấy dữ liệu từ form
+        title = data.get('title', '').strip()
+        content = data.get('content', '').strip()
+        category_id = data.get('category_id') or data.get('category')
+        summary = data.get('summary') or data.get('description', '').strip()
+        thumbnail = data.get('thumbnail', '').strip()
+        status = data.get('status', article.status.value)
+        
+        # Validation
+        if not title:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập tiêu đề bài viết'}), 400
+        
+        if not content:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập nội dung bài viết'}), 400
+        
+        if not category_id:
+            return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+        
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Danh mục không hợp lệ'}), 400
+        
+        # Kiểm tra category tồn tại
+        category = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == category_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+        
+        try:
+            news_status = NewsStatus(status)
+        except ValueError:
+            news_status = article.status
+        
+        # Tạo slug từ tiêu đề
+        base_slug = self._generate_slug(title)
+        slug = base_slug
+        
+        # Kiểm tra slug trùng và thêm số nếu cần (nhưng không trùng với chính nó)
+        counter = 1
+        while self.db_session.query(NewsInternational).filter(NewsInternational.slug == slug, NewsInternational.id != article_id).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        # Extract images từ HTML content
+        import re
+        image_urls = []
+        img_pattern = r'<img[^>]+src=["\']([^"\']+)["\']'
+        matches = re.findall(img_pattern, content)
+        for img_url in matches:
+            if img_url and img_url not in image_urls:
+                image_urls.append(img_url)
+        
+        # Lưu images dưới dạng JSON
+        images_json = None
+        if image_urls:
+            import json
+            images_json = json.dumps(image_urls)
+        
+        try:
+            # Cập nhật bài viết
+            article.title = title
+            article.slug = slug
+            article.content = content
+            article.summary = summary
+            article.thumbnail = thumbnail
+            article.images = images_json
+            article.category_id = category_id
+            article.status = news_status
+            article.published_at = datetime.utcnow() if news_status == NewsStatus.PUBLISHED else article.published_at
+            article.updated_at = datetime.utcnow()
+            
+            self.db_session.commit()
+            self.db_session.refresh(article)
+            
+            return jsonify({
+                'success': True,
+                'message': 'Đã cập nhật bài viết quốc tế',
+                'data': {
+                    'id': article.id,
+                    'title': article.title,
+                    'status': article.status.value
+                }
+            })
+        except Exception as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': f'Lỗi khi cập nhật bài viết: {str(e)}'}), 500
+    
     def api_news_list(self):
         """
         API lấy danh sách bài viết (JSON)
@@ -699,7 +842,9 @@ class AdminController:
                 'id': article.id,
                 'title': article.title,
                 'category': article.category.name if article.category else 'N/A',
-                'author': article.creator.username if article.creator else 'N/A',
+                'author': article.author if article.is_api and article.author else (article.creator.username if article.creator else 'N/A'),
+                'approver': article.approver.username if article.approver else 'N/A',
+                'is_api': article.is_api,
                 'status': 'Approved',
                 'views': article.view_count,
                 'published': article.published_at.strftime('%d/%m/%Y') if article.published_at else ''
@@ -723,9 +868,190 @@ class AdminController:
                 'id': article.id,
                 'title': article.title,
                 'category': article.category.name if article.category else 'N/A',
-                'author': article.creator.username if article.creator else 'N/A',
+                'author': article.author if article.is_api and article.author else (article.creator.username if article.creator else 'N/A'),
+                'approver': article.approver.username if article.approver else None,
+                'is_api': article.is_api,
                 'submitted': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else ''
             } for article in articles]
+        })
+    
+    def api_international_drafts(self):
+        """API lấy danh sách bài viết quốc tế nháp từ bảng NewsInternational"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        search = request.args.get('search', '').strip()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        query = (
+            self.db_session.query(NewsInternational)
+            .join(CategoryInternational)
+            .filter(NewsInternational.status == NewsStatus.DRAFT)
+            .filter(NewsInternational.created_by == user_id)  # Chỉ lấy bài của editor hiện tại
+        )
+        
+        # Tìm kiếm theo title nếu có
+        if search:
+            query = query.filter(NewsInternational.title.ilike(f'%{search}%'))
+        
+        total = query.count()
+        articles = query.order_by(NewsInternational.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'category': article.category.name if article.category else 'N/A',
+                'category_id': article.category_id,
+                'author': article.author if article.is_api and article.author else (article.creator.username if article.creator else 'N/A'),
+                'is_api': article.is_api,
+                'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'status': article.status.value
+            } for article in articles],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'pages': (total + per_page - 1) // per_page
+            }
+        })
+    
+    def api_my_international_articles(self):
+        """API lấy danh sách bài viết quốc tế của editor hiện tại"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        status = request.args.get('status', None)
+        search = request.args.get('search', '').strip()
+        
+        query = (
+            self.db_session.query(NewsInternational)
+            .join(CategoryInternational)
+            .filter(NewsInternational.created_by == user_id)
+        )
+        
+        # Lọc theo status nếu có
+        if status and status != 'all':
+            try:
+                status_enum = NewsStatus(status)
+                query = query.filter(NewsInternational.status == status_enum)
+            except ValueError:
+                pass
+        
+        # Tìm kiếm theo title nếu có
+        if search:
+            query = query.filter(NewsInternational.title.ilike(f'%{search}%'))
+        
+        total = query.count()
+        articles = query.order_by(NewsInternational.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'category': article.category.name if article.category else 'N/A',
+                'category_id': article.category_id,
+                'status': article.status.value,
+                'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'published_at': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
+                'view_count': article.view_count or 0
+            } for article in articles],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'pages': (total + per_page - 1) // per_page
+            }
+        })
+    
+    def api_international_pending_editor(self):
+        """API lấy danh sách bài viết quốc tế chờ duyệt của editor"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        search = request.args.get('search', '').strip()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        query = (
+            self.db_session.query(NewsInternational)
+            .join(CategoryInternational)
+            .filter(NewsInternational.status == NewsStatus.PENDING)
+            .filter(NewsInternational.created_by == user_id)  # Chỉ lấy bài của editor hiện tại
+        )
+        
+        if search:
+            query = query.filter(NewsInternational.title.ilike(f'%{search}%'))
+        
+        total = query.count()
+        articles = query.order_by(NewsInternational.created_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'category': article.category.name if article.category else 'N/A',
+                'category_id': article.category_id,
+                'status': article.status.value,
+                'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'submitted': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else ''
+            } for article in articles],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'pages': (total + per_page - 1) // per_page
+            }
+        })
+    
+    def api_international_published_editor(self):
+        """API lấy danh sách bài viết quốc tế đã xuất bản của editor"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        search = request.args.get('search', '').strip()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        
+        query = (
+            self.db_session.query(NewsInternational)
+            .join(CategoryInternational)
+            .filter(NewsInternational.status == NewsStatus.PUBLISHED)
+            .filter(NewsInternational.created_by == user_id)  # Chỉ lấy bài của editor hiện tại
+        )
+        
+        if search:
+            query = query.filter(NewsInternational.title.ilike(f'%{search}%'))
+        
+        total = query.count()
+        articles = query.order_by(NewsInternational.published_at.desc()).offset((page - 1) * per_page).limit(per_page).all()
+        
+        return jsonify({
+            'success': True,
+            'data': [{
+                'id': article.id,
+                'title': article.title,
+                'category': article.category.name if article.category else 'N/A',
+                'category_id': article.category_id,
+                'published_at': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
+                'view_count': article.view_count or 0
+            } for article in articles],
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total,
+                'pages': (total + per_page - 1) // per_page
+            }
         })
     
     def api_fetch_api_news(self):
@@ -1089,6 +1415,7 @@ class AdminController:
                     status=news_status,
                     is_api=True,  # Đánh dấu bài từ API
                     published_at=published_at if news_status == NewsStatus.PUBLISHED else None,
+                    author=article_data.get('author'),  # Lưu tác giả gốc từ API
                 )
             else:
                 existing_news = db_session.query(News).filter(News.slug == base_slug).first()
@@ -1248,6 +1575,10 @@ class AdminController:
         tags_list = [f"#{tag.name}" for tag in tags]
         tags_string = ' '.join(tags_list) if tags_list else ''
         
+        # Xác định author: nếu là bài từ API thì dùng author field, không thì dùng creator
+        author_name = article.author if (hasattr(article, 'is_api') and article.is_api and hasattr(article, 'author') and article.author) else (article.creator.username if article.creator else 'N/A')
+        author_full_name = article.author if (hasattr(article, 'is_api') and article.is_api and hasattr(article, 'author') and article.author) else (article.creator.full_name if article.creator and article.creator.full_name else article.creator.username if article.creator else 'N/A')
+        
         return jsonify({
             'success': True,
             'data': {
@@ -1259,8 +1590,11 @@ class AdminController:
                 'thumbnail': article.thumbnail or '',
                 'category': article.category.name if article.category else 'N/A',
                 'category_id': article.category_id,
-                'author': article.creator.username if article.creator else 'N/A',
-                'author_full_name': article.creator.full_name if article.creator and article.creator.full_name else article.creator.username if article.creator else 'N/A',
+                'author': author_name,
+                'author_full_name': author_full_name,
+                'approver': article.approver.username if article.approver else None,
+                'approver_full_name': article.approver.full_name if article.approver and article.approver.full_name else (article.approver.username if article.approver else None),
+                'is_api': article.is_api if hasattr(article, 'is_api') else False,
                 'status': article.status.value,
                 'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
                 'published_at': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
@@ -1270,6 +1604,47 @@ class AdminController:
                 'is_hot': article.is_hot if hasattr(article, 'is_hot') else False,
                 'is_deleted': article.is_deleted if hasattr(article, 'is_deleted') else False,
                 'tags': tags_string
+            }
+        })
+    
+    def api_international_article_detail(self, article_id: int):
+        """API lấy chi tiết bài viết quốc tế theo ID"""
+        from database import NewsInternational
+        article = self.db_session.query(NewsInternational).filter(NewsInternational.id == article_id).first()
+        
+        if not article:
+            return jsonify({
+                'success': False,
+                'message': 'Bài viết không tồn tại'
+            }), 404
+        
+        # Xác định author: nếu là bài từ API thì dùng author field, không thì dùng creator
+        author_name = article.author if (article.is_api and article.author) else (article.creator.username if article.creator else 'N/A')
+        author_full_name = article.author if (article.is_api and article.author) else (article.creator.full_name if article.creator and article.creator.full_name else article.creator.username if article.creator else 'N/A')
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'id': article.id,
+                'title': article.title,
+                'slug': article.slug,
+                'summary': article.summary or '',
+                'content': article.content or '',
+                'thumbnail': article.thumbnail or '',
+                'category': article.category.name if article.category else 'N/A',
+                'category_id': article.category_id,
+                'author': author_name,
+                'author_full_name': author_full_name,
+                'approver': article.approver.username if article.approver else None,
+                'approver_full_name': article.approver.full_name if article.approver and article.approver.full_name else (article.approver.username if article.approver else None),
+                'is_api': article.is_api,
+                'status': article.status.value,
+                'created_at': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'published_at': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else '',
+                'updated_at': article.updated_at.strftime('%d/%m/%Y %H:%M') if article.updated_at else '',
+                'view_count': article.view_count,
+                'is_featured': article.is_featured,
+                'is_hot': article.is_hot
             }
         })
     
@@ -1494,6 +1869,113 @@ class AdminController:
             slug = f"{slug}-{status}"
         
         return slug
+    
+    def api_create_international_article(self):
+        """API tạo bài viết quốc tế mới từ editor form"""
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        from database import NewsInternational, CategoryInternational
+        
+        data = request.json if request.is_json else request.form
+        
+        # Lấy dữ liệu từ form
+        title = data.get('title', '').strip()
+        content = data.get('content', '').strip()
+        category_id = data.get('category_id') or data.get('category')
+        summary = data.get('summary') or data.get('description', '').strip()
+        thumbnail = data.get('thumbnail', '').strip()
+        author = data.get('author', '').strip()
+        status = data.get('status', NewsStatus.DRAFT.value)
+        
+        # Validation
+        if not title:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập tiêu đề bài viết'}), 400
+        
+        if not content:
+            return jsonify({'success': False, 'error': 'Vui lòng nhập nội dung bài viết'}), 400
+        
+        if not category_id:
+            return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
+        
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Danh mục không hợp lệ'}), 400
+        
+        # Kiểm tra category tồn tại
+        category = self.db_session.query(CategoryInternational).filter(CategoryInternational.id == category_id).first()
+        if not category:
+            return jsonify({'success': False, 'error': 'Danh mục không tồn tại'}), 400
+        
+        try:
+            news_status = NewsStatus(status)
+        except ValueError:
+            news_status = NewsStatus.DRAFT
+        
+        # Tạo slug từ tiêu đề
+        base_slug = self._generate_slug(title)
+        slug = base_slug
+        
+        # Kiểm tra slug trùng và thêm số nếu cần
+        counter = 1
+        while self.db_session.query(NewsInternational).filter(NewsInternational.slug == slug).first():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        
+        # Extract images từ HTML content
+        import re
+        image_urls = []
+        img_pattern = r'<img[^>]+src=["\']([^"\']+)["\']'
+        matches = re.findall(img_pattern, content)
+        for img_url in matches:
+            if img_url and img_url not in image_urls:
+                image_urls.append(img_url)
+        
+        # Lưu images dưới dạng JSON
+        images_json = None
+        if image_urls:
+            import json
+            images_json = json.dumps(image_urls)
+        
+        try:
+            # Tạo bài viết quốc tế mới
+            news = NewsInternational(
+                title=title,
+                slug=slug,
+                summary=summary,
+                content=content,
+                thumbnail=thumbnail,
+                images=images_json,
+                category_id=category_id,
+                created_by=user_id,
+                approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
+                status=news_status,
+                author=author if author else None,
+                published_at=datetime.utcnow() if news_status == NewsStatus.PUBLISHED else None
+            )
+            
+            self.db_session.add(news)
+            self.db_session.commit()
+            self.db_session.refresh(news)
+            
+            return jsonify({
+                'success': True,
+                'message': 'Đã tạo bài viết quốc tế',
+                'data': {
+                    'id': news.id,
+                    'title': news.title,
+                    'status': news.status.value
+                }
+            })
+        except IntegrityError as e:
+            self.db_session.rollback()
+            return jsonify({'success': False, 'error': 'Bài viết đã tồn tại'}), 400
+        except Exception as e:
+            self.db_session.rollback()
+            current_app.logger.exception('Lỗi tạo bài viết quốc tế: %s', e)
+            return jsonify({'success': False, 'error': f'Không thể tạo bài viết: {str(e)}'}), 500
     
     def api_create_article(self):
         """API tạo bài viết mới từ editor form"""
@@ -2520,36 +3002,68 @@ class AdminController:
             session.clear()
             return redirect(url_for('admin.login'))
         
-        # Lấy tin đã lưu
+        # Lấy tin đã lưu (cả site VN và EN)
         saved_news = self.db_session.query(SavedNews).filter(
-            SavedNews.user_id == user.id,
-            (SavedNews.site == 'vn') | (SavedNews.site.is_(None))
+            SavedNews.user_id == user.id
         ).order_by(SavedNews.created_at.desc()).limit(20).all()
         
-        # Lấy tin đã xem
+        # Lấy tin đã xem (cả site VN và EN)
         viewed_news = self.db_session.query(ViewedNews).filter(
-            ViewedNews.user_id == user.id,
-            (ViewedNews.site == 'vn') | (ViewedNews.site.is_(None))
+            ViewedNews.user_id == user.id
         ).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
         
-        # Lấy bình luận
-        comments = self.db_session.query(Comment).filter(
-            Comment.user_id == user.id).order_by(Comment.created_at.desc()).limit(20).all()
+        # Lấy tất cả bình luận của user (cả site VN và EN), sau đó lọc không trùng news_id/news_international_id
+        all_comments = self.db_session.query(Comment).filter(
+            Comment.user_id == user.id
+        ).order_by(Comment.created_at.desc()).all()
+
+        comments = []
+        seen_news_ids = set()
+        seen_news_international_ids = set()
+        for comment in all_comments:
+            # Mỗi bài viết chỉ lấy 1 bình luận – ưu tiên bình luận mới nhất
+            if comment.news_id and comment.news_id not in seen_news_ids:
+                comments.append(comment)
+                seen_news_ids.add(comment.news_id)
+            elif comment.news_international_id and comment.news_international_id not in seen_news_international_ids:
+                comments.append(comment)
+                seen_news_international_ids.add(comment.news_international_id)
+            if len(comments) >= 20:
+                break
         
-        # Tính số bình luận cho mỗi bài viết
+        # Tính số bình luận cho mỗi bài viết (cả news_id và news_international_id)
         comment_counts = {}
         if comments:
-            news_ids = list(set([comment.news_id for comment in comments]))
-            from sqlalchemy import func
-            counts = self.db_session.query(
-                Comment.news_id,
-                func.count(Comment.id).label('count')
-            ).filter(
-                Comment.news_id.in_(news_ids),
-                Comment.is_active == True
-            ).group_by(Comment.news_id).all()
+            news_ids = list(set([comment.news_id for comment in comments if comment.news_id]))
+            news_international_ids = list(set([comment.news_international_id for comment in comments if comment.news_international_id]))
             
-            comment_counts = {news_id: count for news_id, count in counts}
+            from sqlalchemy import func
+            
+            # Đếm comments cho news_id
+            if news_ids:
+                counts_vn = self.db_session.query(
+                    Comment.news_id,
+                    func.count(Comment.id).label('count')
+                ).filter(
+                    Comment.news_id.in_(news_ids),
+                    Comment.is_active == True
+                ).group_by(Comment.news_id).all()
+                
+                for news_id, count in counts_vn:
+                    comment_counts[news_id] = count
+            
+            # Đếm comments cho news_international_id
+            if news_international_ids:
+                counts_en = self.db_session.query(
+                    Comment.news_international_id,
+                    func.count(Comment.id).label('count')
+                ).filter(
+                    Comment.news_international_id.in_(news_international_ids),
+                    Comment.is_active == True
+                ).group_by(Comment.news_international_id).all()
+                
+                for news_international_id, count in counts_en:
+                    comment_counts[news_international_id] = count
         
         # Tính tổng số bình luận của cá nhân
         total_comments = self.db_session.query(Comment).filter(
@@ -3061,10 +3575,11 @@ class ClientController:
             user_id = None
             if 'user_id' in session:
                 user_id = session['user_id']
-                # Lưu vào tin đã xem
+                # Lưu vào tin đã xem (site vn sử dụng news_id)
                 existing_viewed = db_session.query(ViewedNews).filter(
                     ViewedNews.user_id == user_id,
-                    ViewedNews.news_id == news.id
+                    ViewedNews.news_id == news.id,
+                    ViewedNews.site == 'vn'
                 ).first()
                 
                 if not existing_viewed:
@@ -3080,21 +3595,23 @@ class ClientController:
                     existing_viewed.viewed_at = datetime.utcnow()
                     db_session.commit()
                 
-                # Kiểm tra xem tin đã được lưu chưa
+                # Kiểm tra xem tin đã được lưu chưa (site vn sử dụng news_id)
                 saved_news = db_session.query(SavedNews).filter(
                     SavedNews.user_id == user_id,
-                    SavedNews.news_id == news.id
+                    SavedNews.news_id == news.id,
+                    SavedNews.site == 'vn'
                 ).first()
                 is_saved = saved_news is not None
             
-            # Lấy bình luận
+            # Lấy bình luận (site vn sử dụng news_id)
             from sqlalchemy.orm import joinedload
             comments = db_session.query(Comment).options(
                 joinedload(Comment.user)
             ).filter(
                 Comment.news_id == news.id,
                 Comment.is_active == True,
-                Comment.parent_id == None  # Chỉ lấy comment gốc, không lấy reply
+                Comment.parent_id == None,  # Chỉ lấy comment gốc, không lấy reply
+                Comment.site == 'vn'
             ).order_by(Comment.created_at.desc()).all()
             
             time_format = '%d-%m-%Y %H:%M'
@@ -3412,32 +3929,68 @@ class ClientController:
             session.clear()
             return redirect(url_for('client.user_login'))
         
-        # Lấy tin đã lưu
+        # Lấy tin đã lưu (cả site VN và EN)
         saved_news = self.db_session.query(SavedNews).filter(
-            SavedNews.user_id == user.id).order_by(SavedNews.created_at.desc()).limit(20).all()
+            SavedNews.user_id == user.id
+        ).order_by(SavedNews.created_at.desc()).limit(20).all()
         
-        # Lấy tin đã xem
+        # Lấy tin đã xem (cả site VN và EN)
         viewed_news = self.db_session.query(ViewedNews).filter(
-            ViewedNews.user_id == user.id).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
+            ViewedNews.user_id == user.id
+        ).order_by(ViewedNews.viewed_at.desc()).limit(20).all()
         
-        # Lấy bình luận
-        comments = self.db_session.query(Comment).filter(
-            Comment.user_id == user.id).order_by(Comment.created_at.desc()).limit(20).all()
+        # Lấy tất cả bình luận của user (cả site VN và EN), sau đó lọc không trùng news_id/news_international_id
+        all_comments = self.db_session.query(Comment).filter(
+            Comment.user_id == user.id
+        ).order_by(Comment.created_at.desc()).all()
+
+        comments = []
+        seen_news_ids = set()
+        seen_news_international_ids = set()
+        for comment in all_comments:
+            # Mỗi bài viết chỉ lấy 1 bình luận – ưu tiên bình luận mới nhất
+            if comment.news_id and comment.news_id not in seen_news_ids:
+                comments.append(comment)
+                seen_news_ids.add(comment.news_id)
+            elif comment.news_international_id and comment.news_international_id not in seen_news_international_ids:
+                comments.append(comment)
+                seen_news_international_ids.add(comment.news_international_id)
+            if len(comments) >= 20:
+                break
         
-        # Tính số bình luận cho mỗi bài viết
+        # Tính số bình luận cho mỗi bài viết (cả news_id và news_international_id)
         comment_counts = {}
         if comments:
-            news_ids = list(set([comment.news_id for comment in comments]))
-            from sqlalchemy import func
-            counts = self.db_session.query(
-                Comment.news_id,
-                func.count(Comment.id).label('count')
-            ).filter(
-                Comment.news_id.in_(news_ids),
-                Comment.is_active == True
-            ).group_by(Comment.news_id).all()
+            news_ids = list(set([comment.news_id for comment in comments if comment.news_id]))
+            news_international_ids = list(set([comment.news_international_id for comment in comments if comment.news_international_id]))
             
-            comment_counts = {news_id: count for news_id, count in counts}
+            from sqlalchemy import func, or_
+            
+            # Đếm comments cho news_id
+            if news_ids:
+                counts_vn = self.db_session.query(
+                    Comment.news_id,
+                    func.count(Comment.id).label('count')
+                ).filter(
+                    Comment.news_id.in_(news_ids),
+                    Comment.is_active == True
+                ).group_by(Comment.news_id).all()
+                
+                for news_id, count in counts_vn:
+                    comment_counts[news_id] = count
+            
+            # Đếm comments cho news_international_id
+            if news_international_ids:
+                counts_en = self.db_session.query(
+                    Comment.news_international_id,
+                    func.count(Comment.id).label('count')
+                ).filter(
+                    Comment.news_international_id.in_(news_international_ids),
+                    Comment.is_active == True
+                ).group_by(Comment.news_international_id).all()
+                
+                for news_international_id, count in counts_en:
+                    comment_counts[news_international_id] = count
         
         # Tính tổng số bình luận của cá nhân
         total_comments = self.db_session.query(Comment).filter(
@@ -3587,23 +4140,43 @@ class ClientController:
         """
         API lưu/bỏ lưu tin tức
         Route: POST /api/save-news/<news_id>
+        Hỗ trợ cả news_id (site vn) và news_international_id (site en)
         """
         if 'user_id' not in session:
             return jsonify({'success': False, 'message': 'Vui lòng đăng nhập'}), 401
         
         user_id = session['user_id']
-        news = self.news_model.get_by_id(news_id)
+        site = request.args.get('site', 'vn')
         
-        site = request.args.get('site') if request.args.get('site') else 'vn'
-        if not news:
-            return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
+        # Xác định loại news và lấy thông tin
+        news = None
+        news_international = None
+        
+        if site == 'en':
+            # Site EN: tìm trong news_international
+            int_news_model = InternationalNewsModel(self.db_session)
+            news_international = int_news_model.get_by_id(news_id)
+            if not news_international:
+                return jsonify({'success': False, 'message': 'News not found'}), 404
+        else:
+            # Site VN: tìm trong news
+            news = self.news_model.get_by_id(news_id)
+            if not news:
+                return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
         
         # Kiểm tra xem đã lưu chưa
-        saved_news = self.db_session.query(SavedNews).filter(
-            SavedNews.user_id == user_id,
-            SavedNews.news_id == news_id,
-            SavedNews.site == site
-        ).first()
+        if site == 'en':
+            saved_news = self.db_session.query(SavedNews).filter(
+                SavedNews.user_id == user_id,
+                SavedNews.news_international_id == news_id,
+                SavedNews.site == site
+            ).first()
+        else:
+            saved_news = self.db_session.query(SavedNews).filter(
+                SavedNews.user_id == user_id,
+                SavedNews.news_id == news_id,
+                SavedNews.site == site
+            ).first()
         
         if saved_news:
             # Bỏ lưu
@@ -3613,11 +4186,18 @@ class ClientController:
             return jsonify({'success': True, 'message': message, 'is_saved': False})
         else:
             # Lưu
-            new_saved = SavedNews(
-                user_id=user_id,
-                news_id=news_id,
-                site=site
-            )
+            if site == 'en':
+                new_saved = SavedNews(
+                    user_id=user_id,
+                    news_international_id=news_id,
+                    site=site
+                )
+            else:
+                new_saved = SavedNews(
+                    user_id=user_id,
+                    news_id=news_id,
+                    site=site
+                )
             self.db_session.add(new_saved)
             self.db_session.commit()
 
@@ -3628,18 +4208,29 @@ class ClientController:
         """
         API gửi bình luận
         Route: POST /api/comment/<news_id>
+        Hỗ trợ cả news_id (site vn) và news_international_id (site en)
         """
         if 'user_id' not in session:
             return jsonify({'success': False, 'message': 'Vui lòng đăng nhập để bình luận'}), 401
         
         user_id = session['user_id']
-        news = self.news_model.get_by_id(news_id)
+        site = request.args.get('site', 'vn')
         
-        site = request.args.get('site') if request.args.get('site') else 'vn'
-
-        if not news:
-            message = 'News not found' if site == 'en' else 'Không tìm thấy tin tức'
-            return jsonify({'success': False, 'message': message}), 404
+        # Xác định loại news và lấy thông tin
+        news = None
+        news_international = None
+        
+        if site == 'en':
+            # Site EN: tìm trong news_international
+            int_news_model = InternationalNewsModel(self.db_session)
+            news_international = int_news_model.get_by_id(news_id)
+            if not news_international:
+                return jsonify({'success': False, 'message': 'News not found'}), 404
+        else:
+            # Site VN: tìm trong news
+            news = self.news_model.get_by_id(news_id)
+            if not news:
+                return jsonify({'success': False, 'message': 'Không tìm thấy tin tức'}), 404
         
         content = request.json.get('content', '').strip() if request.is_json else request.form.get('content', '').strip()
         parent_id = request.json.get('parent_id') if request.is_json else request.form.get('parent_id')
@@ -3650,17 +4241,27 @@ class ClientController:
         
         if len(content) > 1000:
             message = 'Comment cannot exceed 1000 characters' if site == 'en' else 'Bình luận không được vượt quá 1000 ký tự'
-            return jsonify({'success': False, 'message': 'Bình luận không được vượt quá 1000 ký tự'}), 400
+            return jsonify({'success': False, 'message': message}), 400
         
         # Tạo bình luận
-        comment = Comment(
-            user_id=user_id,
-            news_id=news_id,
-            content=content,
-            parent_id=int(parent_id) if parent_id else None,
-            site=site,
-            is_active=True
-        )
+        if site == 'en':
+            comment = Comment(
+                user_id=user_id,
+                news_international_id=news_id,
+                content=content,
+                parent_id=int(parent_id) if parent_id else None,
+                site=site,
+                is_active=True
+            )
+        else:
+            comment = Comment(
+                user_id=user_id,
+                news_id=news_id,
+                content=content,
+                parent_id=int(parent_id) if parent_id else None,
+                site=site,
+                is_active=True
+            )
         self.db_session.add(comment)
         self.db_session.commit()
         self.db_session.refresh(comment)
@@ -4030,16 +4631,17 @@ class ClientController:
             user_id = None
             if 'user_id' in session:
                 user_id = session['user_id']
-                # Lưu vào tin đã xem
+                # Lưu vào tin đã xem (site en sử dụng news_international_id)
                 existing_viewed = db_session.query(ViewedNews).filter(
                     ViewedNews.user_id == user_id,
-                    ViewedNews.news_id == news.id
+                    ViewedNews.news_international_id == news.id,
+                    ViewedNews.site == 'en'
                 ).first()
                 
                 if not existing_viewed:
                     viewed_news = ViewedNews(
                         user_id=user_id,
-                        news_id=news.id,
+                        news_international_id=news.id,
                         site='en'
                     )
                     db_session.add(viewed_news)
@@ -4049,22 +4651,23 @@ class ClientController:
                     existing_viewed.viewed_at = datetime.utcnow()
                     db_session.commit()
                 
-                # Kiểm tra xem tin đã được lưu chưa
+                # Kiểm tra xem tin đã được lưu chưa (site en sử dụng news_international_id)
                 saved_news = db_session.query(SavedNews).filter(
                     SavedNews.user_id == user_id,
-                    SavedNews.news_id == news.id
+                    SavedNews.news_international_id == news.id,
+                    SavedNews.site == 'en'
                 ).first()
                 is_saved = saved_news is not None
             
-            # Lấy bình luận
+            # Lấy bình luận (site en sử dụng news_international_id)
             from sqlalchemy.orm import joinedload
             comments = db_session.query(Comment).options(
                 joinedload(Comment.user)
             ).filter(
-                Comment.news_id == news.id,
+                Comment.news_international_id == news.id,
                 Comment.is_active == True,
-                Comment.parent_id == None,
-                Comment.site == 'en'  # Chỉ lấy comment gốc, không lấy reply
+                Comment.parent_id == None,  # Chỉ lấy comment gốc, không lấy reply
+                Comment.site == 'en'
             ).order_by(Comment.created_at.desc()).all()
 
             time_format = '%d-%m-%Y %H:%M'

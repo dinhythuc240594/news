@@ -43,6 +43,17 @@ $(document).ready(function() {
         loadSectionData(section);
     });
     
+    // Search international drafts
+    $('#searchIntDraftsBtn').click(function() {
+        loadInternationalDrafts();
+    });
+    
+    $('#searchIntDrafts').on('keypress', function(e) {
+        if (e.which === 13) {
+            loadInternationalDrafts();
+        }
+    });
+    
     // Logout
     $('#logoutBtn').click(function(e) {
         e.preventDefault();
@@ -114,21 +125,46 @@ $(document).ready(function() {
     // Preview article
     $(document).on('click', '.btn-preview', function() {
         const articleId = $(this).data('id');
-        previewArticle(articleId);
+        const articleType = $(this).data('type'); // 'international' hoặc undefined
+        previewArticle(articleId, articleType);
+    });
+    
+    // Edit international article
+    $(document).on('click', '.btn-edit[data-type="international"]', function() {
+        const articleId = $(this).data('id');
+        editInternationalArticle(articleId);
+    });
+    
+    // Delete international article
+    $(document).on('click', '.btn-delete[data-type="international"]', function() {
+        const articleId = $(this).data('id');
+        if (confirm('Bạn có chắc muốn xóa bài viết này?')) {
+            deleteInternationalArticle(articleId);
+        }
+    });
+    
+    // Submit international draft for approval
+    $(document).on('click', '.btn-submit[data-type="international"]', function() {
+        const articleId = $(this).data('id');
+        if (confirm('Bạn có chắc muốn gửi bài viết này để duyệt?')) {
+            submitInternationalDraft(articleId);
+        }
     });
     
     // Modal approve/reject
     $('#approveBtn').click(function() {
         const articleId = $(this).data('id');
-        approveArticle(articleId);
+        const articleType = $(this).data('type'); // 'international' hoặc undefined
+        approveArticle(articleId, articleType);
         $('#previewArticleModal').modal('hide');
     });
     
     $('#rejectBtn').click(function() {
         const articleId = $(this).data('id');
+        const articleType = $(this).data('type'); // 'international' hoặc undefined
         const reason = prompt('Lý do từ chối:');
         if (reason) {
-            rejectArticle(articleId, reason);
+            rejectArticle(articleId, reason, articleType);
             $('#previewArticleModal').modal('hide');
         }
     });
@@ -206,6 +242,7 @@ function updatePageTitle(section) {
         'tags-manager': 'Quản lý Hashtag',
         'international': 'Bài báo Quốc tế',
         'international-pending': 'Quốc tế chờ duyệt',
+        'international-drafts': 'Quốc tế nháp',
         'menu-manager': 'Quản lý Menu',
         'en-menu-manager': 'Menu Categories EN',
         'users': 'Quản lý người dùng',
@@ -237,6 +274,9 @@ async function loadSectionData(section) {
             break;
         case 'international-pending':
             loadInternationalPending();
+            break;
+        case 'international-drafts':
+            loadInternationalDrafts();
             break;
         case 'dashboard':
             loadStatistics();
@@ -272,7 +312,7 @@ async function loadApprovedArticles() {
                         <td>${article.date}</td>
                         <td><span class="badge bg-success">${article.views} lượt xem</span></td>
                         <td>
-                            <button class="btn btn-sm btn-info btn-action" title="Xem">
+                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}" title="Xem">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </td>
@@ -308,7 +348,7 @@ async function loadRejectedArticles() {
                         <td><span class="badge bg-primary">${article.category}</span></td>
                         <td>${article.date}</td>
                         <td>
-                            <button class="btn btn-sm btn-info btn-action" title="Xem">
+                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}" title="Xem">
                                 <i class="fas fa-eye"></i>
                             </button>
                         </td>
@@ -336,32 +376,35 @@ async function loadInternationalArticles() {
         if (result.success && result.data) {
             let html = '';
             result.data.forEach((article, index) => {
+                const approverDisplay = article.approver || '<span class="text-muted">Chưa duyệt</span>';
                 html += `
                     <tr>
                         <td>${index + 1}</td>
-                        <td>${article.title}</td>
-                        <td><span class="badge bg-info">${article.category}</span></td>
-                        <td>${article.author}</td>
+                        <td><strong>${escapeHtml(article.title)}</strong></td>
+                        <td><span class="badge bg-info">${escapeHtml(article.category)}</span></td>
+                        <td>${escapeHtml(article.author)}${article.is_api ? ' <span class="badge bg-secondary">API</span>' : ''}</td>
+                        <td>${escapeHtml(approverDisplay)}</td>
                         <td><span class="badge bg-success">${article.status}</span></td>
-                        <td>${article.views}</td>
+                        <td>${article.views.toLocaleString('vi-VN')}</td>
                         <td>${article.published}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary"><i class="fas fa-eye"></i></button>
-                            <button class="btn btn-sm btn-warning"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i></button>
+                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}" data-type="international" title="Xem trước">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </td>
                     </tr>
                 `;
             });
             
             if (result.data.length === 0) {
-                html = '<tr><td colspan="8" class="text-center text-muted">Không có bài viết nào</td></tr>';
+                html = '<tr><td colspan="9" class="text-center text-muted">Không có bài viết nào</td></tr>';
             }
             
             $('#international').find('tbody').html(html);
         }
     } catch (error) {
         console.error('Lỗi tải bài viết quốc tế:', error);
+        $('#international').find('tbody').html('<tr><td colspan="9" class="text-center text-danger">Lỗi tải dữ liệu</td></tr>');
     }
 }
 
@@ -377,14 +420,20 @@ async function loadInternationalPending() {
                 html += `
                     <tr>
                         <td>${index + 1}</td>
-                        <td>${article.title}</td>
-                        <td><span class="badge bg-warning">${article.category}</span></td>
-                        <td>${article.author}</td>
+                        <td><strong>${escapeHtml(article.title)}</strong></td>
+                        <td><span class="badge bg-warning">${escapeHtml(article.category)}</span></td>
+                        <td>${escapeHtml(article.author)}${article.is_api ? ' <span class="badge bg-secondary">API</span>' : ''}</td>
                         <td>${article.submitted}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}"><i class="fas fa-eye"></i> Review</button>
-                            <button class="btn btn-sm btn-success btn-approve" data-id="${article.id}" data-type="international"><i class="fas fa-check"></i> Approve</button>
-                            <button class="btn btn-sm btn-danger btn-reject" data-id="${article.id}" data-type="international"><i class="fas fa-times"></i> Reject</button>
+                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}" data-type="international" title="Xem trước">
+                                <i class="fas fa-eye"></i> Review
+                            </button>
+                            <button class="btn btn-sm btn-success btn-approve" data-id="${article.id}" data-type="international" title="Duyệt">
+                                <i class="fas fa-check"></i> Approve
+                            </button>
+                            <button class="btn btn-sm btn-danger btn-reject" data-id="${article.id}" data-type="international" title="Từ chối">
+                                <i class="fas fa-times"></i> Reject
+                            </button>
                         </td>
                     </tr>
                 `;
@@ -398,6 +447,153 @@ async function loadInternationalPending() {
         }
     } catch (error) {
         console.error('Lỗi tải bài viết quốc tế chờ duyệt:', error);
+        $('#international-pending').find('tbody').html('<tr><td colspan="6" class="text-center text-danger">Lỗi tải dữ liệu</td></tr>');
+    }
+}
+
+// Load international drafts
+async function loadInternationalDrafts() {
+    try {
+        const search = $('#searchIntDrafts').val() ? $('#searchIntDrafts').val().trim() : '';
+        let url = '/admin/api/international-drafts';
+        if (search) {
+            url += `?search=${encodeURIComponent(search)}`;
+        }
+        
+        const response = await fetch(url);
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let html = '';
+            result.data.forEach((article, index) => {
+                html += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td><strong>${escapeHtml(article.title)}</strong></td>
+                        <td><span class="badge bg-secondary">${escapeHtml(article.category)}</span></td>
+                        <td>${escapeHtml(article.author)}${article.is_api ? ' <span class="badge bg-secondary">API</span>' : ''}</td>
+                        <td>${article.created}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}" data-type="international" title="Xem trước">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-info btn-submit" data-id="${article.id}" data-type="international" title="Gửi chờ duyệt">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger btn-delete" data-id="${article.id}" data-type="international" title="Xóa">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            if (result.data.length === 0) {
+                html = '<tr><td colspan="6" class="text-center text-muted">Không có bài viết nháp nào</td></tr>';
+            }
+            
+            $('#internationalDraftsTable').html(html);
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết quốc tế nháp:', error);
+        $('#internationalDraftsTable').html('<tr><td colspan="6" class="text-center text-danger">Lỗi tải dữ liệu</td></tr>');
+    }
+}
+
+// Edit international article
+async function editInternationalArticle(articleId) {
+    try {
+        const response = await fetch(`/admin/api/international-article/${articleId}`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+            showToast('Lỗi', result.error || 'Không thể tải bài viết', 'warning');
+            return;
+        }
+        
+        const article = result.data;
+        
+        // Hiển thị thông báo rằng chức năng edit sẽ được thêm sau
+        // Hoặc có thể redirect đến editor page nếu có
+        showToast('Thông báo', 'Chức năng chỉnh sửa bài viết quốc tế đang được phát triển. Vui lòng sử dụng chức năng preview để xem chi tiết.', 'info');
+        
+        // Có thể mở modal preview để xem chi tiết
+        previewArticle(articleId, 'international');
+    } catch (error) {
+        console.error('Lỗi tải bài viết quốc tế:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải bài viết', 'warning');
+    }
+}
+
+// Delete international article
+async function deleteInternationalArticle(articleId) {
+    showSpinner();
+    
+    try {
+        const response = await fetch(`/admin/international/${articleId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (response.ok && result.success) {
+            showToast('Thành công', 'Đã xóa bài viết quốc tế', 'success');
+            
+            // Remove from table
+            $(`button[data-id="${articleId}"][data-type="international"]`).closest('tr').fadeOut(function() {
+                $(this).remove();
+            });
+            
+            // Reload drafts if needed
+            loadInternationalDrafts();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể xóa bài viết', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi xóa bài viết quốc tế:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi xóa bài viết', 'warning');
+    }
+}
+
+// Submit international draft for approval
+async function submitInternationalDraft(articleId) {
+    showSpinner();
+    
+    try {
+        const response = await fetch(`/admin/international/${articleId}/submit`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (response.ok && result.success) {
+            showToast('Thành công', 'Đã gửi bài viết để duyệt', 'success');
+            
+            // Remove from table
+            $(`button[data-id="${articleId}"][data-type="international"]`).closest('tr').fadeOut(function() {
+                $(this).remove();
+            });
+            
+            // Reload drafts and pending
+            loadInternationalDrafts();
+            loadInternationalPending();
+            loadStatistics();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể gửi bài viết để duyệt', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi gửi bài viết quốc tế:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi gửi bài viết', 'warning');
     }
 }
 
@@ -1124,7 +1320,7 @@ function escapeHtml(text) {
 }
 
 // Preview article
-async function previewArticle(articleId) {
+async function previewArticle(articleId, articleType) {
     try {
 
         var htmlState = '';
@@ -1138,8 +1334,11 @@ async function previewArticle(articleId) {
         // Show loading state
         $('#previewContent').html(htmlState);
 
-        // Fetch article data from API
-        const response = await fetch(`/admin/api/article/${articleId}`);
+        // Fetch article data from API - sử dụng endpoint phù hợp với loại bài viết
+        const apiEndpoint = articleType === 'international' 
+            ? `/admin/api/international-article/${articleId}`
+            : `/admin/api/article/${articleId}`;
+        const response = await fetch(apiEndpoint);
         const result = await response.json();
         
         if (!result.success || !result.data) {
@@ -1193,7 +1392,16 @@ async function previewArticle(articleId) {
         // Info
         content += '<div class="article-preview-info text-muted small">';
         content += '<div class="d-flex flex-wrap gap-4">';
-        content += '<span><i class="fas fa-user me-1"></i> <strong>Tác giả:</strong> ' + escapeHtml(article.author_full_name || article.author || 'N/A') + '</span>';
+        // Hiển thị tác giả: nếu là bài từ API thì hiển thị author, không thì hiển thị creator
+        const authorDisplay = article.is_api && article.author 
+            ? escapeHtml(article.author) + ' <span class="badge bg-secondary">Từ API</span>'
+            : escapeHtml(article.author_full_name || article.author || 'N/A');
+        content += '<span><i class="fas fa-user me-1"></i> <strong>Tác giả:</strong> ' + authorDisplay + '</span>';
+        // Hiển thị người duyệt nếu có
+        if (article.approver) {
+            const approverDisplay = article.approver_full_name || article.approver || 'N/A';
+            content += '<span><i class="fas fa-user-check me-1"></i> <strong>Người duyệt:</strong> ' + escapeHtml(approverDisplay) + '</span>';
+        }
         if (article.published_at) {
             content += '<span><i class="fas fa-calendar-alt me-1"></i> <strong>Xuất bản:</strong> ' + escapeHtml(article.published_at) + '</span>';
         }
@@ -1225,7 +1433,9 @@ async function previewArticle(articleId) {
         content += '</div>';
         $('#previewContent').html(content);
         $('#approveBtn').data('id', articleId);
+        $('#approveBtn').data('type', articleType); // Lưu loại bài viết
         $('#rejectBtn').data('id', articleId);
+        $('#rejectBtn').data('type', articleType); // Lưu loại bài viết
         
         // Show/hide approve/reject buttons based on status
         if (article.status === 'pending') {

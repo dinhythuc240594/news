@@ -918,3 +918,29 @@ img {
 .news-detail .news-content img {
     width: 100%;
 }
+
+/* Reset article tags inside news-content to prevent structure conflicts */
+.news-content article {
+    display: block;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+}
+
+.news-content article > * {
+    display: block;
+}
+
+.news-content article > *:first-child {
+    margin-top: 0;
+}
+
+.news-content article > *:last-child {
+    margin-bottom: 0;
+}

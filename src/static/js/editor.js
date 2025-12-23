@@ -32,7 +32,7 @@ $(document).ready(function() {
     // Initialize International Article editor
     $('#intArticleContent').summernote({
         height: 400,
-        placeholder: 'Enter article content in English...',
+        placeholder: 'Nhập nội dung bài viết...',
         toolbar: [
             ['style', ['style']],
             ['font', ['bold', 'italic', 'underline', 'clear']],
@@ -42,11 +42,22 @@ $(document).ready(function() {
             ['table', ['table']],
             ['insert', ['link', 'picture', 'video']],
             ['view', ['fullscreen', 'codeview', 'help']]
-        ]
+        ],
+        callbacks: {
+            onImageUpload: function(files) {
+                // Upload image when inserted into editor
+                for (let i = 0; i < files.length; i++) {
+                    uploadImageToEditor(files[i]);
+                }
+            }
+        }
     });
     
     // Load initial data
     loadMyArticles(); // Bài viết của tôi (tất cả trạng thái, trang 1)
+    
+    // Load international categories on page load
+    loadInternationalCategories();
     
     // Load notifications khi mở dropdown
     $('#notificationDropdown').on('click', function() {
@@ -81,6 +92,16 @@ $(document).ready(function() {
             loadPendingArticlesEditor();
         } else if (section === 'published') {
             loadPublishedArticles();
+        } else if (section === 'international-articles') {
+            loadMyInternationalArticles();
+        } else if (section === 'int-drafts') {
+            loadIntDrafts();
+        } else if (section === 'int-pending') {
+            loadIntPending();
+        } else if (section === 'int-published') {
+            loadIntPublished();
+        } else if (section === 'create-international') {
+            loadInternationalCategories();
         }
     });
     
@@ -145,7 +166,7 @@ $(document).ready(function() {
     });
     
     // International article form handlers
-    $('#internationalArticleForm').submit(function(e) {
+    $('#intArticleForm').submit(function(e) {
         e.preventDefault();
         submitInternationalArticle();
     });
@@ -156,6 +177,30 @@ $(document).ready(function() {
     
     $('#previewIntBtn').click(function() {
         previewInternationalArticle();
+    });
+    
+    // Search international drafts
+    $('#searchIntDrafts').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadIntDrafts(1);
+        }
+    });
+    
+    // Search international pending
+    $('#searchIntPending').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadIntPending(1);
+        }
+    });
+    
+    // Search international published
+    $('#searchIntPublished').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            loadIntPublished(1);
+        }
     });
     
     // Filter articles trong tab "Bài viết của tôi"
@@ -547,7 +592,12 @@ function updatePageTitle(section) {
         'create': 'Tạo bài viết mới',
         'drafts': 'Bản nháp',
         'pending': 'Chờ duyệt',
-        'published': 'Đã xuất bản'
+        'published': 'Đã xuất bản',
+        'international-articles': 'Bài báo Quốc tế',
+        'create-international': 'Tạo bài Quốc tế',
+        'int-drafts': 'Quốc tế nháp',
+        'int-pending': 'Quốc tế chờ duyệt',
+        'int-published': 'Quốc tế đã xuất bản'
     };
     $('#pageTitle').text(titles[section] || 'Dashboard');
 }
@@ -1247,59 +1297,169 @@ function hideSpinner() {
 
 // ===== International Article Functions =====
 
-function submitInternationalArticle() {
-    const title = $('#intArticleTitle').val();
-    const content = $('#intArticleContent').summernote('code');
-    const category = $('#intArticleCategory').val();
-    const summary = $('#intArticleSummary').val();
-    const image = $('#intArticleImage').val();
-    const author = $('#intArticleAuthor').val();
-    const tags = $('#intArticleTags').val();
-    
-    if (!title || !content || !category) {
-        showToast('Error', 'Please fill in all required fields', 'warning');
-        return;
+// Load international categories
+async function loadInternationalCategories() {
+    try {
+        const response = await fetch('/admin/api/international-categories');
+        const result = await response.json();
+        
+        if (result.success && result.data) {
+            let options = '<option value="">Select category</option>';
+            result.data.forEach(cat => {
+                options += `<option value="${cat.id}">${cat.name}</option>`;
+            });
+            $('#intArticleCategory').html(options);
+        }
+    } catch (error) {
+        console.error('Error loading international categories:', error);
     }
-    
-    showSpinner();
-    
-    // Simulate API call
-    setTimeout(function() {
-        hideSpinner();
-        showToast('Success', 'International article submitted for review', 'success');
-        
-        // Reset form
-        $('#internationalArticleForm')[0].reset();
-        $('#intArticleContent').summernote('reset');
-        
-        // Switch to international articles view
-        $('.sidebar-menu a[data-section="international-articles"]').click();
-    }, 1500);
 }
 
-function saveInternationalDraft() {
-    const title = $('#intArticleTitle').val();
+// Submit international article for review
+async function submitInternationalArticle() {
+    const title = $('#intArticleTitle').val().trim();
+    const content = $('#intArticleContent').summernote('code');
+    const category = $('#intArticleCategory').val();
+    const summary = $('#intArticleSummary').val().trim();
+    const thumbnail = $('#intArticleImageUrl').val().trim() || $('#intArticleImage').val().trim();
+    const author = $('#intArticleAuthor').val().trim();
     
     if (!title) {
-        showToast('Error', 'Please enter article title', 'warning');
+        showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết', 'warning');
+        return;
+    }
+    
+    if (!content || content.trim() === '' || content === '<p><br></p>') {
+        showToast('Cảnh báo', 'Vui lòng nhập nội dung bài viết', 'warning');
+        return;
+    }
+    
+    if (!category) {
+        showToast('Cảnh báo', 'Vui lòng chọn danh mục', 'warning');
         return;
     }
     
     showSpinner();
     
-    setTimeout(function() {
+    try {
+        const response = await fetch('/admin/api/create-international-article', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                content: content,
+                category_id: parseInt(category),
+                summary: summary,
+                thumbnail: thumbnail,
+                author: author,
+                status: 'pending'
+            })
+        });
+        
+        const result = await response.json();
         hideSpinner();
-        showToast('Success', 'Draft saved successfully', 'success');
-    }, 1000);
+        
+        if (result.success) {
+            showToast('Thành công', 'Bài viết đã được gửi để duyệt', 'success');
+            
+            // Reset form
+            $('#intArticleForm')[0].reset();
+            $('#intArticleContent').summernote('code', '');
+            $('#intImagePreview').html('');
+            $('#intArticleImageUrl').val('');
+            
+            // Reload stats and switch to pending view
+            refreshEditorStats(false);
+            $('.sidebar-menu a[data-section="int-pending"]').click();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể gửi bài viết', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Error submitting international article:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi gửi bài viết', 'warning');
+    }
+}
+
+// Save international article as draft
+async function saveInternationalDraft() {
+    const title = $('#intArticleTitle').val().trim();
+    const content = $('#intArticleContent').summernote('code');
+    const category = $('#intArticleCategory').val();
+    const summary = $('#intArticleSummary').val().trim();
+    const thumbnail = $('#intArticleImageUrl').val().trim() || $('#intArticleImage').val().trim();
+    const author = $('#intArticleAuthor').val().trim();
+    
+    if (!title) {
+        showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết', 'warning');
+        return;
+    }
+    
+    if (!content || content.trim() === '' || content === '<p><br></p>') {
+        showToast('Cảnh báo', 'Vui lòng nhập nội dung bài viết', 'warning');
+        return;
+    }
+    
+    if (!category) {
+        showToast('Cảnh báo', 'Vui lòng chọn danh mục', 'warning');
+        return;
+    }
+    
+    showSpinner();
+    
+    try {
+        const response = await fetch('/admin/api/create-international-article', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title: title,
+                content: content,
+                category_id: parseInt(category),
+                summary: summary,
+                thumbnail: thumbnail,
+                author: author,
+                status: 'draft'
+            })
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (result.success) {
+            showToast('Thành công', 'Đã lưu bài viết vào bản nháp', 'success');
+            
+            // Reset form
+            $('#intArticleForm')[0].reset();
+            $('#intArticleContent').summernote('code', '');
+            $('#intImagePreview').html('');
+            $('#intArticleImageUrl').val('');
+            
+            // Reload stats and switch to drafts view
+            refreshEditorStats(false);
+            $('.sidebar-menu a[data-section="int-drafts"]').click();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể lưu bản nháp', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Error saving international draft:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi lưu bản nháp', 'warning');
+    }
 }
 
 function previewInternationalArticle() {
     const title = $('#intArticleTitle').val();
     const content = $('#intArticleContent').summernote('code');
-    const category = $('#intArticleCategory').val();
+    const category = $('#intArticleCategory option:selected').text();
+    const summary = $('#intArticleSummary').val();
+    const thumbnail = $('#intArticleImageUrl').val() || $('#intArticleImage').val();
     
     if (!title || !content) {
-        showToast('Warning', 'Please add title and content to preview', 'warning');
+        showToast('Cảnh báo', 'Vui lòng nhập tiêu đề và nội dung để xem trước', 'warning');
         return;
     }
     
@@ -1308,23 +1468,291 @@ function previewInternationalArticle() {
     previewWindow.document.write(`
         <html>
         <head>
-            <title>${title}</title>
+            <title>${escapeHtml(title)}</title>
             <style>
                 body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
                 h1 { color: #333; margin-bottom: 10px; }
                 .meta { color: #666; font-size: 14px; margin-bottom: 20px; }
-                .category { background: #0066cc; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; }
+                .category { background: #0066cc; color: white; padding: 5px 10px; border-radius: 3px; font-size: 12px; display: inline-block; margin-bottom: 10px; }
                 .content { line-height: 1.8; color: #444; }
+                .summary { background: #f5f5f5; padding: 15px; border-left: 4px solid #0066cc; margin-bottom: 20px; }
+                img { max-width: 100%; height: auto; margin: 20px 0; }
             </style>
         </head>
         <body>
-            <span class="category">${category}</span>
-            <h1>${title}</h1>
-            <div class="meta">Preview - ${new Date().toLocaleString()}</div>
+            <span class="category">${escapeHtml(category || 'N/A')}</span>
+            <h1>${escapeHtml(title)}</h1>
+            <div class="meta">Xem trước - ${new Date().toLocaleString('vi-VN')}</div>
+            ${thumbnail ? `<img src="${escapeHtml(thumbnail)}" alt="${escapeHtml(title)}" onerror="this.style.display='none'">` : ''}
+            ${summary ? `<div class="summary"><strong>Tóm tắt:</strong> ${escapeHtml(summary)}</div>` : ''}
             <div class="content">${content}</div>
         </body>
         </html>
     `);
+}
+
+// Load my international articles
+async function loadMyInternationalArticles(page = 1, status = null, search = null) {
+    try {
+        showSpinner();
+        
+        const params = new URLSearchParams();
+        params.append('page', page);
+        params.append('per_page', 10);
+        if (status && status !== 'all') {
+            params.append('status', status);
+        }
+        if (search) {
+            params.append('search', search);
+        }
+        
+        const response = await fetch(`/admin/api/my-international-articles?${params.toString()}`);
+        const result = await response.json();
+        hideSpinner();
+        
+        if (!result.success) {
+            showToast('Error', result.error || 'Failed to load articles', 'warning');
+            return;
+        }
+        
+        const articles = (result.data || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            category: item.category || 'N/A',
+            status: item.status,
+            date: item.created_at || item.published_at || ''
+        }));
+        
+        const pagination = result.pagination || {};
+        displayInternationalArticles(articles, 'internationalArticlesTable', null);
+        updatePagination(
+            pagination,
+            'internationalArticlesPagination',
+            (newPage) => loadMyInternationalArticles(newPage, status, search)
+        );
+        updateInfoText(pagination, 'internationalArticlesInfo');
+    } catch (error) {
+        console.error('Error loading international articles:', error);
+        hideSpinner();
+        showToast('Error', 'An error occurred while loading articles', 'warning');
+    }
+}
+
+// Load international drafts
+async function loadIntDrafts(page = 1) {
+    const search = $('#searchIntDrafts').val() ? $('#searchIntDrafts').val().trim() : null;
+    await fetchInternationalArticlesForSection('draft', page, search, 'intDraftsTable', 'intDraftsPagination', 'intDraftsInfo');
+}
+
+// Load international pending
+async function loadIntPending(page = 1) {
+    const search = $('#searchIntPending').val() ? $('#searchIntPending').val().trim() : null;
+    await fetchInternationalArticlesForSection('pending', page, search, 'intPendingTable', 'intPendingPagination', 'intPendingInfo');
+}
+
+// Load international published
+async function loadIntPublished(page = 1) {
+    const search = $('#searchIntPublished').val() ? $('#searchIntPublished').val().trim() : null;
+    await fetchInternationalArticlesForSection('published', page, search, 'intPublishedTable', 'intPublishedPagination', 'intPublishedInfo');
+}
+
+// Fetch international articles for a specific section
+async function fetchInternationalArticlesForSection(status, page = 1, search = null, tableId, paginationId, infoId) {
+    try {
+        showSpinner();
+        
+        let url = '';
+        if (status === 'draft') {
+            url = '/admin/api/international-drafts';
+        } else if (status === 'pending') {
+            url = '/admin/api/international-pending-editor';
+        } else if (status === 'published') {
+            url = '/admin/api/international-published-editor';
+        } else {
+            return;
+        }
+        
+        const params = new URLSearchParams();
+        params.append('page', page);
+        params.append('per_page', 10);
+        if (search) {
+            params.append('search', search);
+        }
+        
+        const response = await fetch(`${url}?${params.toString()}`);
+        const result = await response.json();
+        hideSpinner();
+        
+        if (!result.success) {
+            showToast('Error', result.error || 'Failed to load articles', 'warning');
+            return;
+        }
+        
+        const articles = (result.data || []).map(item => ({
+            id: item.id,
+            title: item.title,
+            category: item.category || 'N/A',
+            status: item.status || status,
+            date: item.created_at || item.submitted || item.published_at || '',
+            views: item.view_count || 0
+        }));
+        
+        const pagination = result.pagination || {};
+        displayInternationalArticles(articles, tableId, status);
+        updatePagination(
+            pagination,
+            paginationId,
+            (newPage) => fetchInternationalArticlesForSection(status, newPage, search, tableId, paginationId, infoId)
+        );
+        updateInfoText(pagination, infoId);
+    } catch (error) {
+        console.error('Error loading international articles:', error);
+        hideSpinner();
+        showToast('Error', 'An error occurred while loading articles', 'warning');
+    }
+}
+
+// Display international articles
+function displayInternationalArticles(articles, tableBodyId, status = null) {
+    let html = '';
+    
+    if (articles.length === 0) {
+        const colCount = status === 'pending' ? 5 : (status === 'published' ? 5 : 4);
+        html = `<tr><td colspan="${colCount}" class="text-center text-muted">No articles found</td></tr>`;
+    } else {
+        articles.forEach((article, index) => {
+            const statusBadge = getStatusBadge(article.status);
+            const date = article.date ? new Date(article.date + 'Z').toLocaleString('sv-SE', {
+                timeZone: 'Asia/Ho_Chi_Minh',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }) : 'N/A';
+            
+            html += '<tr>';
+            html += '<td><strong>' + escapeHtml(article.title) + '</strong></td>';
+            html += '<td><span class="badge bg-primary">' + escapeHtml(article.category) + '</span></td>';
+            
+            if (tableBodyId === 'internationalArticlesTable') {
+                // For "My International Articles" section - show status
+                html += '<td>' + statusBadge + '</td>';
+                html += '<td>' + date + '</td>';
+            } else if (status === 'pending') {
+                html += '<td>' + statusBadge + '</td>';
+                html += '<td>' + date + '</td>';
+            } else if (status === 'published') {
+                html += '<td>' + date + '</td>';
+                html += '<td>' + (article.views || 0).toLocaleString('vi-VN') + '</td>';
+            } else {
+                // drafts
+                html += '<td>' + date + '</td>';
+            }
+            
+            html += '<td>';
+            if (article.status === 'draft') {
+                html += '<button class="btn btn-sm btn-info btn-action btn-edit-int" data-id="' + article.id + '" title="Edit">';
+                html += '<i class="fas fa-edit"></i>';
+                html += '</button>';
+            }
+            html += '<button class="btn btn-sm btn-danger btn-action btn-delete-int" data-id="' + article.id + '" title="Delete">';
+            html += '<i class="fas fa-trash"></i>';
+            html += '</button>';
+            html += '</td>';
+            html += '</tr>';
+        });
+    }
+    
+    $('#' + tableBodyId).html(html);
+}
+
+// Delete international article
+async function deleteInternationalArticle(articleId) {
+    showSpinner();
+    
+    try {
+        const response = await fetch(`/admin/international/${articleId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const result = await response.json();
+        hideSpinner();
+        
+        if (response.ok && result.success) {
+            showToast('Success', 'Article deleted successfully', 'success');
+            
+            // Remove from table
+            $(`button[data-id="${articleId}"].btn-delete-int`).closest('tr').fadeOut(function() {
+                $(this).remove();
+            });
+            
+            // Reload current section
+            const activeSection = $('.content-section.active').attr('id');
+            if (activeSection === 'int-drafts') {
+                loadIntDrafts();
+            } else if (activeSection === 'int-pending') {
+                loadIntPending();
+            } else if (activeSection === 'int-published') {
+                loadIntPublished();
+            } else if (activeSection === 'international-articles') {
+                loadMyInternationalArticles();
+            }
+            
+            refreshEditorStats(false);
+        } else {
+            showToast('Error', result.error || 'Failed to delete article', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Error deleting international article:', error);
+        showToast('Error', 'An error occurred while deleting article', 'warning');
+    }
+}
+
+// Edit international article
+async function editInternationalArticle(articleId) {
+    try {
+        const response = await fetch(`/admin/api/international-article/${articleId}`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+            showToast('Error', result.error || 'Failed to load article', 'warning');
+            return;
+        }
+        
+        const article = result.data;
+        
+        // Load categories
+        await loadInternationalCategories();
+        
+        // Fill form
+        $('#intArticleTitle').val(article.title);
+        $('#intArticleContent').summernote('code', article.content);
+        $('#intArticleCategory').val(article.category_id);
+        $('#intArticleSummary').val(article.summary || '');
+        $('#intArticleImage').val(article.thumbnail || '');
+        $('#intArticleImageUrl').val(article.thumbnail || '');
+        $('#intArticleAuthor').val(article.author || '');
+        
+        // Show image preview if exists
+        if (article.thumbnail) {
+            $('#intImagePreview').html(`<img src="${escapeHtml(article.thumbnail)}" style="max-width: 100%; border-radius: 8px;" onerror="this.style.display='none'">`);
+        }
+        
+        // Switch to create-international section
+        $('.sidebar-menu a[data-section="create-international"]').click();
+        
+        // Show message
+        showToast('Thông báo', 'Đã tải bài viết. Cập nhật và lưu nháp hoặc gửi để duyệt.', 'info');
+    } catch (error) {
+        console.error('Error loading international article:', error);
+        showToast('Error', 'An error occurred while loading article', 'warning');
+    }
 }
 
 // Show toast notification

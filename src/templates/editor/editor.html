@@ -69,6 +69,21 @@
                     <i class="fas fa-plus-circle"></i> Tạo bài Quốc tế
                 </a>
             </li>
+            <li>
+                <a href="#" data-section="int-drafts">
+                    <i class="fas fa-save"></i> Quốc tế nháp
+                </a>
+            </li>
+            <li>
+                <a href="#" data-section="int-pending">
+                    <i class="fas fa-clock"></i> Quốc tế chờ duyệt
+                </a>
+            </li>
+            <li>
+                <a href="#" data-section="int-published">
+                    <i class="fas fa-check-circle"></i> Quốc tế đã xuất bản
+                </a>
+            </li>
             <li class="nav-divider">
                 <span>KHÁC</span>
             </li>
@@ -199,6 +214,10 @@
         {% include 'editor/pending-section.html' %}
         {% include 'editor/published-section.html' %}
         {% include 'editor/international-section.html' %}
+        {% include 'editor/int-article-section.html' %}
+        {% include 'editor/int-drafts-section.html' %}
+        {% include 'editor/int-pending-section.html' %}
+        {% include 'editor/int-published-section.html' %}
 
     </div>
 
@@ -271,100 +290,6 @@
         </div>
     </div>
 
-    <!-- Create International Article Section -->
-    <div class="content-section" id="create-international">
-        <div class="card">
-            <div class="card-header">
-                <h5><i class="fas fa-plus-circle"></i> Create International Article</h5>
-            </div>
-            <div class="card-body">
-                <form id="internationalArticleForm">
-                    <div class="row">
-                        <div class="col-md-8">
-                            <div class="mb-3">
-                                <label class="form-label">Article Title *</label>
-                                <input type="text" class="form-control" id="intArticleTitle" placeholder="Enter title in English..." required>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Content *</label>
-                                <textarea id="intArticleContent" class="form-control"></textarea>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Summary</label>
-                                <textarea class="form-control" id="intArticleSummary" rows="3" placeholder="Brief summary of the article..."></textarea>
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-4">
-                            <div class="mb-3">
-                                <label class="form-label">Category *</label>
-                                <select class="form-select" id="intArticleCategory" required>
-                                    <option value="">Select category</option>
-                                    <option value="world">World</option>
-                                    <option value="business">Business</option>
-                                    <option value="technology">Technology</option>
-                                    <option value="sports">Sports</option>
-                                    <option value="entertainment">Entertainment</option>
-                                    <option value="health">Health</option>
-                                    <option value="science">Science</option>
-                                </select>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Subcategory</label>
-                                <select class="form-select" id="intArticleSubcategory">
-                                    <option value="">Select subcategory</option>
-                                    <option value="asia">Asia</option>
-                                    <option value="europe">Europe</option>
-                                    <option value="americas">Americas</option>
-                                    <option value="africa">Africa</option>
-                                </select>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Featured Image URL</label>
-                                <input type="url" class="form-control" id="intArticleImage" placeholder="https://example.com/image.jpg">
-                                <small class="text-muted">Enter image URL</small>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label">Author</label>
-                                <input type="text" class="form-control" id="intArticleAuthor" placeholder="Author name">
-                            </div>
-                            
-                            <div class="mb-3" style="position: relative;">
-                                <label class="form-label">Tags</label>
-                                <input type="text" class="form-control" id="intArticleTags" placeholder="Type # to suggest tags, e.g: #climate #summit #environment">
-                                <small class="text-muted">Enter tags in hashtag format: #tag_name</small>
-                                <div id="intTagSuggestions" class="tag-suggestions" style="display: none;"></div>
-                            </div>
-                            
-                            <div class="mb-3 form-check">
-                                <input type="checkbox" class="form-check-input" id="intArticleVisible">
-                                <label class="form-check-label" for="intArticleVisible">
-                                    Visible on international site
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-paper-plane"></i> Submit for Review
-                        </button>
-                        <button type="button" class="btn btn-secondary" id="saveIntDraftBtn">
-                            <i class="fas fa-save"></i> Save as Draft
-                        </button>
-                        <button type="button" class="btn btn-outline-secondary" id="previewIntBtn">
-                            <i class="fas fa-eye"></i> Preview
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
 {% endblock %}
 {% block scripts_url %}
     <!-- jQuery -->
