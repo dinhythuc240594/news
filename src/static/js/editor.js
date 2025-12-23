@@ -2,8 +2,8 @@ $(document).ready(function() {
     // Check authentication
     checkAuth();
     
-    // Load user info
-    loadUserInfo();
+    // // Load user info
+    // loadUserInfo();
     
     // Initialize Summernote editor
     $('#articleContent, #editArticleContent').summernote({
@@ -56,8 +56,8 @@ $(document).ready(function() {
     // Load initial data
     loadMyArticles(); // Bài viết của tôi (tất cả trạng thái, trang 1)
     
-    // Load international categories on page load
-    loadInternationalCategories();
+    // // Load international categories on page load
+    // loadInternationalCategories();
     
     // Load notifications khi mở dropdown
     $('#notificationDropdown').on('click', function() {
@@ -291,10 +291,10 @@ $(document).ready(function() {
         }
     });
     
-    // Initialize tag autocomplete for all tag inputs
-    initTagAutocomplete('#articleTags', '#tagSuggestions');
-    initTagAutocomplete('#editArticleTags', '#editTagSuggestions');
-    initTagAutocomplete('#intArticleTags', '#intTagSuggestions');
+    // // Initialize tag autocomplete for all tag inputs
+    // initTagAutocomplete('#articleTags', '#tagSuggestions');
+    // initTagAutocomplete('#editArticleTags', '#editTagSuggestions');
+    // initTagAutocomplete('#intArticleTags', '#intTagSuggestions');
 });
 
 // ===== Editor statistics & notifications =====
@@ -562,6 +562,11 @@ async function checkAuth() {
         if (!result.success || (result.data.role !== 'editor' && result.data.role !== 'admin')) {
             window.location.href = 'login.html';
             return;
+        }else{
+            if (result.success && result.data) {
+                var html = `<a href="/admin/profile">${result.data.name}</a>`;
+                $('#userName').html(html);
+            }
         }
     } catch (error) {
         console.error('Lỗi kiểm tra đăng nhập:', error);
@@ -936,7 +941,7 @@ async function saveDraft() {
     const category = $('#articleCategory').val();
     const description = $('#articleDescription').val().trim();
     const thumbnail = $('#articleImageUrl').val() || '';
-    const tags = normalizeTagString($('#articleTags').val());
+    // const tags = normalizeTagString($('#articleTags').val());
     
     if (!title) {
         showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
@@ -954,13 +959,13 @@ async function saveDraft() {
     }
     
     // Validate tags - chỉ chấp nhận tags có sẵn
-    if (tags) {
-        const tagValidation = validateTags(tags);
-        if (!tagValidation.valid) {
-            showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
-            return;
-        }
-    }
+    // if (tags) {
+    //     const tagValidation = validateTags(tags);
+    //     if (!tagValidation.valid) {
+    //         showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
+    //         return;
+    //     }
+    // }
     
     showSpinner();
     
@@ -976,7 +981,7 @@ async function saveDraft() {
                 category_id: parseInt(category),
                 summary: description,
                 thumbnail: thumbnail,
-                tags: tags,
+                // tags: tags,
                 status: 'draft'
             })
         });
@@ -1056,7 +1061,7 @@ async function submitArticle() {
     const category = $('#articleCategory').val();
     const description = $('#articleDescription').val().trim();
     const thumbnail = $('#articleImageUrl').val() || '';
-    const tags = normalizeTagString($('#articleTags').val());
+    // const tags = normalizeTagString($('#articleTags').val());
     
     // Validation
     if (!title) {
@@ -1074,12 +1079,12 @@ async function submitArticle() {
         return;
     }
     
-    // Validate tags - chỉ chấp nhận tags có sẵn
-    const tagValidation = validateTags(tags);
-    if (!tagValidation.valid) {
-        showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
-        return;
-    }
+    // // Validate tags - chỉ chấp nhận tags có sẵn
+    // const tagValidation = validateTags(tags);
+    // if (!tagValidation.valid) {
+    //     showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
+    //     return;
+    // }
     
     showSpinner();
     
@@ -1095,7 +1100,7 @@ async function submitArticle() {
                 category_id: parseInt(category),
                 summary: description,
                 thumbnail: thumbnail,
-                tags: tags,
+                // tags: tags,
                 status: 'pending'
             })
         });
@@ -1160,7 +1165,7 @@ async function editArticle(articleId) {
             $('#editArticleDescription').val(article.summary);
             $('#editArticleImageUrl').val(article.thumbnail || '');
             $('#editArticleImagePreview').attr('src', article.thumbnail || '/static/images/default-image.png');
-            $('#editArticleTags').val(article.tags || '');
+            // $('#editArticleTags').val(article.tags || '');
             
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
             modal.show();
@@ -1181,7 +1186,7 @@ async function saveEdit(newStatus = null) {
     const category = $('#editArticleCategory').val();
     const description = $('#editArticleDescription').val();
     const image = $('#editArticleImageUrl').val();
-    const tags = normalizeTagString($('#editArticleTags').val());
+    // const tags = normalizeTagString($('#editArticleTags').val());
     if (!title) {
         showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
         return;
@@ -1203,17 +1208,17 @@ async function saveEdit(newStatus = null) {
         showToast('Cảnh báo', 'Vui lòng chọn ảnh đại diện!', 'warning');
         return;
     }
-    if (!tags) {
-        showToast('Cảnh báo', 'Vui lòng nhập tags!', 'warning');
-        return;
-    }
+    // if (!tags) {
+    //     showToast('Cảnh báo', 'Vui lòng nhập tags!', 'warning');
+    //     return;
+    // }
     
-    // Validate tags - chỉ chấp nhận tags có sẵn
-    const tagValidation = validateTags(tags);
-    if (!tagValidation.valid) {
-        showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
-        return;
-    }
+    // // Validate tags - chỉ chấp nhận tags có sẵn
+    // const tagValidation = validateTags(tags);
+    // if (!tagValidation.valid) {
+    //     showToast('Cảnh báo', `Các tags sau không tồn tại trong hệ thống: ${tagValidation.invalidTags.join(', ')}. Vui lòng chỉ sử dụng tags có sẵn.`, 'warning');
+    //     return;
+    // }
     
     try {
         const payload = {

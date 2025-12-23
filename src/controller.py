@@ -2020,6 +2020,8 @@ class AdminController:
             news_status = NewsStatus.DRAFT
         
         # Tạo slug từ tiêu đề và trạng thái
+        print(title)
+        print(status)
         base_slug = self._generate_slug(title, status)
         slug = base_slug
         
@@ -2351,42 +2353,42 @@ class AdminController:
             'image_url': image_url
         })
 
-    def _generate_slug(self, title: str) -> str:
-        """Tạo slug từ tiêu đề - chuyển tiếng Việt có dấu thành không dấu"""
-        import re
-        import unicodedata
+    # def _generate_slug(self, title: str) -> str:
+    #     """Tạo slug từ tiêu đề - chuyển tiếng Việt có dấu thành không dấu"""
+    #     import re
+    #     import unicodedata
         
-        # Chuyển thành chữ thường
-        slug = title.lower()
+    #     # Chuyển thành chữ thường
+    #     slug = title.lower()
         
-        # Bảng chuyển đổi tiếng Việt có dấu sang không dấu
-        vietnamese_map = {
-            'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
-            'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
-            'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
-            'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
-            'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
-            'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
-            'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
-            'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
-            'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
-            'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
-            'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
-            'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
-            'đ': 'd',
-        }
+    #     # Bảng chuyển đổi tiếng Việt có dấu sang không dấu
+    #     vietnamese_map = {
+    #         'à': 'a', 'á': 'a', 'ả': 'a', 'ã': 'a', 'ạ': 'a',
+    #         'ă': 'a', 'ằ': 'a', 'ắ': 'a', 'ẳ': 'a', 'ẵ': 'a', 'ặ': 'a',
+    #         'â': 'a', 'ầ': 'a', 'ấ': 'a', 'ẩ': 'a', 'ẫ': 'a', 'ậ': 'a',
+    #         'è': 'e', 'é': 'e', 'ẻ': 'e', 'ẽ': 'e', 'ẹ': 'e',
+    #         'ê': 'e', 'ề': 'e', 'ế': 'e', 'ể': 'e', 'ễ': 'e', 'ệ': 'e',
+    #         'ì': 'i', 'í': 'i', 'ỉ': 'i', 'ĩ': 'i', 'ị': 'i',
+    #         'ò': 'o', 'ó': 'o', 'ỏ': 'o', 'õ': 'o', 'ọ': 'o',
+    #         'ô': 'o', 'ồ': 'o', 'ố': 'o', 'ổ': 'o', 'ỗ': 'o', 'ộ': 'o',
+    #         'ơ': 'o', 'ờ': 'o', 'ớ': 'o', 'ở': 'o', 'ỡ': 'o', 'ợ': 'o',
+    #         'ù': 'u', 'ú': 'u', 'ủ': 'u', 'ũ': 'u', 'ụ': 'u',
+    #         'ư': 'u', 'ừ': 'u', 'ứ': 'u', 'ử': 'u', 'ữ': 'u', 'ự': 'u',
+    #         'ỳ': 'y', 'ý': 'y', 'ỷ': 'y', 'ỹ': 'y', 'ỵ': 'y',
+    #         'đ': 'd',
+    #     }
         
-        # Thay thế các ký tự tiếng Việt
-        for viet, latin in vietnamese_map.items():
-            slug = slug.replace(viet, latin)
+    #     # Thay thế các ký tự tiếng Việt
+    #     for viet, latin in vietnamese_map.items():
+    #         slug = slug.replace(viet, latin)
         
-        # Xóa các ký tự không phải chữ cái, số, khoảng trắng, dấu gạch ngang
-        slug = re.sub(r'[^\w\s-]', '', slug)
+    #     # Xóa các ký tự không phải chữ cái, số, khoảng trắng, dấu gạch ngang
+    #     slug = re.sub(r'[^\w\s-]', '', slug)
         
-        # Thay thế nhiều khoảng trắng hoặc dấu gạch ngang liên tiếp bằng một dấu gạch ngang
-        slug = re.sub(r'[-\s]+', '-', slug)
+    #     # Thay thế nhiều khoảng trắng hoặc dấu gạch ngang liên tiếp bằng một dấu gạch ngang
+    #     slug = re.sub(r'[-\s]+', '-', slug)
         
-        return slug.strip('-')
+    #     return slug.strip('-')
     
     def api_menu_items(self):
         """API lấy danh sách categories (menu items)"""
