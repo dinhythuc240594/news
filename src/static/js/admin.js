@@ -198,6 +198,9 @@ $(document).ready(function() {
             deleteTag(tagId);
         }
     });
+
+    loadHandlerAPI();
+
 });
 
 // Check authentication
@@ -1729,89 +1732,6 @@ async function openSaveExternalArticleModal(articleData) {
     modal.show();
 }
 
-// Save external article button handler
-$('#saveAPIArticleBtn').off('click').on('click', async function() {
-    const articleData = JSON.parse($('#saveAPIArticleData').val());
-    const categoryId = $('#saveAPICategory').val();
-    const status = $('#saveAPIStatus').val();
-    const region = $('#saveAPIArticleData').data('region') || 'domestic'; // Lấy region từ data attribute
-    
-    console.log('Saving article with data:', {
-        article: articleData,
-        category_id: categoryId,
-        status: status,
-        region: region
-    });
-    
-    if (!categoryId) {
-        alert('Vui lòng chọn danh mục!');
-        return;
-    }
-    
-    const btn = $(this);
-    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Đang lưu...');
-    
-    try {
-        const requestData = {
-            article: articleData,
-            category_id: parseInt(categoryId),
-            status: status,
-            region: region  // Gửi region để backend biết lưu vào bảng nào
-        };
-        
-        console.log('Request payload:', requestData);
-        
-        const response = await fetch('/admin/api/save-api-article', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestData)
-        });
-        
-        console.log('Response status:', response.status);
-        
-        const result = await response.json();
-        console.log('Response data:', result);
-        
-        if (result.success) {
-            showToast('Thành công', result.message || 'Đã lưu bài viết', 'success');
-            
-            // Close modal
-            bootstrap.Modal.getInstance(document.getElementById('saveAPIArticleModal')).hide();
-            
-            // Chỉ xóa card của bài viết vừa lưu (tìm bằng article ID)
-            const articleId = result.article_id || articleData.id;
-            if (articleId) {
-                // Tìm và xóa card chứa bài viết với ID này
-                $(`.save-api-article[data-article-id="${articleId}"], .save-rss-article[data-article-id="${articleId}"]`)
-                    .closest('.col-md-6').fadeOut(function() {
-                        $(this).remove();
-                        
-                        // Cập nhật số lượng bài còn lại
-                        const remainingCount = $('.save-api-article, .save-rss-article').length;
-                        if (remainingCount === 0) {
-                            $('#apiArticlesList, #rssArticlesList').html(
-                                '<p class="text-muted text-center">Không còn bài viết nào. Hãy tải thêm bài mới.</p>'
-                            );
-                        }
-                    });
-            }
-            
-            // Reload statistics
-            loadStatistics();
-        } else {
-            console.error('Save failed:', result.error);
-            showToast('Lỗi', result.error || 'Không thể lưu bài viết', 'warning');
-        }
-    } catch (error) {
-        console.error('Exception when saving article:', error);
-        showToast('Lỗi', 'Có lỗi xảy ra: ' + error.message, 'warning');
-    } finally {
-        btn.prop('disabled', false).html('<i class="fas fa-save"></i> Lưu bài viết');
-    }
-});
-
 // Load API Categories based on region
 function loadApiCategories(region) {
     // Sử dụng proxy endpoint để tránh CORS (token sẽ được lấy từ settings tự động)
@@ -1850,89 +1770,6 @@ function loadApiCategories(region) {
         }
     });
 }
-
-// Handle region change
-$('#apiRegion').change(function() {
-    const region = $(this).val();
-    loadApiCategories(region);
-});
-
-// Fetch API News Button
-$('#fetchApiBtn').click(function() {
-    const limit = $('#apiLimit').val() || 20;
-    
-    // Kiểm tra tab nào đang active
-    const activeTab = $('#apiModeTabs .nav-link.active').attr('id');
-    let requestData = {
-        source_type: 'api',
-        limit: parseInt(limit)
-        // api_key không cần gửi nữa vì server sẽ lấy từ settings
-    };
-    
-    if (activeTab === 'category-tab') {
-        // Mode: Theo khu vực & danh mục
-        const region = $('#apiRegion').val();
-        const categoryId = $('#apiCategorySelect').val();
-        
-        requestData.mode = 'category';
-        requestData.region = region;
-        requestData.category_id = categoryId;
-        
-        // Lưu region để dùng khi save article
-        window.currentApiRegion = region;
-        
-    } else if (activeTab === 'urls-tab') {
-        // Mode: Theo danh sách URL
-        const apiUrlsText = $('#apiUrls').val().trim();
-        
-        if (!apiUrlsText) {
-            alert('Vui lòng nhập ít nhất một URL bài viết');
-            return;
-        }
-        
-        // Parse URLs từ textarea (mỗi URL một dòng)
-        const urls = apiUrlsText.split('\n')
-            .map(url => url.trim())
-            .filter(url => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')));
-        
-        if (urls.length === 0) {
-            alert('Không tìm thấy URL hợp lệ. Vui lòng nhập URL bắt đầu bằng http:// hoặc https://');
-            return;
-        }
-        
-        requestData.mode = 'urls';
-        requestData.urls = urls;
-        
-        // URLs mode mặc định là domestic, có thể lấy từ một select khác nếu cần
-        window.currentApiRegion = 'domestic';
-    }
-    
-    const btn = $(this);
-    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Đang tải...');
-    
-    $.ajax({
-        url: '/admin/api/fetch-api-news',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(requestData),
-        success: function(response) {
-            if (response.success) {
-                displayApiArticles(response.data);
-                showToast('Thành công', `Đã tải ${response.count} bài viết từ API`, 'success');
-                window.apiArticlesData = response.data;
-            } else {
-                showToast('Lỗi', response.message || 'Không thể tải bài viết', 'warning');
-            }
-        },
-        error: function(xhr) {
-            const errorMsg = xhr.responseJSON?.error || xhr.responseJSON?.message || 'Lỗi kết nối server';
-            showToast('Lỗi', errorMsg, 'warning');
-        },
-        complete: function() {
-            btn.prop('disabled', false).html('<i class="fas fa-download"></i> Tải bài từ API');
-        }
-    });
-});
 
 // Display API Articles
 function displayApiArticles(articles) {
@@ -1978,3 +1815,172 @@ $(document).on('click', '.save-api-article', function() {
     
     openSaveExternalArticleModal(article);
 });
+
+
+async function loadHandlerAPI(){
+    // Save external article button handler
+    $('#saveAPIArticleBtn').off('click').on('click', async function() {
+        const articleData = JSON.parse($('#saveAPIArticleData').val());
+        const categoryId = $('#saveAPICategory').val();
+        const status = $('#saveAPIStatus').val();
+        const region = $('#saveAPIArticleData').data('region') || 'domestic'; // Lấy region từ data attribute
+        
+        console.log('Saving article with data:', {
+            article: articleData,
+            category_id: categoryId,
+            status: status,
+            region: region
+        });
+        
+        if (!categoryId) {
+            alert('Vui lòng chọn danh mục!');
+            return;
+        }
+        
+        const btn = $(this);
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Đang lưu...');
+        
+        try {
+            const requestData = {
+                article: articleData,
+                category_id: parseInt(categoryId),
+                status: status,
+                region: region  // Gửi region để backend biết lưu vào bảng nào
+            };
+            
+            console.log('Request payload:', requestData);
+            
+            const response = await fetch('/admin/api/save-api-article', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+            
+            console.log('Response status:', response.status);
+            
+            const result = await response.json();
+            console.log('Response data:', result);
+            
+            if (result.success) {
+                showToast('Thành công', result.message || 'Đã lưu bài viết', 'success');
+                
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('saveAPIArticleModal')).hide();
+                
+                // Chỉ xóa card của bài viết vừa lưu (tìm bằng article ID)
+                const articleId = result.article_id || articleData.id;
+                if (articleId) {
+                    // Tìm và xóa card chứa bài viết với ID này
+                    $(`.save-api-article[data-article-id="${articleId}"], .save-rss-article[data-article-id="${articleId}"]`)
+                        .closest('.col-md-6').fadeOut(function() {
+                            $(this).remove();
+                            
+                            // Cập nhật số lượng bài còn lại
+                            const remainingCount = $('.save-api-article, .save-rss-article').length;
+                            if (remainingCount === 0) {
+                                $('#apiArticlesList, #rssArticlesList').html(
+                                    '<p class="text-muted text-center">Không còn bài viết nào. Hãy tải thêm bài mới.</p>'
+                                );
+                            }
+                        });
+                }
+                
+                // Reload statistics
+                loadStatistics();
+            } else {
+                console.error('Save failed:', result.error);
+                showToast('Lỗi', result.error || 'Không thể lưu bài viết', 'warning');
+            }
+        } catch (error) {
+            console.error('Exception when saving article:', error);
+            showToast('Lỗi', 'Có lỗi xảy ra: ' + error.message, 'warning');
+        } finally {
+            btn.prop('disabled', false).html('<i class="fas fa-save"></i> Lưu bài viết');
+        }
+    });
+
+    // Handle region change
+    $('#apiRegion').change(function() {
+        const region = $(this).val();
+        loadApiCategories(region);
+    });
+
+    // Fetch API News Button
+    $('#fetchApiBtn').click(function() {
+        const limit = $('#apiLimit').val() || 20;
+        
+        // Kiểm tra tab nào đang active
+        const activeTab = $('#apiModeTabs .nav-link.active').attr('id');
+        let requestData = {
+            source_type: 'api',
+            limit: parseInt(limit)
+            // api_key không cần gửi nữa vì server sẽ lấy từ settings
+        };
+        
+        if (activeTab === 'category-tab') {
+            // Mode: Theo khu vực & danh mục
+            const region = $('#apiRegion').val();
+            const categoryId = $('#apiCategorySelect').val();
+            
+            requestData.mode = 'category';
+            requestData.region = region;
+            requestData.category_id = categoryId;
+            
+            // Lưu region để dùng khi save article
+            window.currentApiRegion = region;
+            
+        } else if (activeTab === 'urls-tab') {
+            // Mode: Theo danh sách URL
+            const apiUrlsText = $('#apiUrls').val().trim();
+            
+            if (!apiUrlsText) {
+                alert('Vui lòng nhập ít nhất một URL bài viết');
+                return;
+            }
+            
+            // Parse URLs từ textarea (mỗi URL một dòng)
+            const urls = apiUrlsText.split('\n')
+                .map(url => url.trim())
+                .filter(url => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')));
+            
+            if (urls.length === 0) {
+                alert('Không tìm thấy URL hợp lệ. Vui lòng nhập URL bắt đầu bằng http:// hoặc https://');
+                return;
+            }
+            
+            requestData.mode = 'urls';
+            requestData.urls = urls;
+            
+            // URLs mode mặc định là domestic, có thể lấy từ một select khác nếu cần
+            window.currentApiRegion = 'domestic';
+        }
+        
+        const btn = $(this);
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Đang tải...');
+        
+        $.ajax({
+            url: '/admin/api/fetch-api-news',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(requestData),
+            success: function(response) {
+                if (response.success) {
+                    displayApiArticles(response.data);
+                    showToast('Thành công', `Đã tải ${response.count} bài viết từ API`, 'success');
+                    window.apiArticlesData = response.data;
+                } else {
+                    showToast('Lỗi', response.message || 'Không thể tải bài viết', 'warning');
+                }
+            },
+            error: function(xhr) {
+                const errorMsg = xhr.responseJSON?.error || xhr.responseJSON?.message || 'Lỗi kết nối server';
+                showToast('Lỗi', errorMsg, 'warning');
+            },
+            complete: function() {
+                btn.prop('disabled', false).html('<i class="fas fa-download"></i> Tải bài từ API');
+            }
+        });
+    });
+}

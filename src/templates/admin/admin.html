@@ -505,246 +505,246 @@
         });
     </script>
 
-<script>
-    // Settings Management
-    let settingsLoaded = false;
-    
-    function loadSettings() {
-        if (settingsLoaded) return;
+    <script>
+        // Settings Management
+        let settingsLoaded = false;
         
-        $.ajax({
-            url: '/admin/api/settings',
-            method: 'GET',
-            success: function(response) {
-                if (response.success && response.settings) {
-                    const settings = response.settings;
-                    
-                    // Load API settings
-                    $('#apiToken').val(settings.api_token?.value || '');
-                    $('#apiBaseUrl').val(settings.api_base_url?.value || 'https://news-api.techreview.pro');
-                    
-                    // Load SMTP settings
-                    $('#smtpServer').val(settings.smtp_server?.value || 'smtp.gmail.com');
-                    $('#smtpPort').val(settings.smtp_port?.value || '587');
-                    $('#smtpUsername').val(settings.smtp_username?.value || '');
-                    $('#smtpPassword').val(settings.smtp_password?.value || '');
-                    $('#smtpFromEmail').val(settings.smtp_from_email?.value || '');
-                    $('#smtpUseTls').val(settings.smtp_use_tls?.value || 'true');
-                    
-                    settingsLoaded = true;
+        function loadSettings() {
+            if (settingsLoaded) return;
+            
+            $.ajax({
+                url: '/admin/api/settings',
+                method: 'GET',
+                success: function(response) {
+                    if (response.success && response.settings) {
+                        const settings = response.settings;
+                        
+                        // Load API settings
+                        $('#apiToken').val(settings.api_token?.value || '');
+                        $('#apiBaseUrl').val(settings.api_base_url?.value || 'https://news-api.techreview.pro');
+                        
+                        // Load SMTP settings
+                        $('#smtpServer').val(settings.smtp_server?.value || 'smtp.gmail.com');
+                        $('#smtpPort').val(settings.smtp_port?.value || '587');
+                        $('#smtpUsername').val(settings.smtp_username?.value || '');
+                        $('#smtpPassword').val(settings.smtp_password?.value || '');
+                        $('#smtpFromEmail').val(settings.smtp_from_email?.value || '');
+                        $('#smtpUseTls').val(settings.smtp_use_tls?.value || 'true');
+                        
+                        settingsLoaded = true;
+                    }
+                },
+                error: function() {
+                    console.error('Error loading settings');
                 }
-            },
-            error: function() {
-                console.error('Error loading settings');
+            });
+        }
+        
+        function saveSettings() {
+            // Validate required fields
+            let isValid = true;
+            $('.form-control').removeClass('is-invalid');
+            
+            // Validate API Token
+            if (!$('#apiToken').val().trim()) {
+                $('#apiToken').addClass('is-invalid');
+                $('#apiToken').next('.invalid-feedback').text('API Token là bắt buộc');
+                isValid = false;
             }
-        });
-    }
-    
-    function saveSettings() {
-        // Validate required fields
-        let isValid = true;
-        $('.form-control').removeClass('is-invalid');
-        
-        // Validate API Token
-        if (!$('#apiToken').val().trim()) {
-            $('#apiToken').addClass('is-invalid');
-            $('#apiToken').next('.invalid-feedback').text('API Token là bắt buộc');
-            isValid = false;
-        }
-        
-        // Validate SMTP required fields
-        if (!$('#smtpServer').val().trim()) {
-            $('#smtpServer').addClass('is-invalid');
-            $('#smtpServer').next('.invalid-feedback').text('SMTP Server là bắt buộc');
-            isValid = false;
-        }
-        
-        if (!$('#smtpPort').val().trim()) {
-            $('#smtpPort').addClass('is-invalid');
-            $('#smtpPort').next('.invalid-feedback').text('SMTP Port là bắt buộc');
-            isValid = false;
-        }
-        
-        if (!$('#smtpUsername').val().trim()) {
-            $('#smtpUsername').addClass('is-invalid');
-            $('#smtpUsername').next('.invalid-feedback').text('SMTP Username là bắt buộc');
-            isValid = false;
-        }
-        
-        if (!$('#smtpPassword').val().trim()) {
-            $('#smtpPassword').addClass('is-invalid');
-            $('#smtpPassword').parent().next('.invalid-feedback').text('SMTP Password là bắt buộc');
-            isValid = false;
-        }
-        
-        if (!isValid) {
-            alert('Vui lòng điền đầy đủ các trường bắt buộc');
-            return;
-        }
-        
-        const btn = $('#saveSettingsBtn');
-        const originalText = btn.html();
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Đang lưu...');
-        
-        const settings = {
-            api_token: $('#apiToken').val().trim(),
-            api_base_url: $('#apiBaseUrl').val().trim() || 'https://news-api.techreview.pro',
-            smtp_server: $('#smtpServer').val().trim(),
-            smtp_port: $('#smtpPort').val().trim(),
-            smtp_username: $('#smtpUsername').val().trim(),
-            smtp_password: $('#smtpPassword').val().trim(),
-            smtp_from_email: $('#smtpFromEmail').val().trim() || $('#smtpUsername').val().trim(),
-            smtp_use_tls: $('#smtpUseTls').val()
-        };
-        
-        $.ajax({
-            url: '/admin/api/settings',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(settings),
-            success: function(response) {
-                if (response.success) {
-                    alert('Lưu cài đặt thành công!');
-                    settingsLoaded = false; // Reload on next show
-                } else {
-                    alert(response.error || 'Có lỗi xảy ra khi lưu cài đặt');
-                }
-            },
-            error: function(xhr) {
-                const error = xhr.responseJSON?.error || 'Có lỗi xảy ra khi lưu cài đặt';
-                alert(error);
-            },
-            complete: function() {
-                btn.prop('disabled', false).html(originalText);
+            
+            // Validate SMTP required fields
+            if (!$('#smtpServer').val().trim()) {
+                $('#smtpServer').addClass('is-invalid');
+                $('#smtpServer').next('.invalid-feedback').text('SMTP Server là bắt buộc');
+                isValid = false;
             }
-        });
-    }
-    
-    function testSmtpConnection() {
-        const btn = $('#testSmtpBtn');
-        const originalText = btn.html();
-        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Đang kiểm tra...');
-        
-        // Get current user email from session or prompt
-        const testEmail = prompt('Nhập email để gửi email test:', '');
-        if (!testEmail) {
-            btn.prop('disabled', false).html(originalText);
-            return;
-        }
-        
-        // Validate email format
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(testEmail)) {
-            alert('Email không đúng định dạng');
-            btn.prop('disabled', false).html(originalText);
-            return;
-        }
-        
-        // Save settings first, then test
-        const settings = {
-            api_token: $('#apiToken').val().trim(),
-            api_base_url: $('#apiBaseUrl').val().trim() || 'https://news-api.techreview.pro',
-            smtp_server: $('#smtpServer').val().trim(),
-            smtp_port: $('#smtpPort').val().trim(),
-            smtp_username: $('#smtpUsername').val().trim(),
-            smtp_password: $('#smtpPassword').val().trim(),
-            smtp_from_email: $('#smtpFromEmail').val().trim() || $('#smtpUsername').val().trim(),
-            smtp_use_tls: $('#smtpUseTls').val()
-        };
-        
-        $.ajax({
-            url: '/admin/api/settings',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(settings),
-            success: function(response) {
-                if (response.success) {
-                    // Test email sending
-                    $.ajax({
-                        url: '/admin/api/test-email',
-                        method: 'POST',
-                        contentType: 'application/json',
-                        data: JSON.stringify({ email: testEmail }),
-                        success: function(testResponse) {
-                            if (testResponse.success) {
-                                alert('Gửi email test thành công! Vui lòng kiểm tra hộp thư của bạn.');
-                            } else {
-                                alert('Lỗi khi gửi email test: ' + (testResponse.error || 'Vui lòng kiểm tra lại cài đặt SMTP'));
-                            }
-                        },
-                        error: function() {
-                            alert('Lỗi khi gửi email test. Vui lòng kiểm tra lại cài đặt SMTP.');
-                        },
-                        complete: function() {
-                            btn.prop('disabled', false).html(originalText);
-                        }
-                    });
-                } else {
-                    alert('Lỗi khi lưu cài đặt: ' + (response.error || 'Vui lòng kiểm tra lại'));
+            
+            if (!$('#smtpPort').val().trim()) {
+                $('#smtpPort').addClass('is-invalid');
+                $('#smtpPort').next('.invalid-feedback').text('SMTP Port là bắt buộc');
+                isValid = false;
+            }
+            
+            if (!$('#smtpUsername').val().trim()) {
+                $('#smtpUsername').addClass('is-invalid');
+                $('#smtpUsername').next('.invalid-feedback').text('SMTP Username là bắt buộc');
+                isValid = false;
+            }
+            
+            if (!$('#smtpPassword').val().trim()) {
+                $('#smtpPassword').addClass('is-invalid');
+                $('#smtpPassword').parent().next('.invalid-feedback').text('SMTP Password là bắt buộc');
+                isValid = false;
+            }
+            
+            if (!isValid) {
+                alert('Vui lòng điền đầy đủ các trường bắt buộc');
+                return;
+            }
+            
+            const btn = $('#saveSettingsBtn');
+            const originalText = btn.html();
+            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Đang lưu...');
+            
+            const settings = {
+                api_token: $('#apiToken').val().trim(),
+                api_base_url: $('#apiBaseUrl').val().trim() || 'https://news-api.techreview.pro',
+                smtp_server: $('#smtpServer').val().trim(),
+                smtp_port: $('#smtpPort').val().trim(),
+                smtp_username: $('#smtpUsername').val().trim(),
+                smtp_password: $('#smtpPassword').val().trim(),
+                smtp_from_email: $('#smtpFromEmail').val().trim() || $('#smtpUsername').val().trim(),
+                smtp_use_tls: $('#smtpUseTls').val()
+            };
+            
+            $.ajax({
+                url: '/admin/api/settings',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(settings),
+                success: function(response) {
+                    if (response.success) {
+                        alert('Lưu cài đặt thành công!');
+                        settingsLoaded = false; // Reload on next show
+                    } else {
+                        alert(response.error || 'Có lỗi xảy ra khi lưu cài đặt');
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || 'Có lỗi xảy ra khi lưu cài đặt';
+                    alert(error);
+                },
+                complete: function() {
                     btn.prop('disabled', false).html(originalText);
                 }
-            },
-            error: function(xhr) {
-                const error = xhr.responseJSON?.error || 'Lỗi khi lưu cài đặt';
-                alert(error);
+            });
+        }
+        
+        function testSmtpConnection() {
+            const btn = $('#testSmtpBtn');
+            const originalText = btn.html();
+            btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin me-2"></i>Đang kiểm tra...');
+            
+            // Get current user email from session or prompt
+            const testEmail = prompt('Nhập email để gửi email test:', '');
+            if (!testEmail) {
                 btn.prop('disabled', false).html(originalText);
+                return;
             }
-        });
-    }
-    
-    // Toggle password visibility
-    $('#toggleSmtpPassword').on('click', function() {
-        const passwordInput = $('#smtpPassword');
-        const icon = $(this).find('i');
-        
-        if (passwordInput.attr('type') === 'password') {
-            passwordInput.attr('type', 'text');
-            icon.removeClass('fa-eye').addClass('fa-eye-slash');
-        } else {
-            passwordInput.attr('type', 'password');
-            icon.removeClass('fa-eye-slash').addClass('fa-eye');
-        }
-    });
-    
-    // Event handlers
-    $('#saveSettingsBtn').on('click', saveSettings);
-    $('#testSmtpBtn').on('click', testSmtpConnection);
-    
-    // Load settings when section is shown
-    function loadSettingsSection() {
-        if ($('#settings').hasClass('active')) {
-            loadSettings();
-        }
-    }
-    
-    // Event handler for settings section
-    $(document).on('click', 'a[data-section="settings"]', function() {
-        setTimeout(loadSettingsSection, 100);
-    });
-    
-    // Also load when section becomes active (for programmatic activation)
-    $(document).ready(function() {
-        // Check if settings section is already active
-        if ($('#settings').hasClass('active')) {
-            loadSettings();
-        }
-        
-        // Watch for section changes
-        const observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(mutation) {
-                if (mutation.target.id === 'settings' && mutation.target.classList.contains('active')) {
-                    loadSettings();
+            
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(testEmail)) {
+                alert('Email không đúng định dạng');
+                btn.prop('disabled', false).html(originalText);
+                return;
+            }
+            
+            // Save settings first, then test
+            const settings = {
+                api_token: $('#apiToken').val().trim(),
+                api_base_url: $('#apiBaseUrl').val().trim() || 'https://news-api.techreview.pro',
+                smtp_server: $('#smtpServer').val().trim(),
+                smtp_port: $('#smtpPort').val().trim(),
+                smtp_username: $('#smtpUsername').val().trim(),
+                smtp_password: $('#smtpPassword').val().trim(),
+                smtp_from_email: $('#smtpFromEmail').val().trim() || $('#smtpUsername').val().trim(),
+                smtp_use_tls: $('#smtpUseTls').val()
+            };
+            
+            $.ajax({
+                url: '/admin/api/settings',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(settings),
+                success: function(response) {
+                    if (response.success) {
+                        // Test email sending
+                        $.ajax({
+                            url: '/admin/api/test-email',
+                            method: 'POST',
+                            contentType: 'application/json',
+                            data: JSON.stringify({ email: testEmail }),
+                            success: function(testResponse) {
+                                if (testResponse.success) {
+                                    alert('Gửi email test thành công! Vui lòng kiểm tra hộp thư của bạn.');
+                                } else {
+                                    alert('Lỗi khi gửi email test: ' + (testResponse.error || 'Vui lòng kiểm tra lại cài đặt SMTP'));
+                                }
+                            },
+                            error: function() {
+                                alert('Lỗi khi gửi email test. Vui lòng kiểm tra lại cài đặt SMTP.');
+                            },
+                            complete: function() {
+                                btn.prop('disabled', false).html(originalText);
+                            }
+                        });
+                    } else {
+                        alert('Lỗi khi lưu cài đặt: ' + (response.error || 'Vui lòng kiểm tra lại'));
+                        btn.prop('disabled', false).html(originalText);
+                    }
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON?.error || 'Lỗi khi lưu cài đặt';
+                    alert(error);
+                    btn.prop('disabled', false).html(originalText);
                 }
             });
+        }
+        
+        // Toggle password visibility
+        $('#toggleSmtpPassword').on('click', function() {
+            const passwordInput = $('#smtpPassword');
+            const icon = $(this).find('i');
+            
+            if (passwordInput.attr('type') === 'password') {
+                passwordInput.attr('type', 'text');
+                icon.removeClass('fa-eye').addClass('fa-eye-slash');
+            } else {
+                passwordInput.attr('type', 'password');
+                icon.removeClass('fa-eye-slash').addClass('fa-eye');
+            }
         });
         
-        const settingsSection = document.getElementById('settings');
-        if (settingsSection) {
-            observer.observe(settingsSection, {
-                attributes: true,
-                attributeFilter: ['class']
-            });
+        // Event handlers
+        $('#saveSettingsBtn').on('click', saveSettings);
+        $('#testSmtpBtn').on('click', testSmtpConnection);
+        
+        // Load settings when section is shown
+        function loadSettingsSection() {
+            if ($('#settings').hasClass('active')) {
+                loadSettings();
+            }
         }
-    });
+        
+        // Event handler for settings section
+        $(document).on('click', 'a[data-section="settings"]', function() {
+            setTimeout(loadSettingsSection, 100);
+        });
+        
+        // Also load when section becomes active (for programmatic activation)
+        $(document).ready(function() {
+            // Check if settings section is already active
+            if ($('#settings').hasClass('active')) {
+                loadSettings();
+            }
+            
+            // Watch for section changes
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.target.id === 'settings' && mutation.target.classList.contains('active')) {
+                        loadSettings();
+                    }
+                });
+            });
+            
+            const settingsSection = document.getElementById('settings');
+            if (settingsSection) {
+                observer.observe(settingsSection, {
+                    attributes: true,
+                    attributeFilter: ['class']
+                });
+            }
+        });
     </script>
 {% endblock %}
