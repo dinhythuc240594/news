@@ -1,7 +1,11 @@
 {% extends 'base_admin.html' %}
 {% block title %}Thông tin cá nhân - VnNews{% endblock %}
 {% block head %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">
+    {% if user.role == 'admin' %}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/style_admin.css') }}">
+    {% elif user.role == 'editor' %}
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/style_editor.css') }}">
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style_profile.css') }}">
 {% endblock %}
 {% block template %}
@@ -287,9 +291,15 @@
                     </div>
 
                     <div class="profile-actions mt-4 text-center">
-                        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left me-2"></i> Quay lại Quản lý hệ thống
-                        </a>
+                        {% if user.role != 'editor' %}
+                            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i> Quay lại Quản lý hệ thống
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('admin.editor_dashboard') }}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left me-2"></i> Quay lại Dashboard
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>

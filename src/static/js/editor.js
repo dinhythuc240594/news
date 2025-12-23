@@ -561,8 +561,8 @@ async function checkAuth() {
         const response = await fetch('/admin/api/current-user');
         const result = await response.json();
         
-        if (!result.success || (result.data.role !== 'editor' && result.data.role !== 'admin')) {
-            window.location.href = 'login.html';
+        if (!result.success || (result.data.role !== 'editor')) {
+            window.location.href = '/admin/login';
             return;
         }else{
             if (result.success && result.data) {
@@ -572,7 +572,7 @@ async function checkAuth() {
         }
     } catch (error) {
         console.error('Lỗi kiểm tra đăng nhập:', error);
-        window.location.href = 'login.html';
+        window.location.href = '/admin/login';
     }
 }
 

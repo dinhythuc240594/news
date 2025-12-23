@@ -35,16 +35,16 @@ def create_app(config_class=Config):
     @app.before_request
     def log_request():
         print(f"\n>>> INCOMING REQUEST: {request.method} {request.path}")
-        print(f">>> Endpoint: {request.endpoint}")
-        print(f">>> View args: {request.view_args}\n")
+        # print(f">>> Endpoint: {request.endpoint}")
+        # print(f">>> View args: {request.view_args}\n")
     
-    # Debug: In ra tất cả routes
-    print("\n" + "="*50)
-    print("REGISTERED ROUTES:")
-    print("="*50)
-    for rule in app.url_map.iter_rules():
-        print(f"{rule.rule} -> {rule.endpoint} [{', '.join(rule.methods)}]")
-    print("="*50 + "\n")
+    # # Debug: In ra tất cả routes
+    # print("\n" + "="*50)
+    # print("REGISTERED ROUTES:")
+    # print("="*50)
+    # for rule in app.url_map.iter_rules():
+    #     print(f"{rule.rule} -> {rule.endpoint} [{', '.join(rule.methods)}]")
+    # print("="*50 + "\n")
     
     # Helper function để xác định site từ request path
     def _get_site_from_request():

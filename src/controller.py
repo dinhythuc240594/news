@@ -34,7 +34,7 @@ from models import (
 )
 
 def admin_required(f):
-    """Decorator yêu cầu quyền admin"""
+    """Decorator yêu cầu quyền admin (chỉ ADMIN, không cho EDITOR truy cập các trang quản trị)."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -43,6 +43,7 @@ def admin_required(f):
         user_model = UserModel(get_session())
         user = user_model.get_by_id(session['user_id'])
         
+        # Chỉ cho phép ADMIN, chặn USER và EDITOR
         if not user or user.role != UserRole.ADMIN:
             flash('Bạn không có quyền truy cập', 'error')
             return redirect(url_for('admin.login'))
@@ -60,8 +61,10 @@ def editor_required(f):
         
         user_model = UserModel(get_session())
         user = user_model.get_by_id(session['user_id'])
-        
+
         if not user or user.role not in [UserRole.ADMIN, UserRole.EDITOR]:
+            print(f"=== DEBUG user ===")
+            print(f"User: {user.username}, {user.role}")
             flash('Bạn không có quyền truy cập', 'error')
             return redirect(url_for('admin.login'))
         
@@ -123,7 +126,7 @@ class AdminController:
                     return redirect(url_for('admin.editor_dashboard'))
             else:
                 flash('Tên đăng nhập hoặc mật khẩu không đúng', 'error')
-        
+        print(f"=== DEBUG login ===")
         return render_template('admin/login.html')
     
     def logout(self):
