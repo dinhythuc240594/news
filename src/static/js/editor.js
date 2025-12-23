@@ -1,3 +1,11 @@
+const loadedSections = new Set();
+
+function markSectionLoaded(section) {
+    if (section) {
+        loadedSections.add(section);
+    }
+}
+
 $(document).ready(function() {
     // Check authentication
     checkAuth();
@@ -53,12 +61,18 @@ $(document).ready(function() {
         }
     });
     
-    // Load initial data
-    loadMyArticles(); // Bài viết của tôi (tất cả trạng thái, trang 1)
-    
-    // // Load international categories on page load
-    // loadInternationalCategories();
-    
+    const sectionLoaders = {
+        'my-articles': () => loadMyArticles(1, $('#filterStatus').val(), $('#searchMyArticles').val().trim()),
+        'drafts': () => loadDrafts(),
+        'pending': () => loadPendingArticlesEditor(),
+        'published': () => loadPublishedArticles(),
+        'international-articles': () => loadMyInternationalArticles(),
+        'int-drafts': () => loadIntDrafts(),
+        'int-pending': () => loadIntPending(),
+        'int-published': () => loadIntPublished(),
+        'create-international': () => loadInternationalCategories()
+    };
+
     // Load notifications khi mở dropdown
     $('#notificationDropdown').on('click', function() {
         loadNotifications(false); // Không hiển thị toast khi click vào dropdown
@@ -83,25 +97,9 @@ $(document).ready(function() {
         // Update page title
         updatePageTitle(section);
 
-        // Lazy load dữ liệu cho các tab khi được mở
-        if (section === 'my-articles') {
-            loadMyArticles(1, $('#filterStatus').val(), $('#searchMyArticles').val().trim());
-        } else if (section === 'drafts') {
-            loadDrafts();
-        } else if (section === 'pending') {
-            loadPendingArticlesEditor();
-        } else if (section === 'published') {
-            loadPublishedArticles();
-        } else if (section === 'international-articles') {
-            loadMyInternationalArticles();
-        } else if (section === 'int-drafts') {
-            loadIntDrafts();
-        } else if (section === 'int-pending') {
-            loadIntPending();
-        } else if (section === 'int-published') {
-            loadIntPublished();
-        } else if (section === 'create-international') {
-            loadInternationalCategories();
+        // Lazy load dữ liệu cho các tab khi được mở lần đầu
+        if (!loadedSections.has(section) && sectionLoaders[section]) {
+            sectionLoaders[section]();
         }
     });
     
@@ -339,27 +337,31 @@ function initEditorStats() {
     }, 30000);
 }
 
+async function requestMyArticles({ page = 1, perPage = 10, status = null, search = null } = {}) {
+    const params = new URLSearchParams();
+    params.append('page', page);
+    params.append('per_page', perPage);
+    if (status && status !== 'all') {
+        params.append('status', status);
+    }
+    if (search) {
+        params.append('search', search);
+    }
+
+    const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+    });
+
+    const result = await response.json();
+    return { ok: response.ok, result };
+}
+
 // Lấy tổng bài theo trạng thái cho editor hiện tại (dựa trên pagination.total)
 async function fetchCountByStatus(status) {
     try {
-        const params = new URLSearchParams();
-        params.append('page', 1);
-        params.append('per_page', 1);
-        if (status && status !== 'all') {
-            params.append('status', status);
-        }
-
-        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        });
-
-        if (!response.ok) {
-            return null;
-        }
-
-        const result = await response.json();
-        if (!result.success || !result.pagination) {
+        const { ok, result } = await requestMyArticles({ page: 1, perPage: 1, status });
+        if (!ok || !result.success || !result.pagination) {
             return null;
         }
 
@@ -610,27 +612,18 @@ function updatePageTitle(section) {
 // Load my articles from API (database, joined with categories) với phân trang & lọc
 async function loadMyArticles(page = 1, status = null, search = null) {
     try {
+        markSectionLoaded('my-articles');
         showSpinner();
 
-        const params = new URLSearchParams();
-        params.append('page', page);
-        params.append('per_page', 10);
-        if (status && status !== 'all') {
-            params.append('status', status);
-        }
-        if (search) {
-            params.append('search', search);
-        }
-
-        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
+        const { ok, result } = await requestMyArticles({
+            page,
+            perPage: 10,
+            status,
+            search
         });
-
-        const result = await response.json();
         hideSpinner();
 
-        if (!result.success) {
+        if (!ok || !result.success) {
             showToast('Lỗi', result.error || 'Không thể tải danh sách bài viết', 'warning');
             return;
         }
@@ -669,45 +662,38 @@ async function loadMyArticles(page = 1, status = null, search = null) {
 // Load danh sách bản nháp
 function loadDrafts(page = 1) {
     const search = $('#searchDrafts').val() ? $('#searchDrafts').val().trim() : null;
-    fetchMyArticlesForSection('draft', page, search, 'draftsTable', 'draftsPagination', 'draftsInfo');
+    fetchMyArticlesForSection('draft', page, search, 'draftsTable', 'draftsPagination', 'draftsInfo', 'drafts');
 }
 
 // Load danh sách chờ duyệt
 function loadPendingArticlesEditor(page = 1) {
     const search = $('#searchPending').val() ? $('#searchPending').val().trim() : null;
-    fetchMyArticlesForSection('pending', page, search, 'pendingTable', 'pendingPagination', 'pendingInfo');
+    fetchMyArticlesForSection('pending', page, search, 'pendingTable', 'pendingPagination', 'pendingInfo', 'pending');
 }
 
 // Load danh sách đã xuất bản
 function loadPublishedArticles(page = 1) {
     const search = $('#searchPublished').val() ? $('#searchPublished').val().trim() : null;
-    fetchMyArticlesForSection('published', page, search, 'publishedTable', 'publishedPagination', 'publishedInfo');
+    fetchMyArticlesForSection('published', page, search, 'publishedTable', 'publishedPagination', 'publishedInfo', 'published');
 }
 
 // Hàm dùng chung để load bài viết cho từng section
-async function fetchMyArticlesForSection(status, page, search, tableId, paginationId, infoId) {
+async function fetchMyArticlesForSection(status, page, search, tableId, paginationId, infoId, sectionKey = null) {
     try {
+        if (sectionKey) {
+            markSectionLoaded(sectionKey);
+        }
         showSpinner();
 
-        const params = new URLSearchParams();
-        params.append('page', page);
-        params.append('per_page', 10);
-        if (status) {
-            params.append('status', status);
-        }
-        if (search) {
-            params.append('search', search);
-        }
-
-        const response = await fetch(`/admin/api/my-articles?${params.toString()}`, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
+        const { ok, result } = await requestMyArticles({
+            page,
+            perPage: 10,
+            status,
+            search
         });
-
-        const result = await response.json();
         hideSpinner();
 
-        if (!result.success) {
+        if (!ok || !result.success) {
             showToast('Lỗi', result.error || 'Không thể tải danh sách bài viết', 'warning');
             return;
         }
@@ -1305,6 +1291,7 @@ function hideSpinner() {
 // Load international categories
 async function loadInternationalCategories() {
     try {
+        markSectionLoaded('create-international');
         const response = await fetch('/admin/api/international-categories');
         const result = await response.json();
         
@@ -1499,6 +1486,7 @@ function previewInternationalArticle() {
 // Load my international articles
 async function loadMyInternationalArticles(page = 1, status = null, search = null) {
     try {
+        markSectionLoaded('international-articles');
         showSpinner();
         
         const params = new URLSearchParams();
@@ -1545,18 +1533,21 @@ async function loadMyInternationalArticles(page = 1, status = null, search = nul
 
 // Load international drafts
 async function loadIntDrafts(page = 1) {
+    markSectionLoaded('int-drafts');
     const search = $('#searchIntDrafts').val() ? $('#searchIntDrafts').val().trim() : null;
     await fetchInternationalArticlesForSection('draft', page, search, 'intDraftsTable', 'intDraftsPagination', 'intDraftsInfo');
 }
 
 // Load international pending
 async function loadIntPending(page = 1) {
+    markSectionLoaded('int-pending');
     const search = $('#searchIntPending').val() ? $('#searchIntPending').val().trim() : null;
     await fetchInternationalArticlesForSection('pending', page, search, 'intPendingTable', 'intPendingPagination', 'intPendingInfo');
 }
 
 // Load international published
 async function loadIntPublished(page = 1) {
+    markSectionLoaded('int-published');
     const search = $('#searchIntPublished').val() ? $('#searchIntPublished').val().trim() : null;
     await fetchInternationalArticlesForSection('published', page, search, 'intPublishedTable', 'intPublishedPagination', 'intPublishedInfo');
 }
