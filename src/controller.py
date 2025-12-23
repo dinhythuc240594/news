@@ -3516,11 +3516,22 @@ class ClientController:
             offset = (page - 1) * per_page
             
             print(f"Getting news for category_id={category.id}, page={page}")
-            news_list = news_model.get_by_category(
-                category_id=category.id,
-                limit=per_page,
-                offset=offset
-            )
+
+            # Nếu là danh mục cấp 1, lấy thêm toàn bộ bài viết của danh mục con
+            if category.parent_id is None:
+                descendant_ids = category_model.get_descendant_ids(category.id)
+                category_ids = [category.id] + descendant_ids
+                news_list = news_model.get_by_categories(
+                    category_ids=category_ids,
+                    limit=per_page,
+                    offset=offset
+                )
+            else:
+                news_list = news_model.get_by_category(
+                    category_id=category.id,
+                    limit=per_page,
+                    offset=offset
+                )
             print(f"Found {len(news_list)} news articles")
 
             categories = category_model.get_all()

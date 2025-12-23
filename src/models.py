@@ -169,6 +169,30 @@ class NewsModel:
         
         return query.all()
     
+    def get_by_categories(
+        self,
+        category_ids: list[int],
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[News]:
+        """Lấy bài viết theo nhiều danh mục (bao gồm danh mục con)."""
+        if not category_ids:
+            return []
+
+        query = (
+            self.db.query(News)
+            .filter(
+                News.category_id.in_(category_ids),
+                News.status == NewsStatus.PUBLISHED,
+            )
+            .order_by(desc(News.created_at))
+        )
+
+        if limit:
+            query = query.limit(limit).offset(offset)
+
+        return query.all()
+
     def get_featured(self, limit: int = 10) -> List[News]:
         """Lấy bài viết nổi bật"""
         return self.db.query(News).filter(
@@ -295,6 +319,23 @@ class CategoryModel:
     def get_by_slug(self, slug: str) -> Optional[Category]:
         """Lấy danh mục theo slug"""
         return self.db.query(Category).filter(Category.slug == slug).first()
+
+    def get_descendant_ids(self, parent_id: int) -> list[int]:
+        """Lấy danh sách id danh mục con (mọi cấp) của parent_id."""
+        categories = self.db.query(Category.id, Category.parent_id).filter(
+            Category.visible == True
+        ).all()
+
+        children = []
+        stack = [parent_id]
+        while stack:
+            current = stack.pop()
+            for cat_id, cat_parent in categories:
+                if cat_parent == current:
+                    children.append(cat_id)
+                    stack.append(cat_id)
+
+        return children
 
 
 class UserModel:
