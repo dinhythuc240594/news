@@ -349,9 +349,15 @@
                     </div>
 
                     <div class="profile-actions mt-4 text-center">
-                        <a href="{{ url_for('client.index') }}" class="btn btn-secondary">
-                            <i class="fas fa-arrow-left me-2"></i> Quay lại trang chủ
+                        {% if user.role|string() == 'admin' %}
+                        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i> Quay lại trang Quản trị viên
                         </a>
+                        {% else %}
+                        <a href="{{ url_for('admin.editor_dashboard') }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left me-2"></i> Quay lại trang Biên tập viên
+                        </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
