@@ -253,6 +253,32 @@ $(document).ready(function() {
         }
     });
     
+    // View article (for pending articles)
+    $(document).on('click', '.btn-view', function() {
+        const articleId = $(this).data('id');
+        viewArticle(articleId);
+    });
+    
+    // Edit international article
+    $(document).on('click', '.btn-edit-int', function() {
+        const articleId = $(this).data('id');
+        editInternationalArticle(articleId);
+    });
+    
+    // Delete international article
+    $(document).on('click', '.btn-delete-int', function() {
+        const articleId = $(this).data('id');
+        if (confirm('Bạn có chắc muốn xóa bài viết này?')) {
+            deleteInternationalArticle(articleId);
+        }
+    });
+    
+    // View international article (for pending articles)
+    $(document).on('click', '.btn-view-int', function() {
+        const articleId = $(this).data('id');
+        viewInternationalArticle(articleId);
+    });
+    
     // Toggle visibility
     $(document).on('change', '.visibility-toggle', function() {
         const articleId = $(this).data('id');
@@ -777,14 +803,26 @@ function displayArticles(articles, tableBodyId) {
         html += '</td>';
         html += '<td>' + (dateVN) + '</td>';
         html += '<td>';
+        // Chỉ hiển thị nút edit và delete cho bài viết draft
+        // Bài viết pending chỉ có quyền xem
         if (article.status === 'draft') {
             html += '<button class="btn btn-sm btn-info btn-action btn-edit" data-id="' + article.id + '" title="Chỉnh sửa">';
             html += '<i class="fas fa-edit"></i>';
             html += '</button>';
+            html += '<button class="btn btn-sm btn-danger btn-action btn-delete" data-id="' + article.id + '" title="Xóa">';
+            html += '<i class="fas fa-trash"></i>';
+            html += '</button>';
+        } else if (article.status === 'pending') {
+            // Bài viết pending chỉ có quyền xem, không có nút action
+            html += '<button class="btn btn-sm btn-info btn-action btn-view" data-id="' + article.id + '" title="Xem bài viết">';
+            html += '<i class="fas fa-eye"></i>';
+            html += '</button>';
+        } else {
+            // Các trạng thái khác (published, rejected) vẫn có nút delete
+            html += '<button class="btn btn-sm btn-danger btn-action btn-delete" data-id="' + article.id + '" title="Xóa">';
+            html += '<i class="fas fa-trash"></i>';
+            html += '</button>';
         }
-        html += '<button class="btn btn-sm btn-danger btn-action btn-delete" data-id="' + article.id + '" title="Xóa">';
-        html += '<i class="fas fa-trash"></i>';
-        html += '</button>';
         html += '</td>';
         html += '</tr>';
     });
@@ -1119,6 +1157,140 @@ async function submitArticle() {
     }
 }
 
+// View article (read-only for pending articles)
+async function viewArticle(articleId) {
+    try {
+        const response = await fetch(`/admin/api/article/${articleId}`);
+        const result = await response.json();
+        if (result.success) {
+            const article = result.data;
+            
+            // Open preview in new window
+            const previewWindow = window.open('', 'Xem bài viết', 'width=1000,height=700,scrollbars=yes');
+            previewWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>${escapeHtml(article.title || 'Xem bài viết')}</title>
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body { 
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                            padding: 40px; 
+                            max-width: 900px; 
+                            margin: 0 auto; 
+                            background: #f5f5f5;
+                            line-height: 1.6;
+                        }
+                        .article-container {
+                            background: white;
+                            padding: 40px;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        }
+                        h1 { 
+                            color: #333; 
+                            margin-bottom: 15px; 
+                            font-size: 28px;
+                            line-height: 1.3;
+                        }
+                        .meta { 
+                            color: #666; 
+                            font-size: 14px; 
+                            margin-bottom: 20px; 
+                            padding-bottom: 15px;
+                            border-bottom: 1px solid #eee;
+                        }
+                        .category { 
+                            background: #0066cc; 
+                            color: white; 
+                            padding: 5px 12px; 
+                            border-radius: 4px; 
+                            font-size: 12px; 
+                            display: inline-block; 
+                            margin-bottom: 15px; 
+                            font-weight: 500;
+                        }
+                        .status-badge {
+                            display: inline-block;
+                            padding: 5px 12px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            font-weight: 500;
+                            margin-left: 10px;
+                        }
+                        .status-pending {
+                            background: #ffc107;
+                            color: #000;
+                        }
+                        .content { 
+                            line-height: 1.8; 
+                            color: #444; 
+                            margin-top: 25px;
+                            font-size: 16px;
+                        }
+                        .summary { 
+                            background: #f8f9fa; 
+                            padding: 20px; 
+                            border-left: 4px solid #0066cc; 
+                            margin-bottom: 25px; 
+                            border-radius: 4px;
+                        }
+                        .summary strong {
+                            color: #333;
+                            display: block;
+                            margin-bottom: 8px;
+                        }
+                        img { 
+                            max-width: 100%; 
+                            height: auto; 
+                            margin: 25px 0; 
+                            border-radius: 8px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        }
+                        .view-info {
+                            background: #e7f3ff;
+                            padding: 15px;
+                            border-radius: 4px;
+                            margin-bottom: 20px;
+                            border-left: 4px solid #0066cc;
+                        }
+                        .view-info strong {
+                            color: #0066cc;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="article-container">
+                        <div class="view-info">
+                            <strong><i class="fas fa-info-circle"></i> Chế độ xem:</strong> Bạn đang xem bài viết ở chế độ chỉ đọc (read-only)
+                        </div>
+                        <span class="category">${escapeHtml(article.category_name || article.category || 'N/A')}</span>
+                        <span class="status-badge status-pending">Chờ duyệt</span>
+                        <h1>${escapeHtml(article.title || 'Không có tiêu đề')}</h1>
+                        <div class="meta">
+                            <i class="fas fa-calendar"></i> Ngày tạo: ${article.created_at ? new Date(article.created_at + 'Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A'} 
+                            ${article.updated_at && article.updated_at !== article.created_at ? 
+                                ' | <i class="fas fa-edit"></i> Cập nhật: ' + new Date(article.updated_at + 'Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''}
+                        </div>
+                        ${article.thumbnail ? `<img src="${escapeHtml(article.thumbnail)}" alt="${escapeHtml(article.title)}" onerror="this.style.display='none'">` : ''}
+                        ${article.summary ? `<div class="summary"><strong>Tóm tắt:</strong> ${escapeHtml(article.summary)}</div>` : ''}
+                        <div class="content">${article.content || 'Không có nội dung'}</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            previewWindow.document.close();
+        } else {
+            showToast('Lỗi', result.error || 'Không thể tải bài viết', 'warning');
+        }
+    } catch (error) {
+        console.error('Lỗi tải bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải bài viết', 'warning');
+    }
+}
+
 // Edit article
 async function editArticle(articleId) {
     try {
@@ -1214,7 +1386,7 @@ async function saveEdit(newStatus = null) {
             category_id: parseInt(category),
             summary: description,
             thumbnail: image,
-            tags: tags
+            // tags: tags
         };
         if (newStatus) {
             payload.status = newStatus;
@@ -1648,14 +1820,26 @@ function displayInternationalArticles(articles, tableBodyId, status = null) {
             }
             
             html += '<td>';
+            // Chỉ hiển thị nút edit và delete cho bài viết draft
+            // Bài viết pending chỉ có quyền xem
             if (article.status === 'draft') {
                 html += '<button class="btn btn-sm btn-info btn-action btn-edit-int" data-id="' + article.id + '" title="Edit">';
                 html += '<i class="fas fa-edit"></i>';
                 html += '</button>';
+                html += '<button class="btn btn-sm btn-danger btn-action btn-delete-int" data-id="' + article.id + '" title="Delete">';
+                html += '<i class="fas fa-trash"></i>';
+                html += '</button>';
+            } else if (article.status === 'pending') {
+                // Bài viết pending chỉ có quyền xem, không có nút action
+                html += '<button class="btn btn-sm btn-info btn-action btn-view-int" data-id="' + article.id + '" title="View article">';
+                html += '<i class="fas fa-eye"></i>';
+                html += '</button>';
+            } else {
+                // Các trạng thái khác (published, rejected) vẫn có nút delete
+                html += '<button class="btn btn-sm btn-danger btn-action btn-delete-int" data-id="' + article.id + '" title="Delete">';
+                html += '<i class="fas fa-trash"></i>';
+                html += '</button>';
             }
-            html += '<button class="btn btn-sm btn-danger btn-action btn-delete-int" data-id="' + article.id + '" title="Delete">';
-            html += '<i class="fas fa-trash"></i>';
-            html += '</button>';
             html += '</td>';
             html += '</tr>';
         });
@@ -1707,6 +1891,148 @@ async function deleteInternationalArticle(articleId) {
         hideSpinner();
         console.error('Error deleting international article:', error);
         showToast('Error', 'An error occurred while deleting article', 'warning');
+    }
+}
+
+// View international article (read-only for pending articles)
+async function viewInternationalArticle(articleId) {
+    try {
+        const response = await fetch(`/admin/api/international-article/${articleId}`);
+        const result = await response.json();
+        
+        if (!result.success || !result.data) {
+            showToast('Error', result.error || 'Failed to load article', 'warning');
+            return;
+        }
+        
+        const article = result.data;
+        
+        // Open preview in new window
+        const previewWindow = window.open('', 'View Article', 'width=1000,height=700,scrollbars=yes');
+        previewWindow.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>${escapeHtml(article.title || 'View Article')}</title>
+                <style>
+                    * { margin: 0; padding: 0; box-sizing: border-box; }
+                    body { 
+                        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                        padding: 40px; 
+                        max-width: 900px; 
+                        margin: 0 auto; 
+                        background: #f5f5f5;
+                        line-height: 1.6;
+                    }
+                    .article-container {
+                        background: white;
+                        padding: 40px;
+                        border-radius: 8px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    }
+                    h1 { 
+                        color: #333; 
+                        margin-bottom: 15px; 
+                        font-size: 28px;
+                        line-height: 1.3;
+                    }
+                    .meta { 
+                        color: #666; 
+                        font-size: 14px; 
+                        margin-bottom: 20px; 
+                        padding-bottom: 15px;
+                        border-bottom: 1px solid #eee;
+                    }
+                    .category { 
+                        background: #0066cc; 
+                        color: white; 
+                        padding: 5px 12px; 
+                        border-radius: 4px; 
+                        font-size: 12px; 
+                        display: inline-block; 
+                        margin-bottom: 15px; 
+                        font-weight: 500;
+                    }
+                    .status-badge {
+                        display: inline-block;
+                        padding: 5px 12px;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        font-weight: 500;
+                        margin-left: 10px;
+                    }
+                    .status-pending {
+                        background: #ffc107;
+                        color: #000;
+                    }
+                    .content { 
+                        line-height: 1.8; 
+                        color: #444; 
+                        margin-top: 25px;
+                        font-size: 16px;
+                    }
+                    .summary { 
+                        background: #f8f9fa; 
+                        padding: 20px; 
+                        border-left: 4px solid #0066cc; 
+                        margin-bottom: 25px; 
+                        border-radius: 4px;
+                    }
+                    .summary strong {
+                        color: #333;
+                        display: block;
+                        margin-bottom: 8px;
+                    }
+                    img { 
+                        max-width: 100%; 
+                        height: auto; 
+                        margin: 25px 0; 
+                        border-radius: 8px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    }
+                    .view-info {
+                        background: #e7f3ff;
+                        padding: 15px;
+                        border-radius: 4px;
+                        margin-bottom: 20px;
+                        border-left: 4px solid #0066cc;
+                    }
+                    .view-info strong {
+                        color: #0066cc;
+                    }
+                    .author {
+                        color: #666;
+                        font-style: italic;
+                        margin-top: 10px;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="article-container">
+                    <div class="view-info">
+                        <strong><i class="fas fa-info-circle"></i> View mode:</strong> You are viewing this article in read-only mode
+                    </div>
+                    <span class="category">${escapeHtml(article.category_name || article.category || 'N/A')}</span>
+                    <span class="status-badge status-pending">Pending</span>
+                    <h1>${escapeHtml(article.title || 'No title')}</h1>
+                    <div class="meta">
+                        <i class="fas fa-calendar"></i> Created: ${article.created_at ? new Date(article.created_at + 'Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A'} 
+                        ${article.updated_at && article.updated_at !== article.created_at ? 
+                            ' | <i class="fas fa-edit"></i> Updated: ' + new Date(article.updated_at + 'Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''}
+                        ${article.author ? '<div class="author"><i class="fas fa-user"></i> Author: ' + escapeHtml(article.author) + '</div>' : ''}
+                    </div>
+                    ${article.thumbnail ? `<img src="${escapeHtml(article.thumbnail)}" alt="${escapeHtml(article.title)}" onerror="this.style.display='none'">` : ''}
+                    ${article.summary ? `<div class="summary"><strong>Summary:</strong> ${escapeHtml(article.summary)}</div>` : ''}
+                    <div class="content">${article.content || 'No content'}</div>
+                </div>
+            </body>
+            </html>
+        `);
+        previewWindow.document.close();
+    } catch (error) {
+        console.error('Error loading international article:', error);
+        showToast('Error', 'An error occurred while loading article', 'warning');
     }
 }
 

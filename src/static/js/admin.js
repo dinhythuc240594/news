@@ -1331,141 +1331,139 @@ function escapeHtml(text) {
 // Preview article
 async function previewArticle(articleId, articleType) {
     try {
-
-        var htmlState = '';
-        htmlState += '<div class="text-center py-5">';
-        htmlState += '<div class="spinner-border text-primary" role="status">';
-        htmlState += '<span class="visually-hidden">Đang tải...</span>';
-        htmlState += '</div>';
-        htmlState += '<p class="mt-3 text-muted">Đang tải bài viết...</p>';
-        htmlState += '</div>';
-
-        // Show loading state
-        $('#previewContent').html(htmlState);
-
         // Fetch article data from API - sử dụng endpoint phù hợp với loại bài viết
         const apiEndpoint = articleType === 'international' 
             ? `/admin/api/international-article/${articleId}`
             : `/admin/api/article/${articleId}`;
         const response = await fetch(apiEndpoint);
         const result = await response.json();
-        
-        if (!result.success || !result.data) {
-            var errorHtml = '';
-            errorHtml += '<div class="alert alert-danger">';
-            errorHtml += '<i class="fas fa-exclamation-circle"></i> Không thể tải bài viết. Vui lòng thử lại.';
-            errorHtml += '</div>';
-            $('#previewContent').html(errorHtml);
-            return;
-        }
-        
-        const article = result.data;
-        
-        // Format status badge
-        const statusBadges = {
-            'draft': '<span class="badge bg-secondary">Bản nháp</span>',
-            'pending': '<span class="badge bg-warning">Chờ duyệt</span>',
-            'published': '<span class="badge bg-success">Đã xuất bản</span>',
-            'rejected': '<span class="badge bg-danger">Đã từ chối</span>',
-            'hidden': '<span class="badge bg-dark">Đã ẩn</span>'
-        };
-        const statusBadge = statusBadges[article.status] || '';
-        
-        // Build content HTML
-        var content = '';
-        content += '<div class="article-preview-container">';
-        
-        // Thumbnail (only if exists)
-        if (article.thumbnail) {
-            content += '<div class="article-preview-thumbnail mb-4">';
-            content += '<img src="' + escapeHtml(article.thumbnail) + '" alt="' + escapeHtml(article.title || '') + '" class="img-fluid rounded shadow-sm" onerror="this.src=\'https://via.placeholder.com/800x400?text=No+Image\'">';
-            content += '</div>';
-        }
-        
-        // Header
-        content += '<div class="article-preview-header mb-4">';
-        content += '<h2 class="article-preview-title mb-3">' + escapeHtml(article.title || 'Không có tiêu đề') + '</h2>';
-        
-        // Meta badges
-        content += '<div class="article-preview-meta d-flex flex-wrap align-items-center gap-3 mb-3">';
-        content += '<span class="badge bg-primary fs-6">' + escapeHtml(article.category || 'N/A') + '</span>';
-        content += statusBadge;
-        if (article.is_featured) {
-            content += '<span class="badge bg-warning"><i class="fas fa-star"></i> Nổi bật</span>';
-        }
-        if (article.is_hot) {
-            content += '<span class="badge bg-danger"><i class="fas fa-fire"></i> Tin nóng</span>';
-        }
-        content += '</div>';
-        
-        // Info
-        content += '<div class="article-preview-info text-muted small">';
-        content += '<div class="d-flex flex-wrap gap-4">';
-        // Hiển thị tác giả: nếu là bài từ API thì hiển thị author, không thì hiển thị creator
-        const authorDisplay = article.is_api && article.author 
-            ? escapeHtml(article.author) + ' <span class="badge bg-secondary">Từ API</span>'
-            : escapeHtml(article.author_full_name || article.author || 'N/A');
-        content += '<span><i class="fas fa-user me-1"></i> <strong>Tác giả:</strong> ' + authorDisplay + '</span>';
-        // Hiển thị người duyệt nếu có
-        if (article.approver) {
-            const approverDisplay = article.approver_full_name || article.approver || 'N/A';
-            content += '<span><i class="fas fa-user-check me-1"></i> <strong>Người duyệt:</strong> ' + escapeHtml(approverDisplay) + '</span>';
-        }
-        if (article.published_at) {
-            content += '<span><i class="fas fa-calendar-alt me-1"></i> <strong>Xuất bản:</strong> ' + escapeHtml(article.published_at) + '</span>';
-        }
-        if (article.created_at) {
-            content += '<span><i class="fas fa-clock me-1"></i> <strong>Tạo lúc:</strong> ' + escapeHtml(article.created_at) + '</span>';
-        }
-        if (article.view_count !== undefined && article.view_count !== null) {
-            content += '<span><i class="fas fa-eye me-1"></i> <strong>Lượt xem:</strong> ' + article.view_count.toLocaleString('vi-VN') + '</span>';
-        }
-        content += '</div>';
-        content += '</div>';
-        content += '</div>';
-        
-        // Summary (only if exists)
-        if (article.summary) {
-            content += '<div class="article-preview-summary mb-4 p-3 bg-light rounded">';
-            content += '<h5 class="mb-2"><i class="fas fa-quote-left text-primary me-2"></i>Tóm tắt:</h5>';
-            content += '<p class="mb-0 text-muted">' + escapeHtml(article.summary) + '</p>';
-            content += '</div>';
-        }
-        
-        // Content
-        content += '<div class="article-preview-content">';
-        content += '<h5 class="mb-3"><i class="fas fa-align-left text-primary me-2"></i>Nội dung:</h5>';
-        content += '<div class="article-content-body">';
-        content += article.content ? article.content : '<p class="text-muted">Chưa có nội dung</p>';
-        content += '</div>';
-        content += '</div>';
-        content += '</div>';
-        $('#previewContent').html(content);
-        $('#approveBtn').data('id', articleId);
-        $('#approveBtn').data('type', articleType); // Lưu loại bài viết
-        $('#rejectBtn').data('id', articleId);
-        $('#rejectBtn').data('type', articleType); // Lưu loại bài viết
-        
-        // Show/hide approve/reject buttons based on status
-        if (article.status === 'pending') {
-            $('#approveBtn').show();
-            $('#rejectBtn').show();
+        if (result.success) {
+            const article = result.data;
+            
+            // Open preview in new window
+            const previewWindow = window.open('', 'Xem bài viết', 'width=1000,height=700,scrollbars=yes');
+            previewWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <title>${escapeHtml(article.title || 'Xem bài viết')}</title>
+                    <style>
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        body { 
+                            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                            padding: 40px; 
+                            max-width: 900px; 
+                            margin: 0 auto; 
+                            background: #f5f5f5;
+                            line-height: 1.6;
+                        }
+                        .article-container {
+                            background: white;
+                            padding: 40px;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                        }
+                        h1 { 
+                            color: #333; 
+                            margin-bottom: 15px; 
+                            font-size: 28px;
+                            line-height: 1.3;
+                        }
+                        .meta { 
+                            color: #666; 
+                            font-size: 14px; 
+                            margin-bottom: 20px; 
+                            padding-bottom: 15px;
+                            border-bottom: 1px solid #eee;
+                        }
+                        .category { 
+                            background: #0066cc; 
+                            color: white; 
+                            padding: 5px 12px; 
+                            border-radius: 4px; 
+                            font-size: 12px; 
+                            display: inline-block; 
+                            margin-bottom: 15px; 
+                            font-weight: 500;
+                        }
+                        .status-badge {
+                            display: inline-block;
+                            padding: 5px 12px;
+                            border-radius: 4px;
+                            font-size: 12px;
+                            font-weight: 500;
+                            margin-left: 10px;
+                        }
+                        .status-pending {
+                            background: #ffc107;
+                            color: #000;
+                        }
+                        .content { 
+                            line-height: 1.8; 
+                            color: #444; 
+                            margin-top: 25px;
+                            font-size: 16px;
+                        }
+                        .summary { 
+                            background: #f8f9fa; 
+                            padding: 20px; 
+                            border-left: 4px solid #0066cc; 
+                            margin-bottom: 25px; 
+                            border-radius: 4px;
+                        }
+                        .summary strong {
+                            color: #333;
+                            display: block;
+                            margin-bottom: 8px;
+                        }
+                        img { 
+                            max-width: 100%; 
+                            height: auto; 
+                            margin: 25px 0; 
+                            border-radius: 8px;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        }
+                        .view-info {
+                            background: #e7f3ff;
+                            padding: 15px;
+                            border-radius: 4px;
+                            margin-bottom: 20px;
+                            border-left: 4px solid #0066cc;
+                        }
+                        .view-info strong {
+                            color: #0066cc;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="article-container">
+                        <div class="view-info">
+                            <strong><i class="fas fa-info-circle"></i> Chế độ xem:</strong> Bạn đang xem bài viết ở chế độ chỉ đọc (read-only)
+                        </div>
+                        <span class="category">${escapeHtml(article.category_name || article.category || 'N/A')}</span>
+                        <span class="status-badge status-pending">Chờ duyệt</span>
+                        <h1>${escapeHtml(article.title || 'Không có tiêu đề')}</h1>
+                        <div class="meta">
+                            <i class="fas fa-calendar"></i> Ngày tạo: ${article.created_at ? new Date(article.created_at + 'Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A'} 
+                            ${article.updated_at && article.updated_at !== article.created_at ? 
+                                ' | <i class="fas fa-edit"></i> Cập nhật: ' + new Date(article.updated_at + 'Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''}
+                        </div>
+                        ${article.thumbnail ? `<img src="${escapeHtml(article.thumbnail)}" alt="${escapeHtml(article.title)}" onerror="this.style.display='none'">` : ''}
+                        ${article.summary ? `<div class="summary"><strong>Tóm tắt:</strong> ${escapeHtml(article.summary)}</div>` : ''}
+                        <div class="content">${article.content || 'Không có nội dung'}</div>
+                    </div>
+                </body>
+                </html>
+            `);
+            previewWindow.document.close();
         } else {
-            $('#approveBtn').hide();
-            $('#rejectBtn').hide();
+            showToast('Lỗi', result.error || 'Không thể tải bài viết', 'warning');
         }
     } catch (error) {
-        console.error('Error loading article preview:', error);
-        var errorHtml = '';
-        errorHtml += '<div class="alert alert-danger">';
-        errorHtml += '<i class="fas fa-exclamation-circle"></i> Có lỗi xảy ra khi tải bài viết: ' + escapeHtml(error.message || 'Lỗi không xác định');
-        errorHtml += '</div>';
-        $('#previewContent').html(errorHtml);
-    } 
-
-    // Get modal element and show it
-    const modal = new bootstrap.Modal(document.getElementById('previewArticleModal'));
-    modal.show();
+        console.error('Lỗi tải bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi tải bài viết', 'warning');
+    }
 
 }
 
