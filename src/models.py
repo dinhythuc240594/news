@@ -69,16 +69,28 @@ class NewsModel:
         self.db.refresh(news)
         return news
     
-    def get_by_id(self, news_id: int) -> Optional[News]:
-        """Lấy bài viết theo ID"""
-        return self.db.query(News).filter(News.id == news_id).first()
+    def get_by_id(self, news_id: int, include_deleted: bool = False) -> Optional[News]:
+        """
+        Lấy bài viết theo ID
+        
+        Args:
+            news_id: ID bài viết
+            include_deleted: Nếu True, lấy cả bài đã xóa (cho admin)
+        """
+        query = self.db.query(News).filter(News.id == news_id)
+        if not include_deleted:
+            query = query.filter(News.is_deleted == False)
+        return query.first()
     
     def get_by_slug(self, slug: str) -> Optional[News]:
-        """Lấy bài viết theo slug"""
-        return self.db.query(News).filter(News.slug == slug).first()
+        """Lấy bài viết theo slug (chỉ lấy bài chưa bị xóa)"""
+        return self.db.query(News).filter(
+            News.slug == slug,
+            News.is_deleted == False
+        ).first()
     
     def get_all(self, limit: int = None, offset: int = 0, 
-                status: NewsStatus = None) -> List[News]:
+                status: NewsStatus = None, include_deleted: bool = False) -> List[News]:
         """
         Lấy danh sách bài viết
         
@@ -86,11 +98,15 @@ class NewsModel:
             limit: Số lượng bài viết
             offset: Vị trí bắt đầu
             status: Lọc theo trạng thái
+            include_deleted: Nếu True, lấy cả bài đã xóa (cho admin)
             
         Returns:
             List of News objects
         """
         query = self.db.query(News)
+        
+        if not include_deleted:
+            query = query.filter(News.is_deleted == False)
         
         if status:
             query = query.filter(News.status == status)
@@ -109,6 +125,7 @@ class NewsModel:
         offset: int = 0,
         status: NewsStatus | None = None,
         search: str | None = None,
+        include_deleted: bool = False,
     ) -> tuple[list[News], int]:
         """
         Lấy danh sách bài viết theo người tạo (editor), hỗ trợ phân trang và tìm kiếm.
@@ -119,11 +136,15 @@ class NewsModel:
             offset: Vị trí bắt đầu
             status: Lọc theo trạng thái
             search: Từ khóa tìm kiếm theo tiêu đề / tóm tắt
+            include_deleted: Nếu True, lấy cả bài đã xóa (cho admin)
 
         Returns:
             (items, total) - danh sách bài viết và tổng số bản ghi
         """
         query = self.db.query(News).filter(News.created_by == creator_id)
+
+        if not include_deleted:
+            query = query.filter(News.is_deleted == False)
 
         if status:
             query = query.filter(News.status == status)
@@ -149,7 +170,7 @@ class NewsModel:
         return items, total
     
     def get_published(self, limit: int = None, offset: int = 0) -> List[News]:
-        """Lấy danh sách bài viết đã xuất bản"""
+        """Lấy danh sách bài viết đã xuất bản (chỉ lấy bài chưa bị xóa)"""
         return self.get_all(
             limit=limit, 
             offset=offset, 
@@ -158,10 +179,11 @@ class NewsModel:
     
     def get_by_category(self, category_id: int, limit: int = None, 
                        offset: int = 0) -> List[News]:
-        """Lấy bài viết theo danh mục"""
+        """Lấy bài viết theo danh mục (chỉ lấy bài chưa bị xóa)"""
         query = self.db.query(News).filter(
             News.category_id == category_id,
-            News.status == NewsStatus.PUBLISHED
+            News.status == NewsStatus.PUBLISHED,
+            News.is_deleted == False
         ).order_by(desc(News.created_at))
         
         if limit:
@@ -175,7 +197,7 @@ class NewsModel:
         limit: int | None = None,
         offset: int = 0,
     ) -> list[News]:
-        """Lấy bài viết theo nhiều danh mục (bao gồm danh mục con)."""
+        """Lấy bài viết theo nhiều danh mục (bao gồm danh mục con, chỉ lấy bài chưa bị xóa)."""
         if not category_ids:
             return []
 
@@ -184,6 +206,7 @@ class NewsModel:
             .filter(
                 News.category_id.in_(category_ids),
                 News.status == NewsStatus.PUBLISHED,
+                News.is_deleted == False,
             )
             .order_by(desc(News.created_at))
         )
@@ -192,30 +215,33 @@ class NewsModel:
             query = query.limit(limit).offset(offset)
 
         return query.all()
-
+    
     def get_featured(self, limit: int = 10) -> List[News]:
-        """Lấy bài viết nổi bật"""
+        """Lấy bài viết nổi bật (chỉ lấy bài chưa bị xóa)"""
         return self.db.query(News).filter(
             News.is_featured == True,
-            News.status == NewsStatus.PUBLISHED
+            News.status == NewsStatus.PUBLISHED,
+            News.is_deleted == False
         ).order_by(desc(News.created_at)).limit(limit).all()
     
     def get_hot(self, limit: int = 10) -> List[News]:
-        """Lấy tin nóng"""
+        """Lấy tin nóng (chỉ lấy bài chưa bị xóa)"""
         return self.db.query(News).filter(
             News.is_hot == True,
-            News.status == NewsStatus.PUBLISHED
+            News.status == NewsStatus.PUBLISHED,
+            News.is_deleted == False
         ).order_by(desc(News.view_count)).limit(limit).all()
     
     def search(self, keyword: str, limit: int = 20) -> List[News]:
-        """Tìm kiếm bài viết"""
+        """Tìm kiếm bài viết (chỉ lấy bài chưa bị xóa)"""
         return self.db.query(News).filter(
             or_(
                 News.title.ilike(f'%{keyword}%'),
                 News.content.ilike(f'%{keyword}%'),
                 News.summary.ilike(f'%{keyword}%')
             ),
-            News.status == NewsStatus.PUBLISHED
+            News.status == NewsStatus.PUBLISHED,
+            News.is_deleted == False
         ).order_by(desc(News.created_at)).limit(limit).all()
     
     def update(self, news_id: int, **kwargs) -> Optional[News]:
@@ -260,12 +286,15 @@ class NewsModel:
         )
     
     def delete(self, news_id: int) -> bool:
-        """Xóa bài viết"""
+        """
+        Xóa mềm bài viết (soft delete) - set is_deleted = True
+        """
         news = self.get_by_id(news_id)
         if not news:
             return False
         
-        self.db.delete(news)
+        news.is_deleted = True
+        news.updated_at = datetime.utcnow()
         self.db.commit()
         return True
     
@@ -447,19 +476,27 @@ class InternationalNewsModel:
     def __init__(self, db_session: Session):
         self.db = db_session
 
-    def get_by_id(self, news_id: int) -> Optional[NewsInternational]:
-        """Lấy bài viết quốc tế theo ID"""
-        return (
-            self.db.query(NewsInternational)
-            .filter(NewsInternational.id == news_id)
-            .first()
-        )
+    def get_by_id(self, news_id: int, include_deleted: bool = False) -> Optional[NewsInternational]:
+        """
+        Lấy bài viết quốc tế theo ID
+        
+        Args:
+            news_id: ID bài viết
+            include_deleted: Nếu True, lấy cả bài đã xóa (cho admin)
+        """
+        query = self.db.query(NewsInternational).filter(NewsInternational.id == news_id)
+        if not include_deleted:
+            query = query.filter(NewsInternational.is_deleted == False)
+        return query.first()
 
     def get_by_slug(self, slug: str) -> Optional[NewsInternational]:
-        """Lấy bài viết quốc tế theo slug"""
+        """Lấy bài viết quốc tế theo slug (chỉ lấy bài chưa bị xóa)"""
         return (
             self.db.query(NewsInternational)
-            .filter(NewsInternational.slug == slug)
+            .filter(
+                NewsInternational.slug == slug,
+                NewsInternational.is_deleted == False
+            )
             .first()
         )
 
@@ -468,9 +505,21 @@ class InternationalNewsModel:
         limit: int | None = None,
         offset: int = 0,
         status: NewsStatus | None = None,
+        include_deleted: bool = False,
     ) -> list[NewsInternational]:
-        """Lấy danh sách bài viết quốc tế"""
+        """
+        Lấy danh sách bài viết quốc tế
+        
+        Args:
+            limit: Số lượng bài viết
+            offset: Vị trí bắt đầu
+            status: Lọc theo trạng thái
+            include_deleted: Nếu True, lấy cả bài đã xóa (cho admin)
+        """
         query = self.db.query(NewsInternational)
+
+        if not include_deleted:
+            query = query.filter(NewsInternational.is_deleted == False)
 
         if status:
             query = query.filter(NewsInternational.status == status)
@@ -485,7 +534,7 @@ class InternationalNewsModel:
     def get_published(
         self, limit: int | None = None, offset: int = 0
     ) -> list[NewsInternational]:
-        """Lấy danh sách bài viết quốc tế đã xuất bản"""
+        """Lấy danh sách bài viết quốc tế đã xuất bản (chỉ lấy bài chưa bị xóa)"""
         return self.get_all(
             limit=limit,
             offset=offset,
@@ -493,12 +542,13 @@ class InternationalNewsModel:
         )
 
     def get_featured(self, limit: int = 10) -> list[NewsInternational]:
-        """Lấy bài viết quốc tế nổi bật"""
+        """Lấy bài viết quốc tế nổi bật (chỉ lấy bài chưa bị xóa)"""
         return (
             self.db.query(NewsInternational)
             .filter(
                 NewsInternational.is_featured.is_(True),
                 NewsInternational.status == NewsStatus.PUBLISHED,
+                NewsInternational.is_deleted == False,
             )
             .order_by(NewsInternational.created_at.desc())
             .limit(limit)
@@ -506,12 +556,13 @@ class InternationalNewsModel:
         )
 
     def get_hot(self, limit: int = 10) -> list[NewsInternational]:
-        """Lấy tin quốc tế nóng nhất"""
+        """Lấy tin quốc tế nóng nhất (chỉ lấy bài chưa bị xóa)"""
         return (
             self.db.query(NewsInternational)
             .filter(
                 NewsInternational.is_hot.is_(True),
                 NewsInternational.status == NewsStatus.PUBLISHED,
+                NewsInternational.is_deleted == False,
             )
             .order_by(NewsInternational.view_count.desc())
             .limit(limit)
@@ -521,12 +572,13 @@ class InternationalNewsModel:
     def get_by_category(
         self, category_id: int, limit: int | None = None, offset: int = 0
     ) -> list[NewsInternational]:
-        """Lấy bài viết quốc tế theo danh mục"""
+        """Lấy bài viết quốc tế theo danh mục (chỉ lấy bài chưa bị xóa)"""
         query = (
             self.db.query(NewsInternational)
             .filter(
                 NewsInternational.category_id == category_id,
                 NewsInternational.status == NewsStatus.PUBLISHED,
+                NewsInternational.is_deleted == False,
             )
             .order_by(NewsInternational.created_at.desc())
         )

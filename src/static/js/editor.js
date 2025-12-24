@@ -1414,23 +1414,51 @@ async function saveEdit(newStatus = null) {
     }
 }
 
-// Delete article
-function deleteArticle(articleId) {
+// Delete article (soft delete)
+async function deleteArticle(articleId) {
     showSpinner();
     
-    // Simulate API call
-    setTimeout(function() {
-        hideSpinner();
-        showToast('Thành công', 'Bài viết đã được xóa', 'success');
-        
-        // Remove from table
-        $('button[data-id="' + articleId + '"]').closest('tr').fadeOut(function() {
-            $(this).remove();
+    try {
+        const response = await fetch(`/admin/news/${articleId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
         });
         
-        // Đồng bộ lại thống kê từ API sau khi xóa
-        refreshEditorStats(false);
-    }, 1000);
+        hideSpinner();
+        
+        if (response.ok) {
+            showToast('Thành công', 'Bài viết đã được xóa', 'success');
+            
+            // Remove from table
+            $('button[data-id="' + articleId + '"]').closest('tr').fadeOut(function() {
+                $(this).remove();
+            });
+            
+            // Reload current section to refresh the list
+            const activeSection = $('.content-section.active').attr('id');
+            if (activeSection === 'my-articles') {
+                loadMyArticles(1, $('#filterStatus').val(), $('#searchMyArticles').val().trim());
+            } else if (activeSection === 'drafts') {
+                loadDrafts(1);
+            } else if (activeSection === 'pending') {
+                loadPendingArticlesEditor(1);
+            } else if (activeSection === 'published') {
+                loadPublishedArticles(1);
+            }
+            
+            // Đồng bộ lại thống kê từ API sau khi xóa
+            refreshEditorStats(false);
+        } else {
+            const result = await response.json().catch(() => ({}));
+            showToast('Lỗi', result.error || 'Không thể xóa bài viết', 'warning');
+        }
+    } catch (error) {
+        hideSpinner();
+        console.error('Lỗi xóa bài viết:', error);
+        showToast('Lỗi', 'Có lỗi xảy ra khi xóa bài viết', 'warning');
+    }
 }
 
 // Toggle visibility

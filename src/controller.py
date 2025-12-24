@@ -362,10 +362,16 @@ class AdminController:
     
     def news_delete(self, news_id: int):
         """
-        Xóa bài viết
+        Xóa mềm bài viết (soft delete) - set is_deleted = True
         Route: POST /admin/news/<news_id>/delete
         """
         success = self.news_model.delete(news_id)
+        
+        if request.is_json or request.headers.get('Content-Type') == 'application/json':
+            if success:
+                return jsonify({'success': True, 'message': 'Đã xóa bài viết'})
+            else:
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
         
         if success:
             flash('Đã xóa bài viết', 'success')
@@ -419,7 +425,7 @@ class AdminController:
     
     def international_news_delete(self, news_id: int):
         """
-        Xóa bài viết quốc tế
+        Xóa mềm bài viết quốc tế (soft delete) - set is_deleted = True
         Route: POST /admin/international/<news_id>/delete
         """
         from database import NewsInternational
@@ -431,7 +437,9 @@ class AdminController:
             flash('Không tìm thấy bài viết', 'error')
             return redirect(request.referrer or url_for('admin.dashboard'))
         
-        self.db_session.delete(article)
+        # Soft delete - set is_deleted = True
+        article.is_deleted = True
+        article.updated_at = datetime.utcnow()
         self.db_session.commit()
         
         if request.is_json or request.headers.get('Content-Type') == 'application/json':
@@ -692,6 +700,7 @@ class AdminController:
         
         items = self.db_session.query(News).filter(
             News.created_by == user_id,
+            News.is_deleted == False,  # Chỉ lấy bài chưa bị xóa
             or_(
                 News.status == NewsStatus.PUBLISHED,
                 News.status == NewsStatus.REJECTED
@@ -839,7 +848,10 @@ class AdminController:
         articles = (
             self.db_session.query(NewsInternational)
             .join(CategoryInternational)
-            .filter(NewsInternational.status == NewsStatus.PUBLISHED)
+            .filter(
+                NewsInternational.status == NewsStatus.PUBLISHED,
+                NewsInternational.is_deleted == False  # Chỉ lấy bài chưa bị xóa
+            )
             .order_by(NewsInternational.published_at.desc())
             .limit(100)
             .all()
@@ -865,7 +877,10 @@ class AdminController:
         articles = (
             self.db_session.query(NewsInternational)
             .join(CategoryInternational)
-            .filter(NewsInternational.status == NewsStatus.PENDING)
+            .filter(
+                NewsInternational.status == NewsStatus.PENDING,
+                NewsInternational.is_deleted == False  # Chỉ lấy bài chưa bị xóa
+            )
             .order_by(NewsInternational.created_at.desc())
             .limit(100)
             .all()
@@ -897,8 +912,11 @@ class AdminController:
         query = (
             self.db_session.query(NewsInternational)
             .join(CategoryInternational)
-            .filter(NewsInternational.status == NewsStatus.DRAFT)
-            .filter(NewsInternational.created_by == user_id)  # Chỉ lấy bài của editor hiện tại
+            .filter(
+                NewsInternational.status == NewsStatus.DRAFT,
+                NewsInternational.created_by == user_id,  # Chỉ lấy bài của editor hiện tại
+                NewsInternational.is_deleted == False  # Chỉ lấy bài chưa bị xóa
+            )
         )
         
         # Tìm kiếm theo title nếu có
@@ -942,7 +960,10 @@ class AdminController:
         query = (
             self.db_session.query(NewsInternational)
             .join(CategoryInternational)
-            .filter(NewsInternational.created_by == user_id)
+            .filter(
+                NewsInternational.created_by == user_id,
+                NewsInternational.is_deleted == False  # Chỉ lấy bài chưa bị xóa
+            )
         )
         
         # Lọc theo status nếu có
@@ -993,8 +1014,11 @@ class AdminController:
         query = (
             self.db_session.query(NewsInternational)
             .join(CategoryInternational)
-            .filter(NewsInternational.status == NewsStatus.PENDING)
-            .filter(NewsInternational.created_by == user_id)  # Chỉ lấy bài của editor hiện tại
+            .filter(
+                NewsInternational.status == NewsStatus.PENDING,
+                NewsInternational.created_by == user_id,  # Chỉ lấy bài của editor hiện tại
+                NewsInternational.is_deleted == False  # Chỉ lấy bài chưa bị xóa
+            )
         )
         
         if search:
@@ -1035,8 +1059,11 @@ class AdminController:
         query = (
             self.db_session.query(NewsInternational)
             .join(CategoryInternational)
-            .filter(NewsInternational.status == NewsStatus.PUBLISHED)
-            .filter(NewsInternational.created_by == user_id)  # Chỉ lấy bài của editor hiện tại
+            .filter(
+                NewsInternational.status == NewsStatus.PUBLISHED,
+                NewsInternational.created_by == user_id,  # Chỉ lấy bài của editor hiện tại
+                NewsInternational.is_deleted == False  # Chỉ lấy bài chưa bị xóa
+            )
         )
         
         if search:
@@ -4754,6 +4781,7 @@ class ClientController:
 
             query = db_session.query(NewsInternational).filter(
                 NewsInternational.status == NewsStatus.PUBLISHED,
+                NewsInternational.is_deleted == False,  # Chỉ lấy bài chưa bị xóa
                 or_(
                     NewsInternational.title.ilike(f'%{keyword}%'),
                     NewsInternational.summary.ilike(f'%{keyword}%'),
