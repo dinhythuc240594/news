@@ -112,14 +112,44 @@ $(document).ready(function() {
         previewAPIArticle(articleData);
     });
     
-    // Reject article
+    // Reject article - mở modal
     $(document).on('click', '.btn-reject', function() {
         const articleId = $(this).data('id');
         const articleType = $(this).data('type'); // 'international' hoặc undefined
-        const reason = prompt('Lý do từ chối:');
-        if (reason) {
-            rejectArticle(articleId, reason, articleType);
+        
+        // Chỉ xử lý cho bài viết trong nước (không phải international)
+        if (!articleType || articleType !== 'international') {
+            $('#rejectArticleId').val(articleId);
+            $('#rejectArticleType').val(articleType || '');
+            $('#rejectReason').val('');
+            
+            const modal = new bootstrap.Modal(document.getElementById('rejectArticleModal'));
+            modal.show();
+        } else {
+            // Giữ nguyên prompt cho bài viết quốc tế (nếu cần)
+            const reason = prompt('Lý do từ chối:');
+            if (reason) {
+                rejectArticle(articleId, reason, articleType);
+            }
         }
+    });
+    
+    // Xử lý confirm reject từ modal
+    $('#confirmRejectBtn').on('click', function() {
+        const articleId = $('#rejectArticleId').val();
+        const articleType = $('#rejectArticleType').val();
+        const reason = $('#rejectReason').val().trim();
+        
+        if (!reason) {
+            alert('Vui lòng nhập lý do từ chối');
+            return;
+        }
+        
+        // Đóng modal
+        bootstrap.Modal.getInstance(document.getElementById('rejectArticleModal')).hide();
+        
+        // Gọi hàm reject
+        rejectArticle(articleId, reason, articleType);
     });
     
     // Preview article
@@ -1287,15 +1317,18 @@ async function rejectArticle(articleId, reason, articleType) {
         const response = await fetch(route, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'X-Reason': reason
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                reason: reason
+            })
         });
         
+        const result = await response.json();
         hideSpinner();
         
-        if (response.ok) {
-            showToast('Thông báo', 'Bài viết đã bị từ chối. Lý do: ' + reason, 'warning');
+        if (response.ok && result.success) {
+            showToast('Thành công', 'Bài viết đã bị từ chối và email đã được gửi đến tác giả', 'success');
             
             // Remove from table
             $(`button[data-id="${articleId}"]`).closest('tr').fadeOut(function() {
@@ -1305,7 +1338,6 @@ async function rejectArticle(articleId, reason, articleType) {
             // Reload stats
             loadStatistics();
         } else {
-            const result = await response.json();
             showToast('Lỗi', result.error || 'Không thể từ chối bài viết', 'warning');
         }
     } catch (error) {

@@ -215,6 +215,46 @@
             </div>
         </div>
 
+        <!-- Reject Article Modal -->
+        <div class="modal fade" id="rejectArticleModal" tabindex="-1" aria-labelledby="rejectArticleModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="rejectArticleModalLabel">
+                            <i class="fas fa-times-circle me-2"></i>Từ chối bài viết
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Đóng"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="rejectArticleId">
+                        <input type="hidden" id="rejectArticleType">
+                        <div class="mb-3">
+                            <label for="rejectReason" class="form-label">
+                                <strong>Lý do từ chối <span class="text-danger">*</span></strong>
+                            </label>
+                            <textarea 
+                                class="form-control" 
+                                id="rejectReason" 
+                                rows="5" 
+                                placeholder="Vui lòng nhập lý do từ chối bài viết. Lý do này sẽ được gửi đến tác giả qua email."
+                                required></textarea>
+                            <small class="form-text text-muted">
+                                Lý do từ chối sẽ được gửi đến tác giả qua email kèm theo link bài viết.
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-1"></i>Hủy
+                        </button>
+                        <button type="button" class="btn btn-danger" id="confirmRejectBtn">
+                            <i class="fas fa-paper-plane me-1"></i>Gửi từ chối
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Save API Article Modal -->
         <div class="modal fade" id="saveAPIArticleModal" tabindex="-1">
             <div class="modal-dialog">

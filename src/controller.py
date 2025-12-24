@@ -340,24 +340,159 @@ class AdminController:
     
     def news_reject(self, news_id: int):
         """
-        Từ chối bài viết
+        Từ chối bài viết và gửi email cho tác giả
         Route: POST /admin/news/<news_id>/reject
         """
         user_id = session.get('user_id')
-        reason = request.headers.get('X-Reason') or request.json.get('reason') if request.is_json else None
-        news = self.news_model.reject(news_id, user_id)
+        
+        # Lấy lý do từ chối từ request body
+        if request.is_json:
+            reason = request.json.get('reason', '').strip()
+        else:
+            reason = request.form.get('reason', '').strip()
+        
+        if not reason:
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Vui lòng nhập lý do từ chối'}), 400
+            flash('Vui lòng nhập lý do từ chối', 'error')
+            return redirect(request.referrer or url_for('admin.dashboard'))
+        
+        # Lấy thông tin bài viết trước khi reject
+        news = self.news_model.get_by_id(news_id, include_deleted=False)
+        if not news:
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+            flash('Không tìm thấy bài viết', 'error')
+            return redirect(request.referrer or url_for('admin.dashboard'))
+        
+        # Thực hiện reject
+        rejected_news = self.news_model.reject(news_id, user_id)
+        
+        if not rejected_news:
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Không thể từ chối bài viết'}), 500
+            flash('Không thể từ chối bài viết', 'error')
+            return redirect(request.referrer or url_for('admin.dashboard'))
+        
+        # Lấy thông tin tác giả
+        creator = self.user_model.get_by_id(news.created_by)
+        if creator and creator.email:
+            try:
+                # Tạo link bài viết
+                article_url = url_for('client.news_detail', slug=news.slug, _external=True)
+                
+                # Tạo nội dung email
+                from email_utils import send_email
+                
+                email_subject = f"Bài viết của bạn đã bị từ chối: {news.title}"
+                
+                email_body_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {{
+                            font-family: Arial, sans-serif;
+                            line-height: 1.6;
+                            color: #333;
+                            max-width: 600px;
+                            margin: 0 auto;
+                            padding: 20px;
+                        }}
+                        .header {{
+                            background-color: #dc3545;
+                            color: white;
+                            padding: 20px;
+                            text-align: center;
+                            border-radius: 5px 5px 0 0;
+                        }}
+                        .content {{
+                            background-color: #f8f9fa;
+                            padding: 20px;
+                            border: 1px solid #dee2e6;
+                        }}
+                        .reason-box {{
+                            background-color: white;
+                            border-left: 4px solid #dc3545;
+                            padding: 15px;
+                            margin: 20px 0;
+                        }}
+                        .article-link {{
+                            display: inline-block;
+                            background-color: #0066cc;
+                            color: white;
+                            padding: 12px 24px;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin: 20px 0;
+                        }}
+                        .footer {{
+                            text-align: center;
+                            color: #6c757d;
+                            font-size: 12px;
+                            margin-top: 20px;
+                            padding-top: 20px;
+                            border-top: 1px solid #dee2e6;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2>Thông báo từ chối bài viết</h2>
+                    </div>
+                    <div class="content">
+                        <p>Xin chào <strong>{creator.full_name or creator.username}</strong>,</p>
+                        
+                        <p>Chúng tôi rất tiếc phải thông báo rằng bài viết của bạn đã bị từ chối:</p>
+                        
+                        <h3 style="color: #0066cc;">{news.title}</h3>
+                        
+                        <div class="reason-box">
+                            <strong>Lý do từ chối:</strong>
+                            <p style="margin-top: 10px; white-space: pre-wrap;">{reason}</p>
+                        </div>
+                        
+                        <p>Bạn có thể xem lại bài viết của mình tại link sau:</p>
+                        <div style="text-align: center;">
+                            <a href="{article_url}" class="article-link">Xem bài viết</a>
+                        </div>
+                        
+                        <p>Vui lòng xem xét lại bài viết và chỉnh sửa theo góp ý trên trước khi gửi lại để duyệt.</p>
+                        
+                        <p>Trân trọng,<br>
+                        <strong>Ban biên tập VnNews</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p>Đây là email tự động. Vui lòng không trả lời email này.</p>
+                        <p>© 2024 VnNews. All rights reserved.</p>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                # Gửi email
+                email_sent = send_email(
+                    to_email=creator.email,
+                    subject=email_subject,
+                    body_html=email_body_html
+                )
+                
+                if not email_sent:
+                    print(f"Warning: Không thể gửi email từ chối đến {creator.email}")
+                
+            except Exception as e:
+                print(f"Error sending rejection email: {str(e)}")
+                # Vẫn tiếp tục dù email không gửi được
         
         if request.is_json or request.headers.get('Content-Type') == 'application/json':
-            if news:
-                return jsonify({'success': True, 'message': 'Đã từ chối bài viết', 'reason': reason})
-            else:
-                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+            return jsonify({
+                'success': True, 
+                'message': 'Đã từ chối bài viết và gửi email cho tác giả',
+                'reason': reason
+            })
         
-        if news:
-            flash('Đã từ chối bài viết', 'success')
-        else:
-            flash('Không tìm thấy bài viết', 'error')
-        
+        flash('Đã từ chối bài viết và gửi email cho tác giả', 'success')
         return redirect(request.referrer or url_for('admin.dashboard'))
     
     def news_delete(self, news_id: int):
