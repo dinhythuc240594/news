@@ -27,7 +27,8 @@
                             <div class="news-meta mb-3">
                                 <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>
                                 <span><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
-                                <span><i class="far fa-user"></i> {{ news.creator.full_name if news.creator else 'Admin' }}</span>
+                                {% set display_author = news.author if news.author else (news.creator.full_name if news.creator else 'Admin') %}
+                                <span><i class="far fa-user"></i> {{ display_author }}</span>
                             </div>
                         </div>
 
@@ -45,6 +46,47 @@
 
                         <div class="news-content">
                             {{ news.content|safe }}
+                        </div>
+
+                        <!-- Author Info -->
+                        <div class="author-info mt-4 p-3 bg-light rounded">
+                            <div class="d-flex align-items-center">
+                                {% set display_author = news.author if news.author else (news.creator.full_name if news.creator else 'Admin') %}
+                                <div class="author-avatar me-3">
+                                    {% if news.author %}
+                                        {# Article from API - display default avatar #}
+                                        <img src="https://ui-avatars.com/api/?name={{ news.author|urlencode }}&size=60&background=007bff&color=fff" 
+                                             alt="{{ news.author }}" 
+                                             class="rounded-circle" 
+                                             width="60" 
+                                             height="60">
+                                    {% elif news.creator and news.creator.avatar %}
+                                        <img src="/{{ news.creator.avatar }}" 
+                                             alt="{{ news.creator.full_name or news.creator.username }}" 
+                                             class="rounded-circle" 
+                                             width="60" 
+                                             height="60">
+                                    {% else %}
+                                        <img src="https://ui-avatars.com/api/?name={{ display_author|urlencode }}&size=60&background=007bff&color=fff" 
+                                             alt="{{ display_author }}" 
+                                             class="rounded-circle" 
+                                             width="60" 
+                                             height="60">
+                                    {% endif %}
+                                </div>
+                                <div class="author-details">
+                                    <h6 class="mb-1">
+                                        <strong>{{ display_author }}</strong>
+                                    </h6>
+                                    <p class="text-muted mb-0 small">
+                                        {% if news.author %}
+                                            Article Author
+                                        {% else %}
+                                            Published on {{ (news.published_at or news.created_at).strftime('%d/%m/%Y %H:%M') }}
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Tags and Share -->
