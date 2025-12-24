@@ -20,7 +20,7 @@
                     </nav>
 
                     <!-- News Detail -->
-                    <article class="news-detail">
+                    <article class="news-detail" style="display: flow-root;">
                         <div class="news-header mb-4">
                             <span class="badge-category">{{ news.category.name }}</span>
                             <h1 class="news-title">{{ news.title }}</h1>
@@ -46,131 +46,128 @@
                         <div class="news-content">
                             {{ news.content|safe }}
                         </div>
-
-                        <!-- Author Info -->
-                        <div class="author-info mt-4 p-3 bg-light rounded">
-                            <div class="d-flex align-items-center">
-                                {% set display_author = news.author if news.author else (news.creator.full_name if news.creator else 'Admin') %}
-                                <div class="author-avatar me-3">
-                                    {% if news.author %}
-                                        {# Bài viết từ API - hiển thị avatar mặc định #}
-                                        <img src="https://ui-avatars.com/api/?name={{ news.author|urlencode }}&size=60&background=007bff&color=fff" 
-                                             alt="{{ news.author }}" 
-                                             class="rounded-circle" 
-                                             width="60" 
-                                             height="60">
-                                    {% elif news.creator and news.creator.avatar %}
-                                        <img src="/{{ news.creator.avatar }}" 
-                                             alt="{{ news.creator.full_name or news.creator.username }}" 
-                                             class="rounded-circle" 
-                                             width="60" 
-                                             height="60">
-                                    {% else %}
-                                        <img src="https://ui-avatars.com/api/?name={{ display_author|urlencode }}&size=60&background=007bff&color=fff" 
-                                             alt="{{ display_author }}" 
-                                             class="rounded-circle" 
-                                             width="60" 
-                                             height="60">
-                                    {% endif %}
-                                </div>
-                                <div class="author-details">
-                                    <h6 class="mb-1">
-                                        <strong>{{ display_author }}</strong>
-                                    </h6>
-                                    <p class="text-muted mb-0 small">
-                                        <i class="far fa-user"></i> Tác giả
-                                        {% if news.creator and news.creator.email and not news.author %}
-                                        <span class="ms-2"><i class="far fa-envelope"></i> {{ news.creator.email }}</span>
-                                        {% endif %}
-                                        {% if news.is_api %}
-                                        <span class="ms-2"><i class="fas fa-rss"></i> Nguồn bên ngoài</span>
-                                        {% endif %}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Tags and Share -->
-                        <div class="news-footer mt-4 pt-4 border-top">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="share-buttons">
-                                        <span class="me-2">Chia sẻ:</span>
-                                        <a id="copyLinkBtn" class="btn btn-sm btn-outline-secondary"><i class="fa fa-paperclip"></i> Copy Link</a>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 text-end">
-                                    {% if user_id %}
-                                    <button id="saveNewsBtn" class="btn btn-sm {% if is_saved %}btn-warning{% else %}btn-outline-warning{% endif %} me-2" data-news-id="{{ news.id }}" data-is-saved="{{ 'true' if is_saved else 'false' }}">
-                                        <i class="fas {% if is_saved %}fa-bookmark{% else %}fa-bookmark-o{% endif %}"></i> 
-                                        <span id="saveNewsText">{% if is_saved %}Đã lưu{% else %}Lưu tin{% endif %}</span>
-                                    </button>
-                                    {% endif %}
-                                    <a href="{{ url_for('client.category', category_slug=news.category.slug) }}" class="btn btn-outline-secondary">
-                                        <i class="fas fa-arrow-left"></i> Về danh mục {{ news.category.name }}
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
                     </article>
-
-                    <!-- Comments Section -->
-                    <section class="comments-section mt-5 pt-4 border-top">
-                        <h2 class="section-title mb-4">
-                            <span>Bình luận ({{ comments|length }})</span>
-                        </h2>
-
-                        {% if user_id %}
-                        <!-- Comment Form -->
-                        <div class="comment-form mb-4">
-                            <form id="commentForm" data-news-id="{{ news.id }}">
-                                <div class="mb-3">
-                                    <textarea class="form-control" id="commentContent" rows="4" placeholder="Viết bình luận của bạn..." required></textarea>
-                                </div>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-paper-plane me-2"></i>Gửi bình luận
-                                </button>
-                            </form>
-                        </div>
-                        {% else %}
-                        <div class="alert alert-info">
-                            <a href="{{ url_for('client.user_login') }}">Đăng nhập</a> để bình luận
-                        </div>
-                        {% endif %}
-
-                        <!-- Comments List -->
-                        <div class="comments-list" id="commentsList">
-                            {% if comments %}
-                                {% for comment in comments %}
-                                <div class="comment-item mb-4 pb-3 border-bottom" data-comment-id="{{ comment.id }}">
-                                    <div class="d-flex">
-                                        <div class="comment-avatar me-3">
-                                            <img src="{% if comment.user.avatar %}/{{ comment.user.avatar }}{% else %}https://ui-avatars.com/api/?name={{ (comment.user.full_name or comment.user.username)|urlencode }}&size=40&background=007bff&color=fff{% endif %}" 
-                                                 alt="{{ comment.user.full_name or comment.user.username }}" 
+                        <!-- Author Section -->
+                        <section class="author-content-section mt-5 pt-4 border-top">
+                            <div class="author-info mt-4 p-3 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    {% set display_author = news.author if news.author else (news.creator.full_name if news.creator else 'Admin') %}
+                                    <div class="author-avatar me-3">
+                                        {% if news.author %}
+                                            {# Bài viết từ API - hiển thị avatar mặc định #}
+                                            <img src="https://ui-avatars.com/api/?name={{ news.author|urlencode }}&size=60&background=007bff&color=fff" 
+                                                 alt="{{ news.author }}" 
                                                  class="rounded-circle" 
-                                                 width="40" 
-                                                 height="40">
-                                        </div>
-                                        <div class="comment-content flex-grow-1">
-                                            <div class="comment-header mb-2">
-                                                <strong>{{ comment.user.full_name or comment.user.username }}</strong>
-                                                <span class="text-muted ms-2 small">
-                                                    <i class="far fa-clock"></i> {{ format_time(comment.created_at) if comment.created_at else '' }}
-                                                </span>
+                                                 width="60" 
+                                                 height="60">
+                                        {% elif news.creator and news.creator.avatar %}
+                                            <img src="/{{ news.creator.avatar }}" 
+                                                 alt="{{ news.creator.full_name or news.creator.username }}" 
+                                                 class="rounded-circle" 
+                                                 width="60" 
+                                                 height="60">
+                                        {% else %}
+                                            <img src="https://ui-avatars.com/api/?name={{ display_author|urlencode }}&size=60&background=007bff&color=fff" 
+                                                 alt="{{ display_author }}" 
+                                                 class="rounded-circle" 
+                                                 width="60" 
+                                                 height="60">
+                                        {% endif %}
+                                    </div>
+                                    <div class="author-details">
+                                        <h6 class="mb-1">
+                                            <strong>{{ display_author }}</strong>
+                                        </h6>
+                                        <p class="text-muted mb-0 small">
+                                            <i class="far fa-user"></i> Tác giả
+                                            {% if news.creator and news.creator.email and not news.author %}
+                                            <!-- <span class="ms-2"><i class="far fa-envelope"></i> {{ news.creator.email }}</span> -->
+                                            {% endif %}
+                                            {% if news.is_api %}
+                                            <span class="ms-2"><i class="fas fa-rss"></i> Nguồn bên ngoài</span>
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                        </section>
+                        
+                        <!-- Tags Section -->
+                        <!-- <section class="tags-section mt-5 pt-4 border-top">
+                            <h2 class="section-title mb-4">
+                                <span>Tags</span>
+                            </h2>
+                            <div class="tags-list">
+                                {% for tag in news.tags %}
+                                <span class="tag-item">{{ tag.name }}</span>
+                                {% endfor %}
+                            </div>
+                        </section> -->
+                        
+                        <!-- Share Section -->
+                        <section class="share-section mt-5 pt-4 border-top">
+                            <div class="share-buttons">
+                                <span class="me-2"><strong>Chia sẻ:</strong></span>
+                                <a id="copyLinkBtn" class="btn btn-sm btn-outline-secondary">
+                                    <i class="fa fa-paperclip"></i> Sao chép link
+                                </a>
+                            </div>
+                        </section>
+                        
+                        <!-- Comments Section -->
+                        <section class="comments-section mt-5 pt-4 border-top">
+                            <h2 class="section-title mb-4">
+                                <span>Bình luận ({{ comments|length }})</span>
+                            </h2>
+
+                            {% if user_id %}
+                            <!-- Comment Form -->
+                            <div class="comment-form mb-4">
+                                <form id="commentForm" data-news-id="{{ news.id }}">
+                                    <div class="mb-3">
+                                        <textarea class="form-control" id="commentContent" rows="4" placeholder="Viết bình luận của bạn..." required></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-paper-plane me-2"></i>Gửi bình luận
+                                    </button>
+                                </form>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <a href="{{ url_for('client.user_login') }}">Đăng nhập</a> để bình luận
+                            </div>
+                            {% endif %}
+
+                            <!-- Comments List -->
+                            <div class="comments-list" id="commentsList">
+                                {% if comments %}
+                                    {% for comment in comments %}
+                                    <div class="comment-item mb-4 pb-3 border-bottom" data-comment-id="{{ comment.id }}">
+                                        <div class="d-flex">
+                                            <div class="comment-avatar me-3">
+                                                <img src="{% if comment.user.avatar %}/{{ comment.user.avatar }}{% else %}https://ui-avatars.com/api/?name={{ (comment.user.full_name or comment.user.username)|urlencode }}&size=40&background=007bff&color=fff{% endif %}" 
+                                                     alt="{{ comment.user.full_name or comment.user.username }}" 
+                                                     class="rounded-circle" 
+                                                     width="40" 
+                                                     height="40">
                                             </div>
-                                            <div class="comment-text">
-                                                {{ comment.content|nl2br|safe }}
+                                            <div class="comment-content flex-grow-1">
+                                                <div class="comment-header mb-2">
+                                                    <strong>{{ comment.user.full_name or comment.user.username }}</strong>
+                                                    <span class="text-muted ms-2 small">
+                                                        <i class="far fa-clock"></i> {{ format_time(comment.created_at) if comment.created_at else '' }}
+                                                    </span>
+                                                </div>
+                                                <div class="comment-text">
+                                                    {{ comment.content|nl2br|safe }}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                                {% endfor %}
-                            {% else %}
-                                <p class="text-muted text-center py-4">Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
-                            {% endif %}
-                        </div>
-                    </section>
-
+                                    {% endfor %}
+                                {% else %}
+                                    <p class="text-muted text-center py-4">Chưa có bình luận nào. Hãy là người đầu tiên bình luận!</p>
+                                {% endif %}
+                            </div>
+                        </section>
                     <!-- Related News -->
                     {% if related_news %}
                     <section class="related-news mt-5">

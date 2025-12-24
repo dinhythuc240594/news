@@ -20,7 +20,7 @@
                     </nav>
 
                     <!-- News Detail -->
-                    <article class="news-detail">
+                    <article class="news-detail" style="display: flow-root;">
                         <div class="news-header mb-4">
                             <span class="badge-category">{{ news.category.name }}</span>
                             <h1 class="news-title">{{ news.title }}</h1>
@@ -46,30 +46,73 @@
                         <div class="news-content">
                             {{ news.content|safe }}
                         </div>
+                    </article>
 
-                        <!-- Tags and Share -->
-                        <div class="news-footer mt-4 pt-4 border-top">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="share-buttons">
-                                        <span class="me-2">Share:</span>
-                                        <a id="copyLinkBtn" class="btn btn-sm btn-outline-secondary"><i class="fa fa-paperclip"></i> Copy Link</a>
-                                    </div>
-                                </div>
-                                <div class="col-md-6 text-end">
-                                    {% if user_id %}
-                                    <button id="saveNewsBtn" class="btn btn-sm {% if is_saved %}btn-warning{% else %}btn-outline-warning{% endif %} me-2" data-news-id="{{ news.id }}" data-is-saved="{{ 'true' if is_saved else 'false' }}">
-                                        <i class="fas {% if is_saved %}fa-bookmark{% else %}fa-bookmark-o{% endif %}"></i> 
-                                        <span id="saveNewsText">{% if is_saved %}Saved{% else %}Save{% endif %}</span>
-                                    </button>
+                    <!-- Author Section -->
+                    <section class="author-content-section mt-5 pt-4 border-top">
+                        <div class="author-info mt-4 p-3 bg-light rounded">
+                            <div class="d-flex align-items-center">
+                                {% set display_author = news.author if news.author else (news.creator.full_name if news.creator else 'Admin') %}
+                                <div class="author-avatar me-3">
+                                    {% if news.author %}
+                                        {# Bài viết từ API - hiển thị avatar mặc định #}
+                                        <img src="https://ui-avatars.com/api/?name={{ news.author|urlencode }}&size=60&background=007bff&color=fff" 
+                                                alt="{{ news.author }}" 
+                                                class="rounded-circle" 
+                                                width="60" 
+                                                height="60">
+                                    {% elif news.creator and news.creator.avatar %}
+                                        <img src="/{{ news.creator.avatar }}" 
+                                                alt="{{ news.creator.full_name or news.creator.username }}" 
+                                                class="rounded-circle" 
+                                                width="60" 
+                                                height="60">
+                                    {% else %}
+                                        <img src="https://ui-avatars.com/api/?name={{ display_author|urlencode }}&size=60&background=007bff&color=fff" 
+                                                alt="{{ display_author }}" 
+                                                class="rounded-circle" 
+                                                width="60" 
+                                                height="60">
                                     {% endif %}
-                                    <a href="{{ url_for('client.category', category_slug=news.category.slug) }}" class="btn btn-outline-secondary">
-                                        <i class="fas fa-arrow-left"></i> Back to category {{ news.category.name }}
-                                    </a>
+                                </div>
+                                <div class="author-details">
+                                    <h6 class="mb-1">
+                                        <strong>{{ display_author }}</strong>
+                                    </h6>
+                                    <p class="text-muted mb-0 small">
+                                        <i class="far fa-user"></i> Tác giả
+                                        {% if news.creator and news.creator.email and not news.author %}
+                                        <!-- <span class="ms-2"><i class="far fa-envelope"></i> {{ news.creator.email }}</span> -->
+                                        {% endif %}
+                                        {% if news.is_api %}
+                                        <span class="ms-2"><i class="fas fa-rss"></i> Nguồn bên ngoài</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                    </section>
+
+                    <!-- Tags and Share -->
+                    <div class="news-footer mt-4 pt-4 border-top">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="share-buttons">
+                                    <span class="me-2">Share:</span>
+                                    <a id="copyLinkBtn" class="btn btn-sm btn-outline-secondary"><i class="fa fa-paperclip"></i> Copy Link</a>
                                 </div>
                             </div>
+                            <div class="col-md-6 text-end">
+                                {% if user_id %}
+                                <button id="saveNewsBtn" class="btn btn-sm {% if is_saved %}btn-warning{% else %}btn-outline-warning{% endif %} me-2" data-news-id="{{ news.id }}" data-is-saved="{{ 'true' if is_saved else 'false' }}">
+                                    <i class="fas {% if is_saved %}fa-bookmark{% else %}fa-bookmark-o{% endif %}"></i> 
+                                    <span id="saveNewsText">{% if is_saved %}Saved{% else %}Save{% endif %}</span>
+                                </button>
+                                {% endif %}
+                                <a href="{{ url_for('client.en_category', category_slug=news.category.slug) }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-arrow-left"></i> Back to category {{ news.category.name }}
+                                </a>
+                            </div>
                         </div>
-                    </article>
+                    </div>
 
                     <!-- Comments Section -->
                     <section class="comments-section mt-5 pt-4 border-top">
@@ -91,7 +134,7 @@
                         </div>
                         {% else %}
                         <div class="alert alert-info">
-                            <a href="{{ url_for('client.user_login') }}">Login</a> to comment
+                            <a href="{{ url_for('client.en_user_login') }}">Login</a> to comment
                         </div>
                         {% endif %}
 
@@ -103,10 +146,10 @@
                                     <div class="d-flex">
                                         <div class="comment-avatar me-3">
                                             <img src="{% if comment.user.avatar %}/{{ comment.user.avatar }}{% else %}https://ui-avatars.com/api/?name={{ (comment.user.full_name or comment.user.username)|urlencode }}&size=40&background=007bff&color=fff{% endif %}" 
-                                                 alt="{{ comment.user.full_name or comment.user.username }}" 
-                                                 class="rounded-circle" 
-                                                 width="40" 
-                                                 height="40">
+                                                    alt="{{ comment.user.full_name or comment.user.username }}" 
+                                                    class="rounded-circle" 
+                                                    width="40" 
+                                                    height="40">
                                         </div>
                                         <div class="comment-content flex-grow-1">
                                             <div class="comment-header mb-2">
@@ -330,7 +373,7 @@
         const sectionTitle = document.querySelector('.comments-section .section-title span');
         if (sectionTitle) {
             const commentCount = document.querySelectorAll('.comment-item').length;
-            sectionTitle.textContent = `Bình luận (${commentCount})`;
+            sectionTitle.textContent = `Comments (${commentCount})`;
         }
     }
 
