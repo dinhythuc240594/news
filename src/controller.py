@@ -104,6 +104,11 @@ class AdminController:
             password = request.form.get('password')
             remember = request.form.get('remember') == 'on'
             
+            # Kiểm tra tài khoản bị khóa trước khi xác thực
+            if self.user_model.is_locked_user(username):
+                flash('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên', 'error')
+                return render_template('admin/login.html')
+            
             user = self.user_model.authenticate(username, password)
             
             if user and user.is_active and user.role in [UserRole.ADMIN, UserRole.EDITOR]:
@@ -3822,6 +3827,15 @@ class ClientController:
         if request.method == 'POST':
             username = request.form.get('username')
             password = request.form.get('password')
+            
+            # Kiểm tra tài khoản bị khóa trước khi xác thực
+            if self.user_model.is_locked_user(username):
+                if site == 'en':
+                    flash('Account has been locked. Please contact administrator', 'error')
+                    return redirect(url_for('client.en_user_login'))
+                else:
+                    flash('Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên', 'error')
+                    return redirect(url_for('client.user_login'))
             
             user = self.user_model.authenticate(username, password)
             

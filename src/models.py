@@ -409,10 +409,36 @@ class UserModel:
         if not user:
             user = self.get_by_email(username)
         
+        # Kiểm tra tài khoản bị khóa trước khi kiểm tra mật khẩu
+        if user and not user.is_active:
+            return None  # Tài khoản bị khóa, không cho đăng nhập
+        
         if user and user.is_active and verify_password(user.password_hash, password):
             return user
         
         return None
+    
+    def is_locked_user(self, username: str) -> bool:
+        """
+        Kiểm tra xem tài khoản có bị khóa không
+        
+        Args:
+            username: Tên đăng nhập hoặc email
+            
+        Returns:
+            True nếu tài khoản bị khóa, False nếu không
+        """
+        # Try username first
+        user = self.get_by_username(username)
+        
+        # If not found, try email
+        if not user:
+            user = self.get_by_email(username)
+        
+        if user and not user.is_active:
+            return True
+        
+        return False
 
 
 class InternationalNewsModel:
