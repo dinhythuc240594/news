@@ -213,7 +213,19 @@
                             <i class="fas fa-fire"></i> Xem nhiều
                         </h3>
                         <div class="most-read-list">
-                            <p class="text-muted text-center">Đang tải...</p>
+                            {% if hot_news %}
+                                {% for news in hot_news %}
+                                <article class="most-read-item">
+                                    <span class="rank">{{ loop.index }}</span>
+                                    <div class="content">
+                                        <h4><a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a></h4>
+                                        <span class="meta"><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
+                                    </div>
+                                </article>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted text-center">Chưa có tin nóng</p>
+                            {% endif %}
                         </div>
                     </aside>
                 </div>
