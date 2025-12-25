@@ -420,38 +420,27 @@ async function fetchCountByStatus(status) {
 }
 
 // Cập nhật lại thống kê & hiển thị toast khi có bài được duyệt / từ chối
-async function refreshEditorStats(showNotifications) {
+async function refreshEditorStats() {
     try {
-        const [total, draft, pending, published, rejected] = await Promise.all([
-            fetchCountByStatus('all'),
-            fetchCountByStatus('draft'),
-            fetchCountByStatus('pending'),
-            fetchCountByStatus('published'),
-            fetchCountByStatus('rejected')
-        ]);
 
-        // Bỏ qua nếu API lỗi
-        if (total === null || draft === null || pending === null || published === null || rejected === null) {
+        const response = await fetch('/admin/api/statistics-editor', {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' }
+        });
+        const result = await response.json();
+        if (!result.success || !result.data) {
             return;
         }
 
-        const prevStats = { ...editorStats };
-
-        editorStats.total = total;
-        editorStats.draft = draft;
-        editorStats.pending = pending;
-        editorStats.published = published;
-        editorStats.rejected = rejected;
-
         // Cập nhật DOM dashboard
-        $('#statTotal').text(total);
-        $('#statDrafts').text(draft);
-        $('#statPending').text(pending);
-        $('#statPublished').text(published);
+        $('#statTotal').text(result.data.total);
+        $('#statDrafts').text(result.data.draft);
+        $('#statPending').text(result.data.pending);
+        $('#statPublished').text(result.data.published);
 
         // Cập nhật badge menu trái
-        $('#draftCount').text(draft);
-        $('#pendingCount').text(pending);
+        $('#draftCount').text(result.data.draft);
+        $('#pendingCount').text(result.data.pending);
     } catch (error) {
         console.error('Lỗi cập nhật thống kê editor:', error);
     }

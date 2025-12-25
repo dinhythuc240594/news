@@ -280,6 +280,11 @@ def api_article_detail(article_id: int):
     """API lấy chi tiết bài viết theo ID"""
     return admin_controller.api_article_detail(article_id)
 
+@admin_bp.route('/api/statistics-editor')
+@controller.editor_required
+def api_statistics_editor():
+    """API lấy thống kê dashboard của editor"""
+    return admin_controller.api_statistics_editor()
 
 @admin_bp.route('/api/international-article/<int:article_id>')
 @controller.admin_required

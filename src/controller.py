@@ -1059,6 +1059,50 @@ class AdminController:
             }
         })
     
+    def api_statistics_editor(self):
+        """API lấy thống kê dashboard của editor"""
+        from sqlalchemy import func
+        
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Chưa đăng nhập'}), 401
+        
+        total = self.db_session.query(func.count(News.id)).filter(
+            News.created_by == user_id
+        ).scalar() or 0
+        
+        pending_count = self.db_session.query(func.count(News.id)).filter(
+            News.created_by == user_id, News.status == NewsStatus.PENDING
+        ).scalar() or 0
+        
+        approved_count = self.db_session.query(func.count(News.id)).filter(
+            News.created_by == user_id, News.status == NewsStatus.PUBLISHED
+        ).scalar() or 0
+        
+        published_count = self.db_session.query(func.count(News.id)).filter(
+            News.created_by == user_id, News.status == NewsStatus.PUBLISHED
+        ).scalar() or 0
+        
+        rejected_count = self.db_session.query(func.count(News.id)).filter(
+            News.created_by == user_id, News.status == NewsStatus.REJECTED
+        ).scalar() or 0
+        
+        draft_count = self.db_session.query(func.count(News.id)).filter(
+            News.created_by == user_id, News.status == NewsStatus.DRAFT
+        ).scalar() or 0
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'total': total,
+                'pending': pending_count,
+                'published': published_count,
+                'rejected': rejected_count,
+                'approved': approved_count,
+                'draft': draft_count
+            }
+        })
+
     def api_pending_articles(self):
         """API lấy danh sách bài viết chờ duyệt"""
         articles = self.news_model.get_all(status=NewsStatus.PENDING, limit=100)
