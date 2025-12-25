@@ -27,7 +27,7 @@
                                             <a href="{{ url_for('client.news_detail', news_slug=main_featured.slug) }}">{{ main_featured.title }}</a>
                                         </h2>
                                         <p class="news-description">
-                                            {{ main_featured.summary or main_featured.content[:200] + '...' }}
+                                            {{ main_featured.summary or main_featured.content|get_description }}
                                         </p>
                                         <div class="news-meta">
                                             <span><i class="far fa-clock"></i> {{ (main_featured.published_at or main_featured.created_at)|timeago }}</span>
@@ -90,7 +90,7 @@
                                                     <a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
                                                 </h3>
                                                 <p class="news-description">
-                                                    {{ news.summary or news.content[:200] + '...' }}
+                                                    {{ news.summary or news.content|get_description }}
                                                 </p>
                                                 <div class="news-meta">
                                                     <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>

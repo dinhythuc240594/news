@@ -50,7 +50,7 @@
                                                 <a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
                                             </h3>
                                             <p class="news-description">
-                                                {{ news.summary or news.content[:200] + '...' }}
+                                                {{ news.summary or news.content|get_description }}
                                             </p>
                                             <div class="news-meta">
                                                 <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>

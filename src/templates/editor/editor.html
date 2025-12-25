@@ -50,6 +50,11 @@
                 </a>
             </li>
             <li>
+                <a href="#" data-section="rejected">
+                    <i class="fas fa-times-circle"></i> Bài từ chối
+                </a>
+            </li>
+            <li>
                 <a href="#" data-section="published">
                     <i class="fas fa-check-circle"></i> Đã xuất bản
                 </a>
@@ -216,6 +221,7 @@
         {% include 'editor/int-drafts-section.html' %}
         {% include 'editor/int-pending-section.html' %}
         {% include 'editor/int-published-section.html' %}
+        {% include 'editor/reject-section.html' %}
 
     </div>
 

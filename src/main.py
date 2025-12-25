@@ -9,6 +9,7 @@ from models import CategoryModel
 from config import Config
 from datetime import datetime, timezone
 import pytz
+import re
 
 
 def create_app(config_class=Config):
@@ -153,6 +154,32 @@ def create_app(config_class=Config):
         if not text:
             return ''
         return text.replace('\n', '<br>')
+    
+    @app.template_filter('get_description')
+    def get_description_filter(content):
+        """
+        Lấy mô tả từ content: loại bỏ HTML tags và lấy 200 từ đầu
+        Nếu content là None hoặc rỗng, trả về chuỗi rỗng
+        """
+        if not content:
+            return ''
+        
+        # Loại bỏ HTML tags
+        text = re.sub(r'<[^>]+>', '', content)
+        
+        # Loại bỏ các ký tự đặc biệt và normalize whitespace
+        text = re.sub(r'&nbsp;', ' ', text)
+        text = re.sub(r'\s+', ' ', text)
+        text = text.strip()
+        
+        # Chia thành các từ
+        words = text.split()
+        
+        # Lấy 200 từ đầu
+        if len(words) > 100:
+            return ' '.join(words[:100]) + '...'
+        else:
+            return text
     
     # Context processor để categories có sẵn trong tất cả templates
     @app.context_processor

@@ -65,6 +65,7 @@ $(document).ready(function() {
         'my-articles': () => loadMyArticles(1, $('#filterStatus').val(), $('#searchMyArticles').val().trim()),
         'drafts': () => loadDrafts(),
         'pending': () => loadPendingArticlesEditor(),
+        'rejected': () => loadRejectedArticles(),
         'published': () => loadPublishedArticles(),
         'international-articles': () => loadMyInternationalArticles(),
         'int-drafts': () => loadIntDrafts(),
@@ -695,6 +696,12 @@ function loadDrafts(page = 1) {
 function loadPendingArticlesEditor(page = 1) {
     const search = $('#searchPending').val() ? $('#searchPending').val().trim() : null;
     fetchMyArticlesForSection('pending', page, search, 'pendingTable', 'pendingPagination', 'pendingInfo', 'pending');
+}
+
+// Load danh sách bị từ chối
+function loadRejectedArticles(page = 1) {
+    const search = $('#searchRejected').val() ? $('#searchRejected').val().trim() : null;
+    fetchMyArticlesForSection('rejected', page, search, 'rejectedTable', 'rejectedPagination', 'rejectedInfo', 'rejected');
 }
 
 // Load danh sách đã xuất bản
