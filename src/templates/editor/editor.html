@@ -10,9 +10,13 @@
             <h4><i class="fas fa-newspaper"></i> VnNews Editor</h4>
         </div>
         <div class="user-info">
-            <div class="user-avatar">
-                <i class="fas fa-user-edit"></i>
-            </div>
+                {% if user.avatar %}
+                    <img src="/{{ user.avatar }}" alt="Avatar" class="rounded-circle" width="60" height="60">
+                {% else %}
+                    <div class="user-avatar">
+                        <i class="fas fa-user-edit rounded-circle" width="40" height="40"></i>
+                    </div>
+                {% endif %}
             <div class="user-details">
                 <strong id="userName"><a href="{{ url_for('admin.profile') }}">{{ user.full_name }}</a></strong>
                 <span class="badge bg-danger">{{ user.role }}</span>
