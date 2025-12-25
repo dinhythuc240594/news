@@ -1,3 +1,6 @@
+"""
+admin router - định nghĩa các route cho admin
+"""
 
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
 # from sqlalchemy.orm import Session
@@ -19,6 +22,7 @@ admin_bp = Blueprint('admin', __name__,
 admin_controller = AdminController()
 
 # Các route cho admin và editor
+'/admin/login'
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Trang đăng nhập"""

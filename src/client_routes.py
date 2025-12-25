@@ -1,3 +1,6 @@
+"""
+client router - định nghĩa các route cho client
+"""
 
 from flask import Blueprint, render_template, request, jsonify, abort
 # from sqlalchemy.orm import Session

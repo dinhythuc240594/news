@@ -1,5 +1,5 @@
 """
-Database configuration and schema for News application
+Database cấu hình và chứa các bảng dữ liệu của web tin tức
 Using PostgreSQL
 """
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Enum, TypeDecorator
@@ -231,6 +231,7 @@ class UserRoleType(TypeDecorator):
         # If all else fails, return None or raise error
         return None
 
+
 class Category(Base):
     """Bảng danh mục tin tức"""
     __tablename__ = 'categories'
@@ -374,6 +375,7 @@ class ViewedNews(Base):
     user = relationship("User", back_populates="viewed_news")
     news = relationship("News", foreign_keys=[news_id])
     news_international = relationship("NewsInternational", foreign_keys=[news_international_id])
+
 
 class Comment(Base):
     """Bảng bình luận của người dùng"""

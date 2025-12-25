@@ -1,3 +1,7 @@
+"""
+Controller - xử lý các route và dữ liệu để hiển thị trên trình duyệt
+"""
+
 from flask import Blueprint, render_template, request, jsonify, abort, redirect, url_for, flash, session, current_app
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError

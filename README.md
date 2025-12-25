@@ -11,7 +11,7 @@ virtualenv venv
 ``3. Truy cập vào folder venv/script và gõ lệnh``
 activate
 
-``4. Cài môi trường Flask framework``
+``4. Cài môi trường Flask framework và các thư viện liên quan``
 pip install -r requirements.txt
 
 ``5. Tạo database trên postgresql with file postgresql_news.sql``

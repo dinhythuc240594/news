@@ -1,6 +1,6 @@
 """
-Model classes cho News application
-Sử dụng SQLAlchemy ORM
+Model classes để quản lý các thao tác thêm, xóa, sửa, lấy dữ liệu của web tin tức
+và sử dụng thư viện SQLAlchemy ORM
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func, or_

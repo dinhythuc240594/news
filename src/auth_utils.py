@@ -1,5 +1,5 @@
 """
-Authentication utilities - Password hashing and validation
+Authentication utilities - xác thực và định dạng các trường dữ liệu
 """
 from werkzeug.security import generate_password_hash, check_password_hash
 import re

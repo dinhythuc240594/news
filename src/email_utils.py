@@ -1,5 +1,5 @@
 """
-Email utilities - Send emails using smtplib
+Email utilities - cấu hình và gửi email bằng smtplib
 """
 import smtplib
 import ssl
