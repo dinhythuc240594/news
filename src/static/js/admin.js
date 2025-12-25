@@ -118,20 +118,23 @@ $(document).ready(function() {
         const articleType = $(this).data('type'); // 'international' hoặc undefined
         
         // Chỉ xử lý cho bài viết trong nước (không phải international)
-        if (!articleType || articleType !== 'international') {
-            $('#rejectArticleId').val(articleId);
-            $('#rejectArticleType').val(articleType || '');
-            $('#rejectReason').val('');
-            
-            const modal = new bootstrap.Modal(document.getElementById('rejectArticleModal'));
-            modal.show();
-        } else {
-            // Giữ nguyên prompt cho bài viết quốc tế (nếu cần)
-            const reason = prompt('Lý do từ chối:');
-            if (reason) {
-                rejectArticle(articleId, reason, articleType);
-            }
-        }
+        // if (!articleType || articleType != 'international') {
+
+        $('#rejectArticleId').val(articleId);
+        $('#rejectArticleType').val(articleType || '');
+        $('#rejectReason').val('');
+        
+        const modal = new bootstrap.Modal(document.getElementById('rejectArticleModal'));
+        modal.show();
+
+        // } 
+        // else {
+        //     // Giữ nguyên prompt cho bài viết quốc tế (nếu cần)
+        //     const reason = prompt('Lý do từ chối:');
+        //     if (reason) {
+        //         rejectArticle(articleId, reason, articleType);
+        //     }
+        // }
     });
     
     // Xử lý confirm reject từ modal
@@ -379,24 +382,49 @@ async function loadRejectedArticles() {
         if (result.success && result.data) {
             let html = '';
             result.data.forEach((article, index) => {
+                const typeBadge = article.type === 'international' 
+                    ? '<span class="badge bg-info">Quốc tế</span>' 
+                    : '<span class="badge bg-secondary">Trong nước</span>';
+                
+                const rejectedBy = article.rejected_by || 'N/A';
+                const rejectedAt = article.rejected_at || article.date;
+                const hasReason = article.rejection_reason && article.rejection_reason.trim() !== '';
+                
                 html += `
                     <tr>
                         <td>${index + 1}</td>
-                        <td><strong>${article.title}</strong></td>
-                        <td>${article.author}</td>
-                        <td><span class="badge bg-primary">${article.category}</span></td>
+                        <td>
+                            <strong>${escapeHtml(article.title)}</strong>
+                            ${typeBadge}
+                        </td>
+                        <td>${escapeHtml(article.author)}</td>
+                        <td><span class="badge bg-primary">${escapeHtml(article.category)}</span></td>
                         <td>${article.date}</td>
                         <td>
-                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}" title="Xem">
+                            <small>${escapeHtml(rejectedBy)}</small><br>
+                            <small class="text-muted">${rejectedAt}</small>
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary btn-preview" data-id="${article.id}" data-type="${article.type || ''}" title="Xem">
                                 <i class="fas fa-eye"></i>
                             </button>
+                            ${hasReason ? `
+                                <button class="btn btn-sm btn-danger btn-view-rejection" 
+                                        data-title="${escapeHtml(article.title)}"
+                                        data-reason="${escapeHtml(article.rejection_reason)}"
+                                        data-rejected-by="${escapeHtml(rejectedBy)}"
+                                        data-rejected-at="${rejectedAt}"
+                                        title="Xem lý do từ chối">
+                                    <i class="fas fa-info-circle"></i> Lý do
+                                </button>
+                            ` : ''}
                         </td>
                     </tr>
                 `;
             });
             
             if (result.data.length === 0) {
-                html = '<tr><td colspan="6" class="text-center text-muted">Không có bài viết nào</td></tr>';
+                html = '<tr><td colspan="7" class="text-center text-muted">Không có bài viết nào</td></tr>';
             }
             
             $('#rejected').find('tbody').html(html);
@@ -405,6 +433,22 @@ async function loadRejectedArticles() {
         console.error('Lỗi tải bài viết bị từ chối:', error);
     }
 }
+
+// Xem lý do từ chối
+$(document).on('click', '.btn-view-rejection', function() {
+    const title = $(this).data('title');
+    const reason = $(this).data('reason');
+    const rejectedBy = $(this).data('rejected-by');
+    const rejectedAt = $(this).data('rejected-at');
+    
+    $('#rejectionArticleTitle').text(title);
+    $('#rejectionRejectedBy').text(rejectedBy);
+    $('#rejectionRejectedAt').text(rejectedAt);
+    $('#rejectionReasonText').text(reason || 'Không có lý do từ chối');
+    
+    const modal = new bootstrap.Modal(document.getElementById('rejectionReasonModal'));
+    modal.show();
+});
 
 // Load international articles
 async function loadInternationalArticles() {

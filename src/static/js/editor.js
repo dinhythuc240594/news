@@ -316,6 +316,26 @@ $(document).ready(function() {
         }
     });
     
+    // Xem lý do từ chối
+    $(document).on('click', '.btn-view-rejection', function() {
+
+        fetch(`/admin/api/rejected-article/${$(this).data('id')}`).then(response => response.json()).then(data => {
+            console.log(data);
+            const title = data.title;
+            const reason = data.rejection_reason;
+            const rejectedBy = data.rejected_by;
+            const rejectedAt = data.rejected_at;
+            
+            $('#rejectionArticleTitle').text(title);
+            $('#rejectionRejectedBy').text(rejectedBy);
+            $('#rejectionRejectedAt').text(rejectedAt);
+            $('#rejectionReasonText').text(reason || 'Không có lý do từ chối');
+            
+            const modal = new bootstrap.Modal(document.getElementById('rejectionReasonModal'));
+            modal.show();
+        });
+    });
+
     // // Initialize tag autocomplete for all tag inputs
     // initTagAutocomplete('#articleTags', '#tagSuggestions');
     // initTagAutocomplete('#editArticleTags', '#editTagSuggestions');
@@ -830,6 +850,14 @@ function displayArticles(articles, tableBodyId) {
             html += '<i class="fas fa-trash"></i>';
             html += '</button>';
         }
+
+        if (article.status === 'rejected') {
+            html += '<button class="btn btn-sm btn-danger btn-action btn-view-rejection"';
+            html += 'data-id="' + article.id + '" data-title="' + article.title + '" data-reason="' + article.rejection_reason + '" data-rejected-by="' + article.rejected_by + '" data-rejected-at="' + article.rejected_at + '" title="Xem lý do từ chối">';
+            html += '<i class="fas fa-info-circle"></i>';
+            html += '</button>';
+        }
+
         html += '</td>';
         html += '</tr>';
     });

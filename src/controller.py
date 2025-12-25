@@ -25,6 +25,8 @@ from database import (
     PasswordResetToken,
     Setting,
     User,
+    NewsRejection,
+    NewsInternationalRejection,
 )
 from models import (
     NewsModel,
@@ -365,8 +367,8 @@ class AdminController:
             flash('Không tìm thấy bài viết', 'error')
             return redirect(request.referrer or url_for('admin.dashboard'))
         
-        # Thực hiện reject
-        rejected_news = self.news_model.reject(news_id, user_id)
+        # Thực hiện reject với lý do
+        rejected_news = self.news_model.reject(news_id, user_id, reason=reason)
         
         if not rejected_news:
             if request.is_json or request.headers.get('Content-Type') == 'application/json':
@@ -538,24 +540,159 @@ class AdminController:
     
     def international_news_reject(self, news_id: int):
         """
-        Từ chối bài viết quốc tế
+        Từ chối bài viết quốc tế và gửi email cho tác giả
         Route: POST /admin/international/<news_id>/reject
         """
         user_id = session.get('user_id')
-        reason = request.headers.get('X-Reason') or request.json.get('reason') if request.is_json else None
-        news = self.int_news_model.reject(news_id, user_id)
+        
+        # Lấy lý do từ chối từ request body
+        if request.is_json:
+            reason = request.json.get('reason', '').strip()
+        else:
+            reason = request.form.get('reason', '').strip()
+        
+        if not reason:
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Vui lòng nhập lý do từ chối'}), 400
+            flash('Vui lòng nhập lý do từ chối', 'error')
+            return redirect(request.referrer or url_for('admin.dashboard'))
+        
+        # Lấy thông tin bài viết trước khi reject
+        news = self.int_news_model.get_by_id(news_id, include_deleted=False)
+        if not news:
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+            flash('Không tìm thấy bài viết', 'error')
+            return redirect(request.referrer or url_for('admin.dashboard'))
+        
+        # Thực hiện reject với lý do
+        rejected_news = self.int_news_model.reject(news_id, user_id, reason=reason)
+        
+        if not rejected_news:
+            if request.is_json or request.headers.get('Content-Type') == 'application/json':
+                return jsonify({'success': False, 'error': 'Không thể từ chối bài viết'}), 500
+            flash('Không thể từ chối bài viết', 'error')
+            return redirect(request.referrer or url_for('admin.dashboard'))
+        
+        # Lấy thông tin tác giả và gửi email (tương tự như news_reject)
+        creator = self.user_model.get_by_id(news.created_by)
+        if creator and creator.email:
+            try:
+                # Tạo link bài viết
+                article_url = url_for('client.news_detail_en', slug=news.slug, _external=True)
+                
+                # Tạo nội dung email
+                from email_utils import send_email
+                
+                email_subject = f"Your article has been rejected: {news.title}"
+                
+                email_body_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {{
+                            font-family: Arial, sans-serif;
+                            line-height: 1.6;
+                            color: #333;
+                            max-width: 600px;
+                            margin: 0 auto;
+                            padding: 20px;
+                        }}
+                        .header {{
+                            background-color: #dc3545;
+                            color: white;
+                            padding: 20px;
+                            text-align: center;
+                            border-radius: 5px 5px 0 0;
+                        }}
+                        .content {{
+                            background-color: #f8f9fa;
+                            padding: 20px;
+                            border: 1px solid #dee2e6;
+                        }}
+                        .reason-box {{
+                            background-color: white;
+                            border-left: 4px solid #dc3545;
+                            padding: 15px;
+                            margin: 20px 0;
+                        }}
+                        .article-link {{
+                            display: inline-block;
+                            background-color: #0066cc;
+                            color: white;
+                            padding: 12px 24px;
+                            text-decoration: none;
+                            border-radius: 5px;
+                            margin: 20px 0;
+                        }}
+                        .footer {{
+                            text-align: center;
+                            color: #6c757d;
+                            font-size: 12px;
+                            margin-top: 20px;
+                            padding-top: 20px;
+                            border-top: 1px solid #dee2e6;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2>Article Rejection Notice</h2>
+                    </div>
+                    <div class="content">
+                        <p>Hello <strong>{creator.full_name or creator.username}</strong>,</p>
+                        
+                        <p>We regret to inform you that your article has been rejected:</p>
+                        
+                        <h3 style="color: #0066cc;">{news.title}</h3>
+                        
+                        <div class="reason-box">
+                            <strong>Rejection reason:</strong>
+                            <p style="margin-top: 10px; white-space: pre-wrap;">{reason}</p>
+                        </div>
+                        
+                        <p>You can review your article at the following link:</p>
+                        <div style="text-align: center;">
+                            <a href="{article_url}" class="article-link">View Article</a>
+                        </div>
+                        
+                        <p>Please review your article and make the necessary changes based on the feedback above before resubmitting for approval.</p>
+                        
+                        <p>Best regards,<br>
+                        <strong>VnNews Editorial Team</strong></p>
+                    </div>
+                    <div class="footer">
+                        <p>This is an automated email. Please do not reply to this email.</p>
+                        <p>© 2024 VnNews. All rights reserved.</p>
+                    </div>
+                </body>
+                </html>
+                """
+                
+                # Gửi email
+                email_sent = send_email(
+                    to_email=creator.email,
+                    subject=email_subject,
+                    body_html=email_body_html
+                )
+                
+                if not email_sent:
+                    print(f"Warning: Không thể gửi email từ chối đến {creator.email}")
+                
+            except Exception as e:
+                print(f"Error sending rejection email: {str(e)}")
+                # Vẫn tiếp tục dù email không gửi được
         
         if request.is_json or request.headers.get('Content-Type') == 'application/json':
-            if news:
-                return jsonify({'success': True, 'message': 'Đã từ chối bài viết quốc tế', 'reason': reason})
-            else:
-                return jsonify({'success': False, 'error': 'Không tìm thấy bài viết'}), 404
+            return jsonify({
+                'success': True, 
+                'message': 'Đã từ chối bài viết quốc tế và gửi email cho tác giả',
+                'reason': reason
+            })
         
-        if news:
-            flash('Đã từ chối bài viết quốc tế', 'success')
-        else:
-            flash('Không tìm thấy bài viết', 'error')
-        
+        flash('Đã từ chối bài viết quốc tế và gửi email cho tác giả', 'success')
         return redirect(request.referrer or url_for('admin.dashboard'))
     
     def international_news_delete(self, news_id: int):
@@ -955,20 +1092,113 @@ class AdminController:
         })
     
     def api_rejected_articles(self):
-        """API lấy danh sách bài viết bị từ chối"""
-        articles = self.news_model.get_all(status=NewsStatus.REJECTED, limit=100)
+        """API lấy danh sách bài viết bị từ chối (bao gồm cả news và news_international)"""
+        # Lấy bài viết trong nước bị từ chối
+        news_articles = self.news_model.get_all(status=NewsStatus.REJECTED, limit=100)
         
-        return jsonify({
-            'success': True,
-            'data': [{
+        # Lấy bài viết quốc tế bị từ chối
+        int_articles = self.int_news_model.get_all(status=NewsStatus.REJECTED, limit=100)
+        
+        # Lấy thông tin từ chối từ database
+        news_ids = [a.id for a in news_articles]
+        int_news_ids = [a.id for a in int_articles]
+        
+        # Query rejection reasons
+        news_rejections = {}
+        if news_ids:
+            rejections = self.db_session.query(NewsRejection).filter(
+                NewsRejection.news_id.in_(news_ids)
+            ).order_by(NewsRejection.created_at.desc()).all()
+            # Lấy rejection mới nhất cho mỗi bài viết
+            for rej in rejections:
+                if rej.news_id not in news_rejections:
+                    news_rejections[rej.news_id] = {
+                        'reason': rej.reason,
+                        'rejected_by': rej.rejector.username if rej.rejector else 'N/A',
+                        'rejected_at': rej.created_at.strftime('%d/%m/%Y %H:%M') if rej.created_at else ''
+                    }
+        
+        int_rejections = {}
+        if int_news_ids:
+            rejections = self.db_session.query(NewsInternationalRejection).filter(
+                NewsInternationalRejection.news_international_id.in_(int_news_ids)
+            ).order_by(NewsInternationalRejection.created_at.desc()).all()
+            # Lấy rejection mới nhất cho mỗi bài viết
+            for rej in rejections:
+                if rej.news_international_id not in int_rejections:
+                    int_rejections[rej.news_international_id] = {
+                        'reason': rej.reason,
+                        'rejected_by': rej.rejector.username if rej.rejector else 'N/A',
+                        'rejected_at': rej.created_at.strftime('%d/%m/%Y %H:%M') if rej.created_at else ''
+                    }
+        
+        # Tạo danh sách kết quả
+        data = []
+        
+        # Thêm bài viết trong nước
+        for article in news_articles:
+            rejection_info = news_rejections.get(article.id, {})
+            data.append({
                 'id': article.id,
                 'title': article.title,
                 'author': article.creator.username if article.creator else 'N/A',
                 'category': article.category.name if article.category else 'N/A',
-                'date': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else ''
-            } for article in articles]
+                'date': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'type': 'news',
+                'rejection_reason': rejection_info.get('reason', ''),
+                'rejected_by': rejection_info.get('rejected_by', ''),
+                'rejected_at': rejection_info.get('rejected_at', '')
+            })
+        
+        # Thêm bài viết quốc tế
+        for article in int_articles:
+            rejection_info = int_rejections.get(article.id, {})
+            data.append({
+                'id': article.id,
+                'title': article.title,
+                'author': article.creator.username if article.creator else 'N/A',
+                'category': article.category.name if article.category else 'N/A',
+                'date': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                'type': 'international',
+                'rejection_reason': rejection_info.get('reason', ''),
+                'rejected_by': rejection_info.get('rejected_by', ''),
+                'rejected_at': rejection_info.get('rejected_at', '')
+            })
+        
+        # Sắp xếp theo ngày từ chối hoặc ngày tạo
+        data.sort(key=lambda x: x.get('rejected_at', x.get('date', '')), reverse=True)
+        
+        return jsonify({
+            'success': True,
+            'data': data
         })
     
+    def api_rejected_article(self, article_id: int):
+        # Query rejection reasons
+        if article_id:
+            article = self.news_model.get_by_id(article_id)
+            if article:
+                rejection = self.db_session.query(NewsRejection).filter(
+                    NewsRejection.news_id == article_id
+                ).first()
+                if rejection:
+                    return jsonify({
+                        'success': True,
+                        'id': article.id,
+                        'title': article.title,
+                        'author': article.creator.username if article.creator else 'N/A',
+                        'category': article.category.name if article.category else 'N/A',
+                        'date': article.created_at.strftime('%d/%m/%Y %H:%M') if article.created_at else '',
+                        'type': 'news',
+                        'rejection_reason': rejection.reason,
+                        'rejected_by': rejection.rejector.username if rejection.rejector else 'N/A',
+                        'rejected_at': rejection.created_at.strftime('%d/%m/%Y %H:%M') if rejection.created_at else ''
+                    })
+                else:
+                    return jsonify({'success': False, 'error': 'Không tìm thấy lý do từ chối'}), 404
+            else:
+                return jsonify({'success': False, 'error': 'Bài viết không tồn tại'}), 404
+
     def api_api_articles(self):
         """API lấy danh sách bài viết từ API bên ngoài (chỉ hiển thị, không lưu)"""
         # Lấy dữ liệu từ session hoặc cache (tạm thời lưu trong session)

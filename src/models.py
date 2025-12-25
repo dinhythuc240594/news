@@ -16,6 +16,8 @@ from database import (
     UserRole,
     NewsInternational,
     CategoryInternational,
+    NewsRejection,
+    NewsInternationalRejection,
 )
 
 
@@ -277,13 +279,32 @@ class NewsModel:
             published_at=datetime.utcnow()
         )
     
-    def reject(self, news_id: int, approved_by: int) -> Optional[News]:
-        """Từ chối bài viết"""
-        return self.update(
+    def reject(self, news_id: int, approved_by: int, reason: str = None) -> Optional[News]:
+        """
+        Từ chối bài viết
+        
+        Args:
+            news_id: ID bài viết
+            approved_by: ID người từ chối
+            reason: Lý do từ chối (nếu có)
+        """
+        result = self.update(
             news_id,
             status=NewsStatus.REJECTED,
             approved_by=approved_by
         )
+        
+        # Lưu lý do từ chối vào bảng news_rejections
+        if result and reason:
+            rejection = NewsRejection(
+                news_id=news_id,
+                rejected_by=approved_by,
+                reason=reason
+            )
+            self.db.add(rejection)
+            self.db.commit()
+        
+        return result
     
     def delete(self, news_id: int) -> bool:
         """
@@ -621,13 +642,32 @@ class InternationalNewsModel:
             published_at=datetime.utcnow()
         )
     
-    def reject(self, news_id: int, approved_by: int) -> Optional[NewsInternational]:
-        """Từ chối bài viết quốc tế"""
-        return self.update(
+    def reject(self, news_id: int, approved_by: int, reason: str = None) -> Optional[NewsInternational]:
+        """
+        Từ chối bài viết quốc tế
+        
+        Args:
+            news_id: ID bài viết
+            approved_by: ID người từ chối
+            reason: Lý do từ chối (nếu có)
+        """
+        result = self.update(
             news_id,
             status=NewsStatus.REJECTED,
             approved_by=approved_by
         )
+        
+        # Lưu lý do từ chối vào bảng news_international_rejections
+        if result and reason:
+            rejection = NewsInternationalRejection(
+                news_international_id=news_id,
+                rejected_by=approved_by,
+                reason=reason
+            )
+            self.db.add(rejection)
+            self.db.commit()
+        
+        return result
 
 
 class InternationalCategoryModel:

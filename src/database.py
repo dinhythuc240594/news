@@ -491,6 +491,36 @@ class PasswordResetToken(Base):
     user = relationship("User", foreign_keys=[user_id])
 
 
+class NewsRejection(Base):
+    """Bảng lưu nội dung từ chối của bài viết (news)"""
+    __tablename__ = 'news_rejections'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    news_id = Column(Integer, ForeignKey('news.id'), nullable=False)
+    rejected_by = Column(Integer, ForeignKey('users.id'), nullable=False)
+    reason = Column(Text, nullable=False)  # Lý do từ chối
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    news = relationship("News", foreign_keys=[news_id])
+    rejector = relationship("User", foreign_keys=[rejected_by])
+
+
+class NewsInternationalRejection(Base):
+    """Bảng lưu nội dung từ chối của bài viết quốc tế (news_international)"""
+    __tablename__ = 'news_international_rejections'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    news_international_id = Column(Integer, ForeignKey('news_international.id'), nullable=False)
+    rejected_by = Column(Integer, ForeignKey('users.id'), nullable=False)
+    reason = Column(Text, nullable=False)  # Lý do từ chối
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    news_international = relationship("NewsInternational", foreign_keys=[news_international_id])
+    rejector = relationship("User", foreign_keys=[rejected_by])
+
+
 class Setting(Base):
     """Bảng cài đặt hệ thống"""
     __tablename__ = 'settings'

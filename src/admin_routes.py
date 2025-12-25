@@ -136,6 +136,12 @@ def api_my_articles():
     return admin_controller.api_my_articles()
 
 
+@admin_bp.route('/api/rejected-article/<int:article_id>')
+@controller.editor_required
+def api_rejected_article(article_id: int):
+    """API lấy thông tin bài viết bị từ chối"""
+    return admin_controller.api_rejected_article(article_id)
+
 @admin_bp.route('/api/my-international-articles')
 @controller.editor_required
 def api_my_international_articles():
