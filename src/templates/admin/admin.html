@@ -14,7 +14,11 @@
         </div>
         <div class="user-info">
             <div class="user-avatar">
-                <i class="fas fa-user-shield"></i>
+                {% if user.avatar %}
+                    <img src="/{{ user.avatar }}" alt="Avatar" class="img-fluid">
+                {% else %}
+                    <i class="fas fa-user-shield"></i>
+                {% endif %}
             </div>
             <div class="user-details">
                 <strong id="userName"><a href="{{ url_for('admin.profile') }}">{{ user.full_name }}</a></strong>
