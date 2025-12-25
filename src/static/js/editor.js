@@ -972,6 +972,8 @@ async function saveDraft() {
     const category = $('#articleCategory').val();
     const description = $('#articleDescription').val().trim();
     const thumbnail = $('#articleImageUrl').val() || '';
+    const isHot = $('#articleIsHot').is(':checked');
+    const isFeatured = $('#articleIsFeatured').is(':checked');
     // const tags = normalizeTagString($('#articleTags').val());
     
     if (!title) {
@@ -1012,6 +1014,8 @@ async function saveDraft() {
                 category_id: parseInt(category),
                 summary: description,
                 thumbnail: thumbnail,
+                is_hot: isHot,
+                is_featured: isFeatured,
                 // tags: tags,
                 status: 'draft'
             })
@@ -1029,6 +1033,8 @@ async function saveDraft() {
             $('#articleContent').summernote('code', '');
             $('#imagePreview').html('');
             $('#articleImageUrl').val('');
+            $('#articleIsHot').prop('checked', false);
+            $('#articleIsFeatured').prop('checked', false);
             
             // Đồng bộ lại thống kê từ API
             refreshEditorStats(false);
@@ -1092,6 +1098,8 @@ async function submitArticle() {
     const category = $('#articleCategory').val();
     const description = $('#articleDescription').val().trim();
     const thumbnail = $('#articleImageUrl').val() || '';
+    const isHot = $('#articleIsHot').is(':checked');
+    const isFeatured = $('#articleIsFeatured').is(':checked');
     // const tags = normalizeTagString($('#articleTags').val());
     
     // Validation
@@ -1131,6 +1139,8 @@ async function submitArticle() {
                 category_id: parseInt(category),
                 summary: description,
                 thumbnail: thumbnail,
+                is_hot: isHot,
+                is_featured: isFeatured,
                 // tags: tags,
                 status: 'pending'
             })
@@ -1148,6 +1158,8 @@ async function submitArticle() {
             $('#articleContent').summernote('code', '');
             $('#imagePreview').html('');
             $('#articleImageUrl').val('');
+            $('#articleIsHot').prop('checked', false);
+            $('#articleIsFeatured').prop('checked', false);
             
             // Đồng bộ lại thống kê từ API
             refreshEditorStats(false);
@@ -1231,6 +1243,14 @@ async function viewArticle(articleId) {
                             background: #ffc107;
                             color: #000;
                         }
+                        .status-hot {
+                            background: #ff0000;
+                            color: #000;
+                        }
+                        .status-featured {
+                            background: #ffa500;
+                            color: #000;
+                        }
                         .content { 
                             line-height: 1.8; 
                             color: #444; 
@@ -1274,6 +1294,8 @@ async function viewArticle(articleId) {
                             <strong><i class="fas fa-info-circle"></i> Chế độ xem:</strong> Bạn đang xem bài viết ở chế độ chỉ đọc (read-only)
                         </div>
                         <span class="category">${escapeHtml(article.category_name || article.category || 'N/A')}</span>
+                        ${article.is_hot ? `<span class="status-badge status-hot"><i class="fas fa-fire text-danger"></i> Tin nóng</span>` : ''}
+                        ${article.is_featured ? `<span class="status-badge status-featured"><i class="fas fa-star text-warning"></i> Tin nổi bật</span>` : ''}
                         <span class="status-badge status-pending">Chờ duyệt</span>
                         <h1>${escapeHtml(article.title || 'Không có tiêu đề')}</h1>
                         <div class="meta">
@@ -1330,6 +1352,8 @@ async function editArticle(articleId) {
             $('#editArticleDescription').val(article.summary);
             $('#editArticleImageUrl').val(article.thumbnail || '');
             $('#editArticleImagePreview').attr('src', article.thumbnail || '/static/images/default-image.png');
+            $('#editArticleIsHot').prop('checked', article.is_hot || false);
+            $('#editArticleIsFeatured').prop('checked', article.is_featured || false);
             // $('#editArticleTags').val(article.tags || '');
             
             const modal = new bootstrap.Modal(document.getElementById('editModal'));
@@ -1351,6 +1375,8 @@ async function saveEdit(newStatus = null) {
     const category = $('#editArticleCategory').val();
     const description = $('#editArticleDescription').val();
     const image = $('#editArticleImageUrl').val();
+    const isHot = $('#editArticleIsHot').is(':checked');
+    const isFeatured = $('#editArticleIsFeatured').is(':checked');
     // const tags = normalizeTagString($('#editArticleTags').val());
     if (!title) {
         showToast('Cảnh báo', 'Vui lòng nhập tiêu đề bài viết!', 'warning');
@@ -1393,6 +1419,8 @@ async function saveEdit(newStatus = null) {
             category_id: parseInt(category),
             summary: description,
             thumbnail: image,
+            is_hot: isHot,
+            is_featured: isFeatured,
             // tags: tags
         };
         if (newStatus) {
@@ -2001,6 +2029,14 @@ async function viewInternationalArticle(articleId) {
                         background: #ffc107;
                         color: #000;
                     }
+                    .status-hot {
+                        background: #ff0000;
+                        color: #000;
+                    }
+                    .status-featured {
+                        background: #ffa500;
+                        color: #000;
+                    }
                     .content { 
                         line-height: 1.8; 
                         color: #444; 
@@ -2049,6 +2085,8 @@ async function viewInternationalArticle(articleId) {
                         <strong><i class="fas fa-info-circle"></i> View mode:</strong> You are viewing this article in read-only mode
                     </div>
                     <span class="category">${escapeHtml(article.category_name || article.category || 'N/A')}</span>
+                    ${article.is_hot ? `<span class="status-badge status-hot"><i class="fas fa-fire text-danger"></i> Tin nóng</span>` : ''}
+                    ${article.is_featured ? `<span class="status-badge status-featured"><i class="fas fa-star text-warning"></i> Tin nổi bật</span>` : ''}
                     <span class="status-badge status-pending">Pending</span>
                     <h1>${escapeHtml(article.title || 'No title')}</h1>
                     <div class="meta">

@@ -2164,6 +2164,14 @@ class AdminController:
         thumbnail = data.get('thumbnail', '').strip()
         tags = data.get('tags', '').strip()
         status = data.get('status', NewsStatus.DRAFT.value)
+        is_hot = data.get('is_hot', False)
+        is_featured = data.get('is_featured', False)
+        
+        # Convert to boolean nếu là string
+        if isinstance(is_hot, str):
+            is_hot = is_hot.lower() in ('true', '1', 'yes', 'on')
+        if isinstance(is_featured, str):
+            is_featured = is_featured.lower() in ('true', '1', 'yes', 'on')
         
         # Validation
         if not title:
@@ -2229,6 +2237,8 @@ class AdminController:
                 category_id=category_id,
                 created_by=user_id,
                 status=news_status,
+                is_hot=bool(is_hot),
+                is_featured=bool(is_featured),
                 published_at=datetime.utcnow() if news_status == NewsStatus.PUBLISHED else None
             )
             
@@ -2333,6 +2343,14 @@ class AdminController:
         thumbnail = data.get('thumbnail', '').strip()
         tags = data.get('tags', '').strip()
         status = data.get('status', article.status.value)
+        is_hot = data.get('is_hot', article.is_hot if hasattr(article, 'is_hot') else False)
+        is_featured = data.get('is_featured', article.is_featured if hasattr(article, 'is_featured') else False)
+        
+        # Convert to boolean nếu là string
+        if isinstance(is_hot, str):
+            is_hot = is_hot.lower() in ('true', '1', 'yes', 'on')
+        if isinstance(is_featured, str):
+            is_featured = is_featured.lower() in ('true', '1', 'yes', 'on')
         
         # Validation
         if not title:
@@ -2394,6 +2412,8 @@ class AdminController:
             article.images = images_json
             article.category_id = category_id
             article.status = news_status
+            article.is_hot = bool(is_hot)
+            article.is_featured = bool(is_featured)
             article.published_at = datetime.utcnow() if news_status == NewsStatus.PUBLISHED else article.published_at
             
             self.db_session.commit()

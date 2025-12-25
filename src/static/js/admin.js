@@ -1431,6 +1431,14 @@ async function previewArticle(articleId, articleType) {
                             background: #ffc107;
                             color: #000;
                         }
+                        .status-hot {
+                            background: #ff0000;
+                            color: #000;
+                        }
+                        .status-featured {
+                            background: #ffa500;
+                            color: #000;
+                        }
                         .content { 
                             line-height: 1.8; 
                             color: #444; 
@@ -1474,6 +1482,8 @@ async function previewArticle(articleId, articleType) {
                             <strong><i class="fas fa-info-circle"></i> Chế độ xem:</strong> Bạn đang xem bài viết ở chế độ chỉ đọc (read-only)
                         </div>
                         <span class="category">${escapeHtml(article.category_name || article.category || 'N/A')}</span>
+                        ${article.is_hot ? `<span class="status-badge status-hot"><i class="fas fa-fire text-danger"></i> Tin nóng</span>` : ''}
+                        ${article.is_featured ? `<span class="status-badge status-featured"><i class="fas fa-star text-warning"></i> Tin nổi bật</span>` : ''}
                         <span class="status-badge status-pending">Chờ duyệt</span>
                         <h1>${escapeHtml(article.title || 'Không có tiêu đề')}</h1>
                         <div class="meta">
