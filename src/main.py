@@ -175,9 +175,9 @@ def create_app(config_class=Config):
         # Chia thành các từ
         words = text.split()
         
-        # Lấy 200 từ đầu
-        if len(words) > 100:
-            return ' '.join(words[:100]) + '...'
+        # Lấy 50 từ đầu
+        if len(words) > 50:
+            return ' '.join(words[:50]) + '...'
         else:
             return text
     
