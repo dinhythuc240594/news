@@ -212,10 +212,22 @@
                     <!-- Most Read -->
                     <aside class="sidebar-widget">
                         <h3 class="widget-title">
-                            <i class="fas fa-fire"></i> Most Read
+                            <i class="fas fa-fire"></i> View more
                         </h3>
                         <div class="most-read-list">
-                            <p class="text-muted text-center">Loading...</p>
+                            {% if hot_news %}
+                                {% for news in hot_news %}
+                                <article class="most-read-item">
+                                    <span class="rank">{{ loop.index }}</span>
+                                    <div class="content">
+                                        <h4><a href="{{ url_for('client.en_news_detail', news_slug=news.slug) }}">{{ news.title }}</a></h4>
+                                        <span class="meta"><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
+                                    </div>
+                                </article>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted text-center">No hot news</p>
+                            {% endif %}
                         </div>
                     </aside>
                 </div>

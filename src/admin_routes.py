@@ -8,7 +8,8 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 import controller
 from controller import AdminController
 
-# Tạo Blueprint cho admin để chỉ đường dẫn file tĩnh trong dự án
+# Tạo Blueprint cho admin với url_prefix để điều hướng route
+# và template_folder cho các file html trong folder admin
 admin_bp = Blueprint('admin', __name__,
                     url_prefix='/admin',
                     template_folder='templates/admin')
@@ -17,6 +18,7 @@ admin_bp = Blueprint('admin', __name__,
 # Khởi tạo admin controller
 admin_controller = AdminController()
 
+# Các route cho admin và editor
 @admin_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Trang đăng nhập"""
@@ -85,7 +87,7 @@ def news_delete(news_id: int):
     return admin_controller.news_delete(news_id)
 
 
-# International News Routes
+# route cho bài báo quốc tế
 @admin_bp.route('/international/<int:news_id>/approve', methods=['POST'])
 @controller.admin_required
 def international_news_approve(news_id: int):
@@ -121,7 +123,7 @@ def api_edit_international_article(article_id: int):
     return admin_controller.api_edit_international_article(article_id)
 
 
-# API Routes
+# route API
 @admin_bp.route('/api/news')
 @controller.editor_required
 def api_news_list():
@@ -446,7 +448,7 @@ def api_update_menu_order():
     return admin_controller.api_update_menu_order()
 
 
-# International Menu Items API Routes
+# route của các api menu item
 @admin_bp.route('/api/international-menu-items')
 @controller.admin_required
 def api_international_menu_items():
@@ -496,7 +498,7 @@ def profile():
     """Trang thông tin cá nhân của admin/editor"""
     return admin_controller.profile()
 
-# User Management Routes
+# route api quản lý user
 @admin_bp.route('/api/users')
 @controller.admin_required
 def api_users_list():
@@ -521,7 +523,7 @@ def api_toggle_user_status(user_id: int):
     """API khóa/mở khóa user"""
     return admin_controller.api_toggle_user_status(user_id)
 
-# Settings Routes
+#  routes api setting
 @admin_bp.route('/api/settings')
 @controller.admin_required
 def api_get_settings():
