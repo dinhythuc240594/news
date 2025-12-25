@@ -906,9 +906,9 @@ class AdminController:
             News.status == NewsStatus.REJECTED
         ).scalar() or 0
         
-        # Đếm số bài viết từ API trong cache (tạm thời)
-        api_articles = session.get('api_articles_cache', [])
-        api_count = len(api_articles)
+        api_pending_count = self.db_session.query(func.count(NewsInternational.id)).filter(NewsInternational.is_api == True, NewsInternational.status == NewsStatus.PENDING).scalar() or 0
+        api_approved_count = self.db_session.query(func.count(NewsInternational.id)).filter(NewsInternational.is_api == True, NewsInternational.status == NewsStatus.PUBLISHED).scalar() or 0
+        api_rejected_count = self.db_session.query(func.count(NewsInternational.id)).filter(NewsInternational.is_api == True, NewsInternational.status == NewsStatus.REJECTED).scalar() or 0
         
         return jsonify({
             'success': True,
@@ -916,7 +916,9 @@ class AdminController:
                 'pending': pending_count,
                 'approved': approved_count,
                 'rejected': rejected_count,
-                'api': api_count
+                'api_pending': api_pending_count,
+                'api_approved': api_approved_count,
+                'api_rejected': api_rejected_count
             }
         })
     

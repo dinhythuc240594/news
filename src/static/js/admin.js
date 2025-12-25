@@ -675,7 +675,9 @@ async function loadStatistics() {
             $('#statPending').text(stats.pending);
             $('#statApproved').text(stats.approved);
             $('#statRejected').text(stats.rejected);
-            $('#statAPI').text(stats.api);
+            $('#apiApproved').text(stats.api_approved);
+            $('#apiRejected').text(stats.api_rejected);
+            $('#apiPending').text(stats.api_pending);
             $('#pendingCount').text(stats.pending);
 
             // Update notification bell if elements exist
