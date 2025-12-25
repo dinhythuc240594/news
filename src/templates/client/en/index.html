@@ -47,7 +47,7 @@
                                             <span class="badge-category">{{ news.category.name }}</span>
                                         </div>
                                         <h3 class="news-title">
-                                            <a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
+                                            <a href="{{ url_for('client.en_news_detail', news_slug=news.slug) }}">{{ news.title }}</a>
                                         </h3>
                                         <div class="news-meta">
                                             <span><i class="far fa-clock"></i> {{ (news.published_at or news.created_at)|timeago }}</span>
@@ -127,7 +127,7 @@
                                 <article class="most-read-item">
                                     <span class="rank">{{ loop.index }}</span>
                                     <div class="content">
-                                        <h4><a href="{{ url_for('client.news_detail', news_slug=news.slug) }}">{{ news.title }}</a></h4>
+                                        <h4><a href="{{ url_for('client.en_news_detail', news_slug=news.slug) }}">{{ news.title }}</a></h4>
                                         <span class="meta"><i class="far fa-eye"></i> {{ news.view_count|format_view }}</span>
                                     </div>
                                 </article>

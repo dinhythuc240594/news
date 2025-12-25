@@ -1532,6 +1532,14 @@ class AdminController:
             
             status = data.get('status', NewsStatus.DRAFT.value)
             region = data.get('region', 'domestic')  # domestic hoặc international
+            is_hot = data.get('is_hot', False)
+            is_featured = data.get('is_featured', False)
+            
+            # Convert to boolean nếu là string
+            if isinstance(is_hot, str):
+                is_hot = is_hot.lower() in ('true', '1', 'yes', 'on')
+            if isinstance(is_featured, str):
+                is_featured = is_featured.lower() in ('true', '1', 'yes', 'on')
             
             if not category_id:
                 return jsonify({'success': False, 'error': 'Vui lòng chọn danh mục'}), 400
@@ -1585,6 +1593,8 @@ class AdminController:
                     approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
                     status=news_status,
                     is_api=True,  # Đánh dấu bài từ API
+                    is_hot=bool(is_hot),
+                    is_featured=bool(is_featured),
                     published_at=published_at if news_status == NewsStatus.PUBLISHED else None,
                     author=article_data.get('author'),  # Lưu tác giả gốc từ API
                 )
@@ -1608,6 +1618,8 @@ class AdminController:
                     approved_by=user_id if news_status == NewsStatus.PUBLISHED else None,
                     status=news_status,
                     is_api=True,  # Đánh dấu bài từ API
+                    is_hot=bool(is_hot),
+                    is_featured=bool(is_featured),
                     published_at=published_at if news_status == NewsStatus.PUBLISHED else None,
                     author=article_data.get('author'),
                 )

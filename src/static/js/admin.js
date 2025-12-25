@@ -1763,6 +1763,8 @@ async function openSaveExternalArticleModal(articleData) {
     $('#saveAPITitle').val(articleData.title);
     $('#saveAPISummary').val(articleData.summary || articleData.description || '');
     $('#saveAPIStatus').val('pending'); // Default to pending
+    $('#saveAPIIsHot').prop('checked', false);
+    $('#saveAPIIsFeatured').prop('checked', false);
     
     // Update modal title để rõ đang lưu loại báo nào
     const modalTitle = isInternational ? 'Lưu bài viết Quốc tế từ API' : 'Lưu bài viết từ API';
@@ -1864,6 +1866,8 @@ async function loadHandlerAPI(){
         const categoryId = $('#saveAPICategory').val();
         const status = $('#saveAPIStatus').val();
         const region = $('#saveAPIArticleData').data('region') || 'domestic'; // Lấy region từ data attribute
+        const isHot = $('#saveAPIIsHot').is(':checked');
+        const isFeatured = $('#saveAPIIsFeatured').is(':checked');
         
         console.log('Saving article with data:', {
             article: articleData,
@@ -1885,7 +1889,9 @@ async function loadHandlerAPI(){
                 article: articleData,
                 category_id: parseInt(categoryId),
                 status: status,
-                region: region  // Gửi region để backend biết lưu vào bảng nào
+                region: region,  // Gửi region để backend biết lưu vào bảng nào
+                is_hot: isHot,
+                is_featured: isFeatured
             };
             
             console.log('Request payload:', requestData);
