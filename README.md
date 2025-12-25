@@ -2,23 +2,27 @@
 ``Mở cmd tại folder có chứa folder src``
 ``Chạy các lệnh bên dưới``
 
-``1. Cài thư viện tạo môi trường ảo``
-pip install virtualenv
+``1. Copy env.example thanh .env``
+copy env.example .env
 
-``2. Tạo môi trường ảo``
-virtualenv venv
+``2. Cấu hình .env``
+# Secret Key - Thay đổi giá trị này trong production!
+# Sử dụng: python -c "import secrets; print(secrets.token_hex(32))" để tạo secret key an toàn
+SECRET_KEY=123456789
 
-``3. Truy cập vào folder venv/script và gõ lệnh``
-activate
+# Database Configuration
+# Format: postgresql://username:password@host:port/database
+DATABASE_URL=postgresql://postgres:1@localhost:5432/newsdb
 
-``4. Cài môi trường Flask framework và các thư viện liên quan``
-pip install -r requirements.txt
+# Email Configuration (SMTP)
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=True
+MAIL_USE_SSL=False
+MAIL_USERNAME=mail@gmail
+MAIL_PASSWORD=password
+MAIL_DEFAULT_SENDER=mail@gmail.com
+MAIL_SUBJECT_PREFIX=[VnNews ] 
 
-``5. Tạo database trên postgresql with file postgresql_news.sql``
-Mở pgAdmin của postgresql để tạo database bằng file "postgresql_news.sql"
-
-``6. Cấu hình database của postgresql with file database.py``
-DATABASE_URL = os.environ.get('DATABASE_URL') or 'postgresql://postgres:123456789@localhost:5432/newsdb'
-
-``7. Chạy lệnh dưới để khởi động flask``
-python src/main.py
+``3. Chạy file setup.bat``
+Để bắt đầu chạy web demo

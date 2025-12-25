@@ -1,6 +1,9 @@
 """
 Main application file - Khởi tạo Flask app và đăng ký routes
 """
+from dotenv import load_dotenv
+load_dotenv()  # Load biến môi trường từ file .env
+
 from flask import Flask, request
 from admin_routes import admin_bp
 from client_routes import client_bp
