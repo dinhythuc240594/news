@@ -812,7 +812,7 @@ function displayArticles(articles, tableBodyId) {
         html += '<td>';
         // Chỉ hiển thị nút edit và delete cho bài viết draft
         // Bài viết pending chỉ có quyền xem
-        if (article.status === 'draft') {
+        if (article.status === 'draft' || article.status === 'rejected') {
             html += '<button class="btn btn-sm btn-info btn-action btn-edit" data-id="' + article.id + '" title="Chỉnh sửa">';
             html += '<i class="fas fa-edit"></i>';
             html += '</button>';
