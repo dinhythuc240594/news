@@ -1853,7 +1853,7 @@ function displayInternationalArticles(articles, tableBodyId, status = null) {
     } else {
         articles.forEach((article, index) => {
             const statusBadge = getStatusBadge(article.status);
-            const date = article.date ? new Date(article.date + 'Z').toLocaleString('sv-SE', {
+            const date = article.date ? new Date(article.date + 'Z').toLocaleString('vi-VN', {
                 timeZone: 'Asia/Ho_Chi_Minh',
                 year: 'numeric',
                 month: '2-digit',

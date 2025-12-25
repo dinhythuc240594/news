@@ -1360,6 +1360,21 @@ function escapeHtml(text) {
     return text.toString().replace(/[&<>"']/g, function(m) { return map[m]; });
 }
 
+function updateDateTime(date) {
+    const now = date ? new Date(date.replace('Z', '')) : new Date();
+    const options = { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    };
+    options.locale = 'vi-VN';
+    const dateTimeString = now.toLocaleDateString(options.locale, options);
+    return dateTimeString;
+}
+
 // Preview article
 async function previewArticle(articleId, articleType) {
     try {
@@ -1487,9 +1502,9 @@ async function previewArticle(articleId, articleType) {
                         <span class="status-badge status-pending">Chờ duyệt</span>
                         <h1>${escapeHtml(article.title || 'Không có tiêu đề')}</h1>
                         <div class="meta">
-                            <i class="fas fa-calendar"></i> Ngày tạo: ${article.created_at ? new Date(article.created_at + 'Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'N/A'} 
+                            <i class="fas fa-calendar"></i> Ngày tạo: ${updateDateTime(article.created_at) || 'N/A'} 
                             ${article.updated_at && article.updated_at !== article.created_at ? 
-                                ' | <i class="fas fa-edit"></i> Cập nhật: ' + new Date(article.updated_at + 'Z').toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : ''}
+                                ' | <i class="fas fa-edit"></i> Cập nhật: ' + updateDateTime(article.updated_at) || 'N/A' : ''}
                         </div>
                         ${article.thumbnail ? `<img src="${escapeHtml(article.thumbnail)}" alt="${escapeHtml(article.title)}" onerror="this.style.display='none'">` : ''}
                         ${article.summary ? `<div class="summary"><strong>Tóm tắt:</strong> ${escapeHtml(article.summary)}</div>` : ''}
@@ -1834,7 +1849,7 @@ function displayApiArticles(articles) {
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">
                                 <i class="fas fa-globe"></i> ${article.source || 'N/A'}<br>
-                                <i class="fas fa-calendar"></i> ${article.published_at || 'N/A'}
+                                <i class="fas fa-calendar"></i> ${updateDateTime(article.published_at) || 'N/A'}
                             </small>
                             <button class="btn btn-sm btn-primary save-api-article" data-index="${index}" data-article-id="${article.id}">
                                 <i class="fas fa-save"></i> Lưu

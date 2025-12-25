@@ -1003,7 +1003,7 @@ class AdminController:
                 'is_api': article.is_api,
                 'status': 'Approved',
                 'views': article.view_count,
-                'published': article.published_at.strftime('%d/%m/%Y') if article.published_at else ''
+                'published': article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else ''
             } for article in articles]
         })
     
