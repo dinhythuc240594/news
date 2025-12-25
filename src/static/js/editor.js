@@ -441,6 +441,11 @@ async function refreshEditorStats() {
         // Cập nhật badge menu trái
         $('#draftCount').text(result.data.draft);
         $('#pendingCount').text(result.data.pending);
+
+
+        $('#approvedNewsTitle').text(result.data.article_approved);
+        $('#updateNewsTitle').text(result.data.article_update);
+        $('#newestNewsTitle').text(result.data.article_newest);
     } catch (error) {
         console.error('Lỗi cập nhật thống kê editor:', error);
     }
@@ -685,9 +690,6 @@ async function loadMyArticles(page = 1, status = null, search = null) {
             (newPage) => loadMyArticles(newPage, $('#filterStatus').val(), $('#searchMyArticles').val().trim())
         );
         updateInfoText(pagination, 'myArticlesInfo');
-        // getApprovedNewsTitle(articles);
-        // getUpdateNewsTitle(articles);
-        // getCreateNewsTitle(articles);
     } catch (error) {
         console.error('Lỗi tải bài viết:', error);
         hideSpinner();

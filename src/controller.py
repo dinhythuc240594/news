@@ -1091,6 +1091,18 @@ class AdminController:
             News.created_by == user_id, News.status == NewsStatus.DRAFT
         ).scalar() or 0
 
+        article_approved = self.db_session.query(News).filter(
+            News.created_by == user_id, News.status == NewsStatus.PUBLISHED
+        ).order_by(News.published_at.desc()).first()
+
+        article_update = self.db_session.query(News).filter(
+            News.created_by == user_id, News.status == NewsStatus.DRAFT, News.updated_at > News.created_at
+        ).order_by(News.created_at.desc()).first()
+
+        article_newest = self.db_session.query(News).filter(
+            News.created_by == user_id
+        ).order_by(News.created_at.desc()).first()
+
         return jsonify({
             'success': True,
             'data': {
@@ -1099,7 +1111,10 @@ class AdminController:
                 'published': published_count,
                 'rejected': rejected_count,
                 'approved': approved_count,
-                'draft': draft_count
+                'draft': draft_count,
+                'article_approved': article_approved.title if article_approved else '',
+                'article_update': article_update.title if article_update else '',
+                'article_newest': article_newest.title if article_newest else ''
             }
         })
 
