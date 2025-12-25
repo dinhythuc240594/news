@@ -104,14 +104,29 @@
                         
                         <!-- Share Section -->
                         <section class="share-section mt-5 pt-4 border-top">
-                            <div class="share-buttons">
-                                <span class="me-2"><strong>Chia sẻ:</strong></span>
-                                <a id="copyLinkBtn" class="btn btn-sm btn-outline-secondary">
-                                    <i class="fa fa-paperclip"></i> Sao chép link
-                                </a>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="share-buttons">
+                                        <span class="me-2"><strong>Chia sẻ:</strong></span>
+                                        <a id="copyLinkBtn" class="btn btn-sm btn-outline-secondary">
+                                            <i class="fa fa-paperclip"></i> Sao chép link
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 text-end">
+                                    {% if user_id %}
+                                    <button id="saveNewsBtn" class="btn btn-sm {% if is_saved %}btn-warning{% else %}btn-outline-warning{% endif %} me-2" data-news-id="{{ news.id }}" data-is-saved="{{ 'true' if is_saved else 'false' }}">
+                                        <i class="fas {% if is_saved %}fa-bookmark{% else %}fa-bookmark-o{% endif %}"></i> 
+                                        <span id="saveNewsText">{% if is_saved %}Saved{% else %}Save{% endif %}</span>
+                                    </button>
+                                    {% endif %}
+                                    <a href="{{ url_for('client.category', category_slug=news.category.slug) }}" class="btn btn-outline-secondary">
+                                        <i class="fas fa-arrow-left"></i> Quay về danh mục {{ news.category.name }}
+                                    </a>
+                                </div>
                             </div>
                         </section>
-                        
+
                         <!-- Comments Section -->
                         <section class="comments-section mt-5 pt-4 border-top">
                             <h2 class="section-title mb-4">

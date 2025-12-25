@@ -1421,6 +1421,10 @@ function updateDateTime(date) {
     return dateTimeString;
 }
 
+function htmlPreview(article) {
+    var html = '';
+}
+
 // Preview article
 async function previewArticle(articleId, articleType) {
     try {
@@ -1545,7 +1549,9 @@ async function previewArticle(articleId, articleType) {
                         <span class="category">${escapeHtml(article.category_name || article.category || 'N/A')}</span>
                         ${article.is_hot ? `<span class="status-badge status-hot"><i class="fas fa-fire text-danger"></i> Tin nóng</span>` : ''}
                         ${article.is_featured ? `<span class="status-badge status-featured"><i class="fas fa-star text-warning"></i> Tin nổi bật</span>` : ''}
-                        <span class="status-badge status-pending">Chờ duyệt</span>
+                        ${article.status === 'pending' ? `<span class="status-badge status-pending">Chờ duyệt</span>` : ''}
+                        ${article.status === 'approved' ? `<span class="status-badge status-approved">Đã duyệt</span>` : ''}
+                        ${article.status === 'rejected' ? `<span class="status-badge status-rejected">Đã từ chối</span>` : ''}
                         <h1>${escapeHtml(article.title || 'Không có tiêu đề')}</h1>
                         <div class="meta">
                             <i class="fas fa-calendar"></i> Ngày tạo: ${updateDateTime(article.created_at) || 'N/A'} 
